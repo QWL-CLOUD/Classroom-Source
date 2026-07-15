@@ -130,11 +130,18 @@ const legacyStoreDefinitions: LegacyStoreDefinition[] = [
     note: 'Records are counted and preserved, but will not be imported until the Standards schema exists.',
   },
   {
-    storeName: 'cos-planning-templates',
+    storeName: 'cos-planning-templates-v19',
     label: 'Planning templates',
-    target: 'lessonPlans + lessonSeries',
+    target: 'lessonPlans + lessonSeries + Lesson Flow',
     decision: 'review',
     note: 'Templates require a separate classification pass before becoming reusable v20 planning records.',
+  },
+  {
+    storeName: 'cos-planning-templates',
+    label: 'Planning templates (legacy alias)',
+    target: 'lessonPlans + lessonSeries + Lesson Flow',
+    decision: 'review',
+    note: 'Older template keys remain supported and require the same classification pass.',
   },
   {
     storeName: 'cos-calendar-quarantine-v19',

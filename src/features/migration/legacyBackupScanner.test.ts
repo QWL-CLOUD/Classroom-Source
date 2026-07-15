@@ -100,3 +100,14 @@ describe('legacy backup scanner', () => {
     );
   });
 });
+
+it('recognizes the v19 planning-template store name used by real backups', () => {
+  const scan = scanLegacyBackupJson(
+    createEnvelope({
+      'cos-planning-templates-v19': JSON.stringify([{ id: 'template-1' }]),
+    }),
+  );
+
+  expect(scan.recognizedStores).toEqual(['cos-planning-templates-v19']);
+  expect(scan.summary.reviewRecords).toBe(1);
+});
