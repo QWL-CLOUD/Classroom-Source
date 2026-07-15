@@ -2,14 +2,28 @@ import { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
+  ClipboardCheck,
   Database,
+  Download,
   FileJson,
   ListChecks,
   LockKeyhole,
+  RefreshCw,
   RotateCcw,
   ShieldCheck,
   type LucideIcon,
 } from 'lucide-react';
+import {
+  captureLegacyStorageSnapshot,
+  generateMigrationAcceptanceReport,
+  getLatestMigrationAcceptanceReport,
+  migrationAcceptanceJson,
+  migrationAcceptanceMarkdown,
+  saveMigrationAcceptanceReport,
+  type LegacyStorageSnapshot,
+  type MigrationAcceptanceCheckStatus,
+  type MigrationAcceptanceReport,
+} from '@/features/migration/migrationAcceptance';
 import {
   commitMigrationPlan,
   getLatestMigrationExecution,
@@ -294,12 +308,20 @@ function ExecutionReport({
   onRollbackConfirmed,
   onRollback,
   rollingBack,
+  canGenerateAcceptance,
+  generatingAcceptance,
+  acceptanceReady,
+  onGenerateAcceptance,
 }: {
   execution: MigrationExecutionResult;
   rollbackConfirmed: boolean;
   onRollbackConfirmed: (value: boolean) => void;
   onRollback: () => void;
   rollingBack: boolean;
+  canGenerateAcceptance: boolean;
+  generatingAcceptance: boolean;
+  acceptanceReady: boolean;
+  onGenerateAcceptance: () => void;
 }) {
   const committed = execution.status === 'committed';
 
@@ -355,6 +377,40 @@ function ExecutionReport({
       </dl>
 
       {committed && (
+        <div className={styles.acceptanceActionPanel}>
+          <div className={styles.acceptanceActionHeading}>
+            <ClipboardCheck size={22} aria-hidden="true" />
+            <div>
+              <h3>Complete real-backup acceptance</h3>
+              <p>
+                Re-check the committed records against the recovery manifest, confirm legacy storage
+                was unchanged, and create a privacy-safe completion report.
+              </p>
+            </div>
+          </div>
+          <button
+            className="button button-primary"
+            type="button"
+            onClick={onGenerateAcceptance}
+            disabled={!canGenerateAcceptance || generatingAcceptance}
+          >
+            <RefreshCw size={18} aria-hidden="true" />
+            {generatingAcceptance
+              ? 'Running acceptance…'
+              : acceptanceReady
+                ? 'Re-run acceptance checks'
+                : 'Generate completion report'}
+          </button>
+          {!canGenerateAcceptance && (
+            <small>
+              Choose the same private backup and generate its reversible plan to enable the full
+              source-to-commit comparison.
+            </small>
+          )}
+        </div>
+      )}
+
+      {committed && (
         <div className={styles.rollbackPanel}>
           <h3>Rollback this migration</h3>
           <p>
@@ -386,6 +442,202 @@ function ExecutionReport({
   );
 }
 
+function checkStatusLabel(status: MigrationAcceptanceCheckStatus): string {
+  if (status === 'pass') return 'Pass';
+  if (status === 'follow-up') return 'Follow-up';
+  return 'Fail';
+}
+
+function downloadTextFile(fileName: string, content: string, mimeType: string) {
+  const url = URL.createObjectURL(new Blob([content], { type: mimeType }));
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function AcceptanceReportCard({ report }: { report: MigrationAcceptanceReport }) {
+  const statusLabel =
+    report.status === 'passed'
+      ? 'Passed'
+      : report.status === 'passed-with-follow-up'
+        ? 'Passed with follow-up'
+        : 'Failed';
+  const statusTone =
+    report.status === 'failed' ? 'error' : report.status === 'passed' ? 'success' : 'warning';
+
+  return (
+    <section className={`card ${styles.acceptanceCard}`} aria-labelledby="acceptance-heading">
+      <div className={styles.planHeader}>
+        <div>
+          <p className="page-eyebrow">Phase 1E · Completion evidence</p>
+          <h2 id="acceptance-heading">Migration completion report</h2>
+        </div>
+        <span className={styles.acceptanceStatus} data-status={report.status}>
+          {statusLabel}
+        </span>
+      </div>
+
+      <Notice icon={report.status === 'failed' ? AlertTriangle : ClipboardCheck} tone={statusTone}>
+        {report.status === 'failed'
+          ? 'The migration remains committed, but one or more independent acceptance checks failed.'
+          : report.status === 'passed'
+            ? 'The committed migration passed every source, database, rollback, and privacy check.'
+            : 'The committed migration passed integrity checks; deferred and review items remain for later phases.'}
+      </Notice>
+
+      <dl className={styles.acceptanceSummary}>
+        <div>
+          <dt>Verified records</dt>
+          <dd>{report.summary.verifiedRecords}</dd>
+        </div>
+        <div>
+          <dt>Planned writes</dt>
+          <dd>{report.summary.plannedWrites}</dd>
+        </div>
+        <div>
+          <dt>Restore-point entries</dt>
+          <dd>{report.summary.restorePointEntries}</dd>
+        </div>
+        <div>
+          <dt>Follow-up items</dt>
+          <dd>{report.summary.followUpItems}</dd>
+        </div>
+        <div>
+          <dt>Legacy keys checked</dt>
+          <dd>{report.summary.legacyStorageKeyCount}</dd>
+        </div>
+        <div>
+          <dt>Integrity hash</dt>
+          <dd>{report.integrityHash}</dd>
+        </div>
+      </dl>
+
+      <section aria-labelledby="acceptance-checks-heading">
+        <h3 id="acceptance-checks-heading">Acceptance checks</h3>
+        <ul className={styles.acceptanceChecks}>
+          {report.checks.map((check) => (
+            <li key={check.id} data-status={check.status}>
+              {check.status === 'pass' ? (
+                <CheckCircle2 size={19} aria-hidden="true" />
+              ) : (
+                <AlertTriangle size={19} aria-hidden="true" />
+              )}
+              <div>
+                <strong>
+                  {checkStatusLabel(check.status)} · {check.label}
+                </strong>
+                <span>{check.detail}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section aria-labelledby="acceptance-tables-heading">
+        <div className={styles.sectionHeading}>
+          <div>
+            <p className="page-eyebrow">Independent table verification</p>
+            <h3 id="acceptance-tables-heading">Target table results</h3>
+          </div>
+          <span>{report.tables.length} planned target group(s)</span>
+        </div>
+        <div
+          className={styles.tableScroll}
+          role="region"
+          aria-label="Migration completion table"
+          tabIndex={0}
+        >
+          <table className={styles.acceptanceTable}>
+            <caption className="sr-only">
+              Planned, inserted, reused, verified, and current record counts by target table
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Target</th>
+                <th scope="col">Planned</th>
+                <th scope="col">Inserted</th>
+                <th scope="col">Reused</th>
+                <th scope="col">Verified</th>
+                <th scope="col">Current total</th>
+                <th scope="col">Result</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.tables.map((table) => (
+                <tr key={table.targetTable}>
+                  <th scope="row">{table.targetTable}</th>
+                  <td>{table.plannedWrites}</td>
+                  <td>{table.inserted}</td>
+                  <td>{table.reused}</td>
+                  <td>{table.verified}</td>
+                  <td>{table.currentTableCount ?? '—'}</td>
+                  <td>
+                    <span className={styles.acceptanceResult} data-status={table.status}>
+                      {checkStatusLabel(table.status)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className={styles.followUpPanel} aria-labelledby="follow-up-heading">
+        <h3 id="follow-up-heading">Follow-up queue</h3>
+        {report.followUp.length > 0 ? (
+          <ul>
+            {report.followUp.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        ) : (
+          <p>No follow-up items remain.</p>
+        )}
+      </section>
+
+      <div className={styles.privacyPanel}>
+        <ShieldCheck size={20} aria-hidden="true" />
+        <div>
+          <strong>Privacy-safe report</strong>
+          <span>No names, record content, or private backup file are stored in this report.</span>
+        </div>
+      </div>
+
+      <div className={styles.actionRow}>
+        <button
+          className="button button-primary"
+          type="button"
+          onClick={() =>
+            downloadTextFile(
+              `Classroom-v20-migration-completion-${report.sourceFingerprint}.json`,
+              migrationAcceptanceJson(report),
+              'application/json',
+            )
+          }
+        >
+          <Download size={18} aria-hidden="true" /> Download JSON report
+        </button>
+        <button
+          className="button"
+          type="button"
+          onClick={() =>
+            downloadTextFile(
+              `Classroom-v20-migration-completion-${report.sourceFingerprint}.md`,
+              migrationAcceptanceMarkdown(report),
+              'text/markdown',
+            )
+          }
+        >
+          <Download size={18} aria-hidden="true" /> Download Markdown report
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function formatExecutionError(reason: unknown): string {
   if (reason instanceof MigrationExecutionConflictError) {
     return `${reason.message} ${reason.conflicts.length} conflict(s) require review.`;
@@ -398,18 +650,31 @@ export function MigrationRoute() {
   const [plan, setPlan] = useState<ReversibleMigrationPlan | null>(null);
   const [rawBackupText, setRawBackupText] = useState<string | null>(null);
   const [execution, setExecution] = useState<MigrationExecutionResult | null>(null);
+  const [acceptance, setAcceptance] = useState<MigrationAcceptanceReport | null>(null);
+  const [legacySnapshotAtScan, setLegacySnapshotAtScan] = useState<LegacyStorageSnapshot | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
+  const [acceptanceError, setAcceptanceError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [commitConfirmed, setCommitConfirmed] = useState(false);
   const [rollbackConfirmed, setRollbackConfirmed] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [rollingBack, setRollingBack] = useState(false);
+  const [generatingAcceptance, setGeneratingAcceptance] = useState(false);
 
   useEffect(() => {
     let active = true;
-    getLatestMigrationExecution()
-      .then((latest) => {
-        if (active) setExecution(latest);
+    Promise.all([getLatestMigrationExecution(), getLatestMigrationAcceptanceReport()])
+      .then(([latestExecution, latestAcceptance]) => {
+        if (!active) return;
+        setExecution(latestExecution);
+        if (
+          latestExecution?.status === 'committed' &&
+          latestAcceptance?.runId === latestExecution.runId
+        ) {
+          setAcceptance(latestAcceptance);
+        }
       })
       .catch((reason) => {
         if (active) setError(formatExecutionError(reason));
@@ -423,9 +688,12 @@ export function MigrationRoute() {
     setScan(null);
     setPlan(null);
     setRawBackupText(null);
+    setAcceptance(null);
     setError(null);
+    setAcceptanceError(null);
     setFileName(file?.name ?? null);
     setCommitConfirmed(false);
+    setLegacySnapshotAtScan(captureLegacyStorageSnapshot());
     if (!file) return;
 
     try {
@@ -453,9 +721,44 @@ export function MigrationRoute() {
     }
   }
 
+  async function runAcceptance(targetExecution: MigrationExecutionResult | null = execution) {
+    if (!scan || !plan || !targetExecution || targetExecution.status !== 'committed') {
+      setAcceptanceError(
+        'Choose the same private backup and generate its reversible plan before running acceptance.',
+      );
+      return;
+    }
+    if (targetExecution.sourceFingerprint !== plan.sourceFingerprint) {
+      setAcceptanceError('The selected backup does not match the committed migration run.');
+      return;
+    }
+
+    setAcceptanceError(null);
+    setGeneratingAcceptance(true);
+    try {
+      const report = await generateMigrationAcceptanceReport(
+        scan,
+        plan,
+        targetExecution,
+        undefined,
+        {
+          legacyStorageBefore: legacySnapshotAtScan ?? undefined,
+          legacyStorageAfter: captureLegacyStorageSnapshot(),
+        },
+      );
+      await saveMigrationAcceptanceReport(report);
+      setAcceptance(report);
+    } catch (reason) {
+      setAcceptanceError(formatExecutionError(reason));
+    } finally {
+      setGeneratingAcceptance(false);
+    }
+  }
+
   async function commitPlan() {
     if (!plan || !commitConfirmed) return;
     setError(null);
+    setAcceptanceError(null);
     setCommitting(true);
 
     try {
@@ -463,6 +766,7 @@ export function MigrationRoute() {
       setExecution(result);
       setCommitConfirmed(false);
       setRollbackConfirmed(false);
+      await runAcceptance(result);
     } catch (reason) {
       setError(formatExecutionError(reason));
     } finally {
@@ -478,6 +782,8 @@ export function MigrationRoute() {
     try {
       const result = await rollbackMigrationRun(execution.runId);
       setExecution(result);
+      setAcceptance(null);
+      setAcceptanceError(null);
       setRollbackConfirmed(false);
     } catch (reason) {
       setError(formatExecutionError(reason));
@@ -532,6 +838,9 @@ export function MigrationRoute() {
     execution?.status === 'committed' &&
     execution.sourceFingerprint === plan.sourceFingerprint,
   );
+  const canGenerateAcceptance = Boolean(scan && plan && alreadyCommitted);
+  const activeAcceptance =
+    execution?.status === 'committed' && acceptance?.runId === execution.runId ? acceptance : null;
 
   return (
     <section>
@@ -540,9 +849,9 @@ export function MigrationRoute() {
           <p className="page-eyebrow">System</p>
           <h1 className="page-title">Migration center</h1>
           <p className="page-subtitle">
-            Phase 1D validates legacy stores, generates a reversible plan, and commits approved v20
-            records in one verified IndexedDB transaction. Legacy <code>cos-*</code> storage remains
-            read-only.
+            Phase 1E adds independent real-backup acceptance, persistent completion evidence, and
+            privacy-safe JSON and Markdown reports after the verified migration transaction. Legacy{' '}
+            <code>cos-*</code> storage remains read-only.
           </p>
         </div>
       </header>
@@ -732,8 +1041,22 @@ export function MigrationRoute() {
           onRollbackConfirmed={setRollbackConfirmed}
           onRollback={rollbackExecution}
           rollingBack={rollingBack}
+          canGenerateAcceptance={canGenerateAcceptance}
+          generatingAcceptance={generatingAcceptance}
+          acceptanceReady={Boolean(activeAcceptance)}
+          onGenerateAcceptance={() => runAcceptance()}
         />
       )}
+
+      {acceptanceError && (
+        <section className={`card ${styles.acceptanceError}`} aria-live="polite">
+          <Notice icon={AlertTriangle} tone="error">
+            {acceptanceError}
+          </Notice>
+        </section>
+      )}
+
+      {activeAcceptance && <AcceptanceReportCard report={activeAcceptance} />}
     </section>
   );
 }
