@@ -27,7 +27,7 @@ const syntheticBackup = JSON.stringify({
   },
 });
 
-test('migration preview generates a reversible plan without writing records', async ({ page }) => {
+test('migration preview commits and rolls back a verified transaction', async ({ page }) => {
   await page.goto('./#/migration');
   await page.locator('input[type="file"]').setInputFiles({
     name: 'synthetic-private-backup.json',
@@ -47,28 +47,40 @@ test('migration preview generates a reversible plan without writing records', as
 
   await expect(page.getByRole('heading', { name: 'Reversible migration plan' })).toBeVisible();
   await expect(page.getByText('Rollback manifest is complete.')).toBeVisible();
-  await expect(page.getByText('Plan write operations: 0')).toBeVisible();
 
   const planTable = page.getByRole('region', {
     name: 'Reversible migration plan table',
   });
-
   const calendarEventsRow = planTable
-    .getByRole('rowheader', {
-      name: 'calendarEvents',
-      exact: true,
-    })
+    .getByRole('rowheader', { name: 'calendarEvents', exact: true })
     .locator('..');
-
   const libraryRow = planTable
-    .getByRole('rowheader', {
-      name: 'Library tables (future phase)',
-      exact: true,
-    })
+    .getByRole('rowheader', { name: 'Library tables (future phase)', exact: true })
     .locator('..');
 
   await expect(calendarEventsRow.getByRole('cell').nth(0)).toHaveText('1');
   await expect(libraryRow.getByRole('cell').nth(2)).toHaveText('1');
+
+  await page
+    .getByRole('checkbox', {
+      name: /I have reviewed the counts and understand/,
+    })
+    .check();
+  await page.getByRole('button', { name: 'Commit migration safely' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Migration committed safely' })).toBeVisible();
+  await expect(page.getByText('Restore-point entries').locator('..')).toContainText('4');
+  await expect(page.getByText('Inserted records').locator('..')).toContainText('4');
+
+  await page
+    .getByRole('checkbox', {
+      name: /I understand rollback removes the unchanged v20 records/,
+    })
+    .check();
+  await page.getByRole('button', { name: 'Rollback migration' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Migration rolled back safely' })).toBeVisible();
+  await expect(page.getByText('Rollback deletions').locator('..')).toContainText('4');
 
   const results = await new AxeBuilder({ page }).analyze();
   expect(
