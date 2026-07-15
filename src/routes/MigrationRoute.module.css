@@ -1,7 +1,8 @@
 .grid {
   display: grid;
-  grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 350px) minmax(0, 1fr);
   gap: 22px;
+  align-items: start;
 }
 
 .uploadCard,
@@ -9,13 +10,28 @@
   padding: 26px;
 }
 
+.uploadCard {
+  position: sticky;
+  top: 24px;
+}
+
+.uploadCard h2,
+.reportCard h2,
+.report h3 {
+  color: var(--heading);
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
 .uploadCard h2,
 .reportCard h2 {
   margin: 12px 0 8px;
-  color: var(--heading);
-  font:
-    700 25px/1.1 Georgia,
-    serif;
+  font-size: 25px;
+  line-height: 1.1;
+}
+
+.report h3 {
+  margin: 0 0 14px;
+  font-size: 21px;
 }
 
 .uploadCard p,
@@ -35,74 +51,320 @@
   opacity: 0;
 }
 
+.uploadCard label:focus-within {
+  outline: 3px solid rgb(56 86 91 / 28%);
+  outline-offset: 3px;
+}
+
 .fileName {
+  overflow-wrap: anywhere;
   font-size: 13px;
 }
 
-.error,
-.success,
-.warning {
+.privateNote {
+  padding-top: 16px;
+  border-top: 1px solid var(--border-soft);
+  font-size: 13px;
+}
+
+.notice {
   display: flex;
   gap: 9px;
   align-items: center;
+  margin-top: 12px;
   padding: 11px 13px;
   border-radius: 11px;
 }
 
-.error {
+.notice[data-tone='error'] {
   color: #7d3030;
   background: #fae8e8;
 }
 
-.success {
+.notice[data-tone='success'] {
+  margin-top: 0;
   color: #2f5a49;
   background: #e6f1e9;
 }
 
-.warning {
-  margin-top: 12px;
+.notice[data-tone='warning'] {
   color: #765b21;
   background: #fbf0d4;
 }
 
-.report dl {
+.metadata {
   display: grid;
   gap: 8px;
-  margin: 18px 0;
+  margin: 18px 0 26px;
 }
 
-.report dl div {
+.metadata div {
   display: grid;
-  grid-template-columns: 150px minmax(0, 1fr);
+  grid-template-columns: 170px minmax(0, 1fr);
   gap: 14px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border-soft);
 }
 
-.report dt {
+.metadata dt {
   color: var(--text-muted);
 }
 
-.report dd {
+.metadata dd {
   margin: 0;
   color: var(--heading);
+  overflow-wrap: anywhere;
   font-weight: 700;
 }
 
-.report summary {
-  cursor: pointer;
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(145px, 1fr));
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.summaryCard {
+  display: grid;
+  gap: 4px;
+  min-height: 118px;
+  padding: 15px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.summaryCard > span {
+  color: #4f5b57;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.summaryCard strong {
   color: var(--heading);
-  font-weight: 700;
+  font-size: 28px;
+  line-height: 1;
 }
 
-.noWrite {
-  margin: 18px 0 0;
+.summaryCard small {
+  color: #4f5b57;
+  line-height: 1.35;
+}
+
+.summaryCard[data-tone='ready'] {
+  background: #e9f3ec;
+}
+
+.summaryCard[data-tone='review'] {
+  background: #fbf1d8;
+}
+
+.summaryCard[data-tone='deferred'] {
+  background: #edf0f6;
+}
+
+.summaryCard[data-tone='quarantine'] {
+  background: #f5ece6;
+}
+
+.summaryCard[data-tone='invalid'] {
+  background: #faeaea;
+}
+
+.issueSummary {
+  margin: -10px 0 26px;
   color: var(--text-secondary);
   font-size: 13px;
 }
 
-@media (max-width: 900px) {
+.sectionHeading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.sectionHeading h3 {
+  margin-bottom: 0;
+}
+
+.sectionHeading > span {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.tableScroll {
+  margin-top: 12px;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+
+.storeTable {
+  width: 100%;
+  min-width: 1050px;
+  border-collapse: collapse;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.storeTable th,
+.storeTable td {
+  padding: 13px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  text-align: left;
+  vertical-align: top;
+}
+
+.storeTable thead th {
+  color: var(--heading);
+  background: var(--surface-soft);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.storeTable tbody tr:last-child th,
+.storeTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.storeTable tbody th {
+  min-width: 180px;
+}
+
+.storeTable tbody th strong,
+.storeTable td > strong,
+.storeTable td > small {
+  display: block;
+}
+
+.storeTable code {
+  display: block;
+  margin-top: 5px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.storeTable td > small {
+  max-width: 290px;
+  margin-top: 5px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.decision {
+  display: inline-flex;
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: var(--heading);
+  background: var(--surface-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.decision[data-decision='ready'] {
+  color: #285640;
+  background: #dcecdf;
+}
+
+.decision[data-decision='review'] {
+  color: #70551f;
+  background: #f7e7bd;
+}
+
+.decision[data-decision='deferred'] {
+  color: #45536d;
+  background: #e2e7f1;
+}
+
+.decision[data-decision='quarantine'] {
+  color: #6b4837;
+  background: #eee0d7;
+}
+
+.decision[data-decision='invalid'] {
+  color: #7d3030;
+  background: #fae2e2;
+}
+
+.storeWarnings summary {
+  width: max-content;
+  cursor: pointer;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.storeWarnings ul {
+  width: 250px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.noWarnings {
+  color: var(--text-secondary);
+}
+
+.noWrite {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 20px;
+  padding: 14px;
+  border: 1px solid #c9ded0;
+  border-radius: 13px;
+  color: #2f5a49;
+  background: #eef7f0;
+}
+
+.noWrite div {
+  display: grid;
+  gap: 3px;
+}
+
+.noWrite span {
+  font-size: 12px;
+}
+
+@media (max-width: 1100px) {
   .grid {
     grid-template-columns: 1fr;
   }
+
+  .uploadCard {
+    position: static;
+  }
+}
+
+@media (max-width: 700px) {
+  .uploadCard,
+  .reportCard {
+    padding: 20px;
+  }
+
+  .metadata div {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .summaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 460px) {
+  .summaryGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tableScroll:focus-visible {
+  outline: 3px solid rgb(56 86 91 / 35%);
+  outline-offset: 3px;
 }
