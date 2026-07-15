@@ -21,3 +21,30 @@ until plan/session/series classification is implemented. Toolkit and standards r
 **Quarantine** and never re-enter the active calendar automatically.
 
 The Phase 1B scanner is a pure in-memory operation and reports zero IndexedDB write operations.
+
+## Phase 1C reversible migration plan
+
+Phase 1C converts supported legacy records into in-memory v20 draft operations. It still performs no
+IndexedDB writes. Every planned `create` or `quarantine` operation receives a matching inverse
+`delete` operation in the rollback manifest.
+
+The plan currently prepares:
+
+- the active school year required by learner contexts;
+- Class, Group, and Individual records as `learnerContexts`;
+- group memberships when referenced learners are present;
+- schedule definitions as `scheduleBlocks`;
+- valid active events as `calendarEvents`;
+- shared Today/Tasks records as `tasks`;
+- classifiable lessons as `lessonPlans` and dated `sessionOccurrences`;
+- legacy calendar quarantine records as new `quarantineRecords`.
+
+Records that need human classification remain **Review**. Toolkit and Standards records remain
+**Deferred** with their source JSON preserved in memory. Missing identifiers and duplicate target
+identifiers are **Skipped**. Conversion failures with a stable source identifier are planned for
+**Quarantine**, never silently discarded.
+
+The source backup is never mutated. The plan shows only anonymous counts, destination tables, a
+source fingerprint, and rollback coverage. Full private record content is not rendered in the UI.
+Commit and rollback execution remain disabled until the next phase adds a single-transaction commit
+workflow and explicit user confirmation.
