@@ -40,7 +40,8 @@
   line-height: 1.55;
 }
 
-.uploadCard label {
+.uploadCard label,
+.uploadCard button {
   margin-top: 10px;
 }
 
@@ -92,13 +93,15 @@
   background: #fbf0d4;
 }
 
-.metadata {
+.metadata,
+.planMetadata {
   display: grid;
   gap: 8px;
   margin: 18px 0 26px;
 }
 
-.metadata div {
+.metadata div,
+.planMetadata div {
   display: grid;
   grid-template-columns: 170px minmax(0, 1fr);
   gap: 14px;
@@ -106,11 +109,13 @@
   border-bottom: 1px solid var(--border-soft);
 }
 
-.metadata dt {
+.metadata dt,
+.planMetadata dt {
   color: var(--text-muted);
 }
 
-.metadata dd {
+.metadata dd,
+.planMetadata dd {
   margin: 0;
   color: var(--heading);
   overflow-wrap: anywhere;
@@ -171,6 +176,10 @@
   background: #faeaea;
 }
 
+.summaryCard[data-tone='neutral'] {
+  background: #eef2ef;
+}
+
 .issueSummary {
   margin: -10px 0 26px;
   color: var(--text-secondary);
@@ -203,23 +212,39 @@
   border-radius: 14px;
 }
 
-.storeTable {
+.tableScroll:focus-visible {
+  outline: 3px solid rgb(56 86 91 / 35%);
+  outline-offset: 3px;
+}
+
+.storeTable,
+.planTable {
   width: 100%;
-  min-width: 1050px;
   border-collapse: collapse;
   color: var(--text-primary);
   font-size: 13px;
 }
 
+.storeTable {
+  min-width: 1050px;
+}
+
+.planTable {
+  min-width: 760px;
+}
+
 .storeTable th,
-.storeTable td {
+.storeTable td,
+.planTable th,
+.planTable td {
   padding: 13px 12px;
   border-bottom: 1px solid var(--border-soft);
   text-align: left;
   vertical-align: top;
 }
 
-.storeTable thead th {
+.storeTable thead th,
+.planTable thead th {
   color: var(--heading);
   background: var(--surface-soft);
   font-size: 12px;
@@ -228,7 +253,9 @@
 }
 
 .storeTable tbody tr:last-child th,
-.storeTable tbody tr:last-child td {
+.storeTable tbody tr:last-child td,
+.planTable tbody tr:last-child th,
+.planTable tbody tr:last-child td {
   border-bottom: 0;
 }
 
@@ -255,6 +282,16 @@
   margin-top: 5px;
   color: var(--text-secondary);
   line-height: 1.4;
+}
+
+.planTable tbody th {
+  min-width: 230px;
+  color: var(--heading);
+  overflow-wrap: anywhere;
+}
+
+.planTable td {
+  font-variant-numeric: tabular-nums;
 }
 
 .decision {
@@ -311,25 +348,82 @@
   color: var(--text-secondary);
 }
 
-.noWrite {
+.noWrite,
+.rollbackNote {
   display: flex;
   gap: 10px;
   align-items: center;
   margin-top: 20px;
   padding: 14px;
-  border: 1px solid #c9ded0;
   border-radius: 13px;
+}
+
+.noWrite {
+  border: 1px solid #c9ded0;
   color: #2f5a49;
   background: #eef7f0;
 }
 
-.noWrite div {
+.rollbackNote {
+  border: 1px solid #d6dce8;
+  color: #3f4f6a;
+  background: #f0f3f9;
+}
+
+.noWrite div,
+.rollbackNote div {
   display: grid;
   gap: 3px;
 }
 
-.noWrite span {
+.noWrite span,
+.rollbackNote span {
   font-size: 12px;
+}
+
+.planSection {
+  margin-top: 30px;
+  padding-top: 28px;
+  border-top: 2px solid var(--border);
+}
+
+.planHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.planHeader h3 {
+  margin-bottom: 0;
+}
+
+.planStatus {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #45536d;
+  background: #e2e7f1;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.planIntro {
+  max-width: 760px;
+  margin: 10px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.planMetadata {
+  margin-top: 20px;
+}
+
+.planSection > button {
+  margin-top: 16px;
 }
 
 @media (max-width: 1100px) {
@@ -348,7 +442,8 @@
     padding: 20px;
   }
 
-  .metadata div {
+  .metadata div,
+  .planMetadata div {
     grid-template-columns: 1fr;
     gap: 3px;
   }
@@ -362,9 +457,4 @@
   .summaryGrid {
     grid-template-columns: 1fr;
   }
-}
-
-.tableScroll:focus-visible {
-  outline: 3px solid rgb(56 86 91 / 35%);
-  outline-offset: 3px;
 }
