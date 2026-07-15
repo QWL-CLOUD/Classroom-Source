@@ -1,0 +1,108 @@
+.grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+  gap: 22px;
+}
+
+.uploadCard,
+.reportCard {
+  padding: 26px;
+}
+
+.uploadCard h2,
+.reportCard h2 {
+  margin: 12px 0 8px;
+  color: var(--heading);
+  font:
+    700 25px/1.1 Georgia,
+    serif;
+}
+
+.uploadCard p,
+.reportCard > p {
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.uploadCard label {
+  margin-top: 10px;
+}
+
+.uploadCard input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.fileName {
+  font-size: 13px;
+}
+
+.error,
+.success,
+.warning {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  padding: 11px 13px;
+  border-radius: 11px;
+}
+
+.error {
+  color: #7d3030;
+  background: #fae8e8;
+}
+
+.success {
+  color: #2f5a49;
+  background: #e6f1e9;
+}
+
+.warning {
+  margin-top: 12px;
+  color: #765b21;
+  background: #fbf0d4;
+}
+
+.report dl {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0;
+}
+
+.report dl div {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.report dt {
+  color: var(--text-muted);
+}
+
+.report dd {
+  margin: 0;
+  color: var(--heading);
+  font-weight: 700;
+}
+
+.report summary {
+  cursor: pointer;
+  color: var(--heading);
+  font-weight: 700;
+}
+
+.noWrite {
+  margin: 18px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,242 @@
+.shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 286px minmax(0, 1fr);
+  background: var(--surface-app);
+}
+
+.shell[data-sidebar-collapsed='true'] {
+  grid-template-columns: 88px minmax(0, 1fr);
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 22px 18px 18px;
+  color: var(--text-on-dark);
+  background: var(--sidebar);
+  border-right: 1px solid rgb(255 255 255 / 8%);
+}
+
+.brandRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.shell[data-sidebar-collapsed='true'] .brandRow {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}
+
+.brandMark {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  color: #fff;
+  background: rgb(255 255 255 / 13%);
+  font:
+    700 23px/1 Georgia,
+    serif;
+}
+
+.brandName {
+  font:
+    700 22px/1.1 Georgia,
+    serif;
+}
+
+.schoolYear {
+  margin-top: 4px;
+  color: var(--text-on-dark-muted);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.iconButton,
+.historyControls button {
+  border: 0;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.iconButton {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  color: inherit;
+  background: rgb(255 255 255 / 10%);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+}
+
+.navGroup h2 {
+  margin: 0 0 7px 12px;
+  color: var(--text-on-dark-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.navLink {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 13px;
+  border-radius: 12px;
+  color: var(--text-on-dark-muted);
+  text-decoration: none;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.navLink:hover {
+  color: #fff;
+  background: rgb(255 255 255 / 7%);
+}
+
+.activeNavLink {
+  color: #fff;
+  background: #485a63;
+}
+
+.shell[data-sidebar-collapsed='true'] .navLink {
+  justify-content: center;
+  padding: 0;
+}
+
+.sidebarFooter {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin-top: auto;
+  padding: 18px 10px 0;
+  color: var(--text-on-dark-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  border-top: 1px solid rgb(255 255 255 / 10%);
+}
+
+.workspace {
+  min-width: 0;
+}
+
+.topbar {
+  position: sticky;
+  z-index: 10;
+  top: 0;
+  min-height: 78px;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 28px;
+  background: rgb(244 246 244 / 91%);
+  border-bottom: 1px solid var(--border-soft);
+  backdrop-filter: blur(18px);
+}
+
+.searchBox {
+  width: min(760px, 72%);
+  min-height: 48px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: #fff;
+  box-shadow: var(--shadow-soft);
+}
+
+.searchBox input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  color: var(--text-primary);
+  background: transparent;
+  font: inherit;
+}
+
+.historyControls {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: var(--shadow-soft);
+}
+
+.historyControls button {
+  width: 44px;
+  height: 44px;
+  color: var(--text-muted);
+  background: transparent;
+}
+
+.historyControls button + button {
+  border-left: 1px solid var(--border-soft);
+}
+
+.content {
+  padding: 34px clamp(22px, 4vw, 64px) 64px;
+}
+
+@media (max-width: 880px) {
+  .shell,
+  .shell[data-sidebar-collapsed='true'] {
+    grid-template-columns: 76px minmax(0, 1fr);
+  }
+
+  .sidebar {
+    padding-inline: 12px;
+  }
+
+  .brandRow {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .brandRow > div:not(.brandMark),
+  .brandRow .iconButton,
+  .navGroup h2,
+  .navLink span,
+  .sidebarFooter span {
+    display: none;
+  }
+
+  .navLink {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .topbar {
+    justify-content: space-between;
+    padding-inline: 18px;
+  }
+
+  .searchBox {
+    width: 100%;
+  }
+
+  .content {
+    padding-inline: 18px;
+  }
+}

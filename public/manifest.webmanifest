@@ -1,0 +1,9 @@
+{
+  "name": "Classroom",
+  "short_name": "Classroom",
+  "start_url": "./#/today",
+  "display": "standalone",
+  "background_color": "#f4f6f4",
+  "theme_color": "#66747c",
+  "icons": []
+}

@@ -1,0 +1,96 @@
+.datePicker input {
+  min-width: 160px;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  gap: 28px;
+}
+
+.leftColumn {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+
+.panel {
+  padding: 22px;
+}
+
+.panel h2,
+.scheduleHeader h2 {
+  margin: 0 0 14px;
+  color: var(--heading);
+  font:
+    700 23px/1.1 Georgia,
+    serif;
+}
+
+.panel p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.warmPanel {
+  background: var(--surface-warm);
+  border-color: #dccca6;
+}
+
+.capture {
+  width: 100%;
+  min-height: 100px;
+  margin-bottom: 12px;
+  padding: 12px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.scheduleColumn {
+  min-width: 0;
+}
+
+.scheduleHeader {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.scheduleHeader h2 {
+  margin-bottom: 0;
+  font-size: 29px;
+}
+
+.scheduleEmpty {
+  min-height: 480px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  padding: 48px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.scheduleEmpty h3 {
+  margin: 4px 0 0;
+  color: var(--heading);
+  font-size: 21px;
+}
+
+.scheduleEmpty p {
+  max-width: 600px;
+  margin: 0 0 8px;
+  line-height: 1.6;
+}
+
+@media (max-width: 1040px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}

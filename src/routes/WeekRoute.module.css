@@ -1,0 +1,155 @@
+.range {
+  margin-left: 10px;
+  color: var(--text-secondary);
+  font:
+    700 20px/1.2 Inter,
+    sans-serif;
+  letter-spacing: 0;
+}
+
+.navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: end;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  padding: 18px 20px;
+}
+
+.controls label:first-child {
+  display: grid;
+  gap: 7px;
+  min-width: 240px;
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.toggleLabel {
+  position: relative;
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  color: var(--heading);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.toggleLabel input {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 0;
+  width: 44px;
+  height: 25px;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.toggleTrack {
+  position: relative;
+  width: 44px;
+  height: 25px;
+  border-radius: 999px;
+  background: #cfd7d4;
+  pointer-events: none;
+  transition: background 130ms ease;
+}
+
+.toggleTrack::after {
+  content: '';
+  width: 19px;
+  height: 19px;
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 15%);
+  transition: transform 130ms ease;
+}
+
+.toggleLabel input:focus-visible + .toggleTrack {
+  outline: 3px solid rgb(79 116 119 / 35%);
+  outline-offset: 3px;
+}
+
+.toggleLabel input:checked + .toggleTrack::after {
+  transform: translateX(19px);
+}
+
+.weekGrid {
+  display: grid;
+  grid-template-columns: repeat(var(--day-count), minmax(220px, 1fr));
+  gap: 14px;
+  align-items: start;
+  overflow-x: auto;
+  padding-bottom: 18px;
+}
+
+.dayColumn {
+  min-width: 220px;
+  min-height: 500px;
+  overflow: hidden;
+}
+
+.dayHeader {
+  min-height: 76px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.dayHeader h2 {
+  margin: 0;
+  color: var(--heading);
+  font-size: 20px;
+}
+
+.dayHeader p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+}
+
+.addButton {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 12px;
+  color: var(--heading);
+  background: var(--surface-soft);
+}
+
+.dayEmpty {
+  min-height: 390px;
+  display: grid;
+  place-content: center;
+  gap: 6px;
+  padding: 22px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.dayEmpty p {
+  margin: 0;
+  color: var(--heading);
+  font-weight: 700;
+}
+
+.dayEmpty span {
+  font-size: 13px;
+  line-height: 1.5;
+}
