@@ -68,11 +68,29 @@ test('migration preview commits and rolls back a verified transaction', async ({
     .check();
   await page.getByRole('button', { name: 'Commit migration safely' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Migration committed safely' })).toBeVisible();
-  await expect(page.getByText('Restore-point entries').locator('..')).toContainText('4');
-  await expect(page.getByText('Inserted records').locator('..')).toContainText('4');
+  const committedPanel = page.getByLabel('Migration committed safely');
 
-  await expect(page.getByRole('heading', { name: 'Migration completion report' })).toBeVisible();
+await expect(
+  committedPanel.getByRole('heading', {
+    name: 'Migration committed safely',
+  }),
+).toBeVisible();
+
+await expect(
+  committedPanel.getByText('Restore-point entries', { exact: true }).locator('..'),
+).toContainText('4');
+
+await expect(
+  committedPanel.getByText('Inserted records', { exact: true }).locator('..'),
+).toContainText('4');
+
+const completionReport = page.getByLabel('Migration completion report');
+
+await expect(
+  completionReport.getByRole('heading', {
+    name: 'Migration completion report',
+  }),
+).toBeVisible();
   await expect(page.getByText('Passed with follow-up', { exact: true })).toBeVisible();
   await expect(page.getByText('Verified records').locator('..')).toContainText('4');
   await expect(page.getByText(/Legacy browser storage unchanged/)).toBeVisible();
