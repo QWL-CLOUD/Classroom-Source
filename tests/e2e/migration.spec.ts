@@ -72,6 +72,21 @@ test('migration preview commits and rolls back a verified transaction', async ({
   await expect(page.getByText('Restore-point entries').locator('..')).toContainText('4');
   await expect(page.getByText('Inserted records').locator('..')).toContainText('4');
 
+  await expect(page.getByRole('heading', { name: 'Migration completion report' })).toBeVisible();
+  await expect(page.getByText('Passed with follow-up', { exact: true })).toBeVisible();
+  await expect(page.getByText('Verified records').locator('..')).toContainText('4');
+  await expect(page.getByText(/Legacy browser storage unchanged/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Download JSON report' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Download Markdown report' })).toBeEnabled();
+
+  const acceptanceResults = await new AxeBuilder({ page }).analyze();
+  expect(
+    acceptanceResults.violations,
+    acceptanceResults.violations
+      .map((violation) => `${violation.id}: ${violation.help}`)
+      .join('\n'),
+  ).toEqual([]);
+
   await page
     .getByRole('checkbox', {
       name: /I understand rollback removes the unchanged v20 records/,
@@ -82,9 +97,9 @@ test('migration preview commits and rolls back a verified transaction', async ({
   await expect(page.getByRole('heading', { name: 'Migration rolled back safely' })).toBeVisible();
   await expect(page.getByText('Rollback deletions').locator('..')).toContainText('4');
 
-  const results = await new AxeBuilder({ page }).analyze();
+  const rollbackResults = await new AxeBuilder({ page }).analyze();
   expect(
-    results.violations,
-    results.violations.map((violation) => `${violation.id}: ${violation.help}`).join('\n'),
+    rollbackResults.violations,
+    rollbackResults.violations.map((violation) => `${violation.id}: ${violation.help}`).join('\n'),
   ).toEqual([]);
 });
