@@ -1,0 +1,21 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.DS_Store
+*.local
+.env
+.env.*
+!.env.example
+
+# Private Classroom data must never be committed
+private-data/
+uploads/
+*full-backup*.json
+*system-health*.json
+*school-calendar*.pdf
+*.xlsx
+*.xls
+*.docx
+*.heic
