@@ -70,3 +70,32 @@ Manual rollback runs in one transaction. It deletes only records inserted by tha
 only when their current content still matches the committed snapshot. A migrated record changed
 after commit blocks the complete rollback, preventing accidental deletion of newer user edits.
 Legacy `cos-*` localStorage keys remain read-only throughout commit and rollback.
+
+## Phase 1E real-backup acceptance and completion report
+
+Phase 1E performs an independent post-commit acceptance pass. It compares the selected backup scan,
+the reversible plan, the committed migration run, the private recovery manifest, and the current
+IndexedDB records. The acceptance pass does not trust the execution summary alone: every inserted or
+reused target record is read back and compared with the canonical record snapshot stored in the
+recovery manifest.
+
+The acceptance checklist verifies:
+
+- source fingerprint and plan identity consistency;
+- planned writes versus inserted and reused targets;
+- record-by-record post-commit equality;
+- restore-point and rollback coverage;
+- unchanged browser-local `cos-*` storage using before-and-after fingerprints;
+- exclusion of Review, Deferred, and Skipped records from active v20 tables;
+- isolation of quarantine records;
+- privacy-safe report content.
+
+A report is **Passed** when every integrity check succeeds and no follow-up records remain. It is
+**Passed with follow-up** when the committed data is valid but Review, Deferred, Quarantine,
+unrecognized, or provisional records remain. It is **Failed** when a fingerprint, record, storage,
+or rollback check does not match.
+
+The completion report is saved locally in `appSettings`, protected by its own integrity hash, and
+can be downloaded as JSON or Markdown. The export contains counts, table names, timestamps, run IDs,
+and fingerprints only. It contains no learner names, record content, or source backup data. A
+rollback hides the active completion report because the accepted migration is no longer active.
