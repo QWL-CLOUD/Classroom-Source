@@ -458,3 +458,145 @@
     grid-template-columns: 1fr;
   }
 }
+
+.commitPanel,
+.rollbackPanel {
+  margin-top: 22px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.commitHeading {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.commitHeading h4,
+.rollbackPanel h3,
+.executionCard h2 {
+  margin: 0;
+  color: var(--heading);
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.commitHeading h4,
+.rollbackPanel h3 {
+  font-size: 19px;
+}
+
+.commitHeading p,
+.commitHeading p code,
+.rollbackPanel p,
+.rollbackPanel p code {
+  margin: 6px 0 0;
+  color: #4f5b57;
+  line-height: 1.5;
+}
+
+.confirmation {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 16px;
+  color: var(--text-primary);
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.confirmation input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--accent-strong);
+}
+
+.confirmation:focus-within {
+  outline: 3px solid rgb(56 86 91 / 28%);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.actionRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.executionCard {
+  margin-top: 22px;
+  padding: 26px;
+}
+
+.executionCard h2 {
+  font-size: 25px;
+}
+
+.executionStatus {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.executionStatus[data-status='committed'] {
+  color: #285640;
+  background: #dcecdf;
+}
+
+.executionStatus[data-status='rolled-back'] {
+  color: #70551f;
+  background: #f7e7bd;
+}
+
+.executionMetadata {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 20px 0 0;
+}
+
+.executionMetadata div {
+  min-width: 0;
+  padding: 13px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.executionMetadata dt {
+  color: #4f5b57;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.executionMetadata dd {
+  margin: 5px 0 0;
+  color: var(--heading);
+  overflow-wrap: anywhere;
+  font-weight: 800;
+}
+
+.rollbackPanel button {
+  margin-top: 16px;
+}
+
+@media (max-width: 760px) {
+  .executionMetadata {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Phase 1D accessibility contrast fix */
+.commitPanel .commitHeading p,
+.commitPanel .commitHeading p code,
+.rollbackPanel p,
+.rollbackPanel p code {
+  color: #4f5b57;
+}

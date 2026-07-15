@@ -1,13 +1,22 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
+  Database,
   FileJson,
   ListChecks,
+  LockKeyhole,
   RotateCcw,
   ShieldCheck,
   type LucideIcon,
 } from 'lucide-react';
+import {
+  commitMigrationPlan,
+  getLatestMigrationExecution,
+  MigrationExecutionConflictError,
+  rollbackMigrationRun,
+  type MigrationExecutionResult,
+} from '@/features/migration/migrationExecutor';
 import {
   scanLegacyBackupJson,
   type LegacyBackupScan,
@@ -77,7 +86,23 @@ function Notice({
   );
 }
 
-function PlanReport({ plan, onDiscard }: { plan: ReversibleMigrationPlan; onDiscard: () => void }) {
+function PlanReport({
+  plan,
+  onDiscard,
+  onCommit,
+  commitConfirmed,
+  onCommitConfirmed,
+  committing,
+  alreadyCommitted,
+}: {
+  plan: ReversibleMigrationPlan;
+  onDiscard: () => void;
+  onCommit: () => void;
+  commitConfirmed: boolean;
+  onCommitConfirmed: (value: boolean) => void;
+  committing: boolean;
+  alreadyCommitted: boolean;
+}) {
   const summaryItems: SummaryItem[] = [
     {
       label: 'Create',
@@ -121,15 +146,15 @@ function PlanReport({ plan, onDiscard }: { plan: ReversibleMigrationPlan; onDisc
     <section className={styles.planSection} aria-labelledby="migration-plan-heading">
       <div className={styles.planHeader}>
         <div>
-          <p className="page-eyebrow">Phase 1C · In-memory only</p>
+          <p className="page-eyebrow">Phase 1D · Safe execution</p>
           <h3 id="migration-plan-heading">Reversible migration plan</h3>
         </div>
-        <span className={styles.planStatus}>Draft</span>
+        <span className={styles.planStatus}>{alreadyCommitted ? 'Committed' : 'Draft'}</span>
       </div>
 
       <p className={styles.planIntro}>
-        The plan contains transformed v20 draft records and matching inverse deletes. It has not
-        opened a write transaction and cannot change Today, Week, Calendar, Tasks, or Learners.
+        The plan contains transformed v20 records and matching inverse deletes. Review, deferred,
+        and skipped records remain outside active v20 tables.
       </p>
 
       <dl className={styles.planMetadata}>
@@ -211,27 +236,188 @@ function PlanReport({ plan, onDiscard }: { plan: ReversibleMigrationPlan; onDisc
         </div>
       </div>
 
-      <div className={styles.noWrite}>
-        <ShieldCheck size={20} aria-hidden="true" />
-        <div>
-          <strong>No data was written to IndexedDB.</strong>
-          <span>Plan write operations: {plan.writeOperations}</span>
-        </div>
-      </div>
+      {!alreadyCommitted && (
+        <div className={styles.commitPanel}>
+          <div className={styles.commitHeading}>
+            <LockKeyhole size={22} aria-hidden="true" />
+            <div>
+              <h4>Confirm safe migration</h4>
+              <p>
+                Commit uses one IndexedDB transaction, saves a recovery manifest, verifies every
+                inserted record, and leaves all legacy <code>cos-*</code> data unchanged.
+              </p>
+            </div>
+          </div>
 
-      <button className="button" type="button" onClick={onDiscard}>
-        Discard generated plan
-      </button>
+          <label className={styles.confirmation}>
+            <input
+              type="checkbox"
+              checked={commitConfirmed}
+              onChange={(event) => onCommitConfirmed(event.target.checked)}
+            />
+            <span>
+              I have reviewed the counts and understand that active v20 records will now be written
+              locally in this browser.
+            </span>
+          </label>
+
+          <div className={styles.actionRow}>
+            <button
+              className="button button-primary"
+              type="button"
+              onClick={onCommit}
+              disabled={!commitConfirmed || committing}
+            >
+              <Database size={18} aria-hidden="true" />
+              {committing ? 'Committing migration…' : 'Commit migration safely'}
+            </button>
+            <button className="button" type="button" onClick={onDiscard} disabled={committing}>
+              Discard generated plan
+            </button>
+          </div>
+        </div>
+      )}
+
+      {alreadyCommitted && (
+        <Notice icon={CheckCircle2} tone="success">
+          This backup fingerprint is already committed. Use the recovery panel below to roll it
+          back.
+        </Notice>
+      )}
     </section>
   );
+}
+
+function ExecutionReport({
+  execution,
+  rollbackConfirmed,
+  onRollbackConfirmed,
+  onRollback,
+  rollingBack,
+}: {
+  execution: MigrationExecutionResult;
+  rollbackConfirmed: boolean;
+  onRollbackConfirmed: (value: boolean) => void;
+  onRollback: () => void;
+  rollingBack: boolean;
+}) {
+  const committed = execution.status === 'committed';
+
+  return (
+    <section className={`card ${styles.executionCard}`} aria-labelledby="execution-heading">
+      <div className={styles.planHeader}>
+        <div>
+          <p className="page-eyebrow">Recovery center</p>
+          <h2 id="execution-heading">
+            {committed ? 'Migration committed safely' : 'Migration rolled back safely'}
+          </h2>
+        </div>
+        <span className={styles.executionStatus} data-status={execution.status}>
+          {execution.status}
+        </span>
+      </div>
+
+      <Notice icon={committed ? CheckCircle2 : RotateCcw} tone={committed ? 'success' : 'warning'}>
+        {committed
+          ? 'The transaction completed and every inserted record passed post-write verification.'
+          : 'All unchanged records inserted by this migration were removed; reused records were preserved.'}
+      </Notice>
+
+      <dl className={styles.executionMetadata}>
+        <div>
+          <dt>Migration run</dt>
+          <dd>{execution.runId}</dd>
+        </div>
+        <div>
+          <dt>Inserted records</dt>
+          <dd>{execution.insertedRecords}</dd>
+        </div>
+        <div>
+          <dt>Existing identical records reused</dt>
+          <dd>{execution.reusedRecords}</dd>
+        </div>
+        <div>
+          <dt>Restore-point entries</dt>
+          <dd>{execution.restorePointEntries}</dd>
+        </div>
+        <div>
+          <dt>Rollback deletions</dt>
+          <dd>{execution.deletedRecords}</dd>
+        </div>
+        <div>
+          <dt>{committed ? 'Committed' : 'Rolled back'}</dt>
+          <dd>
+            {new Date(
+              committed ? execution.committedAt : (execution.rolledBackAt ?? execution.committedAt),
+            ).toLocaleString()}
+          </dd>
+        </div>
+      </dl>
+
+      {committed && (
+        <div className={styles.rollbackPanel}>
+          <h3>Rollback this migration</h3>
+          <p>
+            Rollback removes only records inserted by this migration. It stops without deleting
+            anything when one of those records has been edited after commit.
+          </p>
+          <label className={styles.confirmation}>
+            <input
+              type="checkbox"
+              checked={rollbackConfirmed}
+              onChange={(event) => onRollbackConfirmed(event.target.checked)}
+            />
+            <span>
+              I understand rollback removes the unchanged v20 records created by this run.
+            </span>
+          </label>
+          <button
+            className="button"
+            type="button"
+            onClick={onRollback}
+            disabled={!rollbackConfirmed || rollingBack}
+          >
+            <RotateCcw size={18} aria-hidden="true" />
+            {rollingBack ? 'Rolling back migration…' : 'Rollback migration'}
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function formatExecutionError(reason: unknown): string {
+  if (reason instanceof MigrationExecutionConflictError) {
+    return `${reason.message} ${reason.conflicts.length} conflict(s) require review.`;
+  }
+  return reason instanceof Error ? reason.message : 'The migration action could not be completed.';
 }
 
 export function MigrationRoute() {
   const [scan, setScan] = useState<LegacyBackupScan | null>(null);
   const [plan, setPlan] = useState<ReversibleMigrationPlan | null>(null);
   const [rawBackupText, setRawBackupText] = useState<string | null>(null);
+  const [execution, setExecution] = useState<MigrationExecutionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [commitConfirmed, setCommitConfirmed] = useState(false);
+  const [rollbackConfirmed, setRollbackConfirmed] = useState(false);
+  const [committing, setCommitting] = useState(false);
+  const [rollingBack, setRollingBack] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    getLatestMigrationExecution()
+      .then((latest) => {
+        if (active) setExecution(latest);
+      })
+      .catch((reason) => {
+        if (active) setError(formatExecutionError(reason));
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   async function scanFile(file: File | undefined) {
     setScan(null);
@@ -239,6 +425,7 @@ export function MigrationRoute() {
     setRawBackupText(null);
     setError(null);
     setFileName(file?.name ?? null);
+    setCommitConfirmed(false);
     if (!file) return;
 
     try {
@@ -253,6 +440,7 @@ export function MigrationRoute() {
   function generatePlan() {
     if (!rawBackupText) return;
     setError(null);
+    setCommitConfirmed(false);
 
     try {
       setPlan(createReversibleMigrationPlan(rawBackupText));
@@ -262,6 +450,39 @@ export function MigrationRoute() {
           ? reason.message
           : 'The reversible migration plan could not be generated.',
       );
+    }
+  }
+
+  async function commitPlan() {
+    if (!plan || !commitConfirmed) return;
+    setError(null);
+    setCommitting(true);
+
+    try {
+      const result = await commitMigrationPlan(plan);
+      setExecution(result);
+      setCommitConfirmed(false);
+      setRollbackConfirmed(false);
+    } catch (reason) {
+      setError(formatExecutionError(reason));
+    } finally {
+      setCommitting(false);
+    }
+  }
+
+  async function rollbackExecution() {
+    if (!execution || execution.status !== 'committed' || !rollbackConfirmed) return;
+    setError(null);
+    setRollingBack(true);
+
+    try {
+      const result = await rollbackMigrationRun(execution.runId);
+      setExecution(result);
+      setRollbackConfirmed(false);
+    } catch (reason) {
+      setError(formatExecutionError(reason));
+    } finally {
+      setRollingBack(false);
     }
   }
 
@@ -306,16 +527,22 @@ export function MigrationRoute() {
       ]
     : [];
 
+  const alreadyCommitted = Boolean(
+    plan &&
+    execution?.status === 'committed' &&
+    execution.sourceFingerprint === plan.sourceFingerprint,
+  );
+
   return (
     <section>
       <header className="page-header">
         <div>
           <p className="page-eyebrow">System</p>
-          <h1 className="page-title">Migration preview</h1>
+          <h1 className="page-title">Migration center</h1>
           <p className="page-subtitle">
-            Phase 1C validates legacy stores, then generates an in-memory v20 migration plan with a
-            matching rollback manifest. It never writes records or modifies old <code>cos-*</code>{' '}
-            storage.
+            Phase 1D validates legacy stores, generates a reversible plan, and commits approved v20
+            records in one verified IndexedDB transaction. Legacy <code>cos-*</code> storage remains
+            read-only.
           </p>
         </div>
       </header>
@@ -323,10 +550,10 @@ export function MigrationRoute() {
       <div className={styles.grid}>
         <article className={`card ${styles.uploadCard}`}>
           <ShieldCheck size={30} aria-hidden="true" />
-          <h2>Read-only scan and plan</h2>
+          <h2>Scan, plan, and confirm</h2>
           <p>
-            Select your private full backup JSON. The browser reads it locally, validates every
-            supported store, and can prepare reversible draft operations.
+            Select your private full backup JSON. The browser reads it locally, validates supported
+            stores, and prepares reversible operations before any write is enabled.
           </p>
           <label className="button button-primary">
             <FileJson size={18} aria-hidden="true" /> Choose backup
@@ -344,7 +571,7 @@ export function MigrationRoute() {
           )}
           <p className={styles.privateNote}>
             Keep private backups off GitHub. Names and full record content are not rendered in the
-            scan or plan report.
+            scan, plan, or execution report.
           </p>
         </article>
 
@@ -474,16 +701,39 @@ export function MigrationRoute() {
               <div className={styles.noWrite}>
                 <ShieldCheck size={20} aria-hidden="true" />
                 <div>
-                  <strong>No data was written to IndexedDB.</strong>
+                  <strong>No data was written during scan or planning.</strong>
                   <span>Scanner write operations: {scan.writeOperations}</span>
                 </div>
               </div>
 
-              {plan && <PlanReport plan={plan} onDiscard={() => setPlan(null)} />}
+              {plan && (
+                <PlanReport
+                  plan={plan}
+                  onDiscard={() => {
+                    setPlan(null);
+                    setCommitConfirmed(false);
+                  }}
+                  onCommit={commitPlan}
+                  commitConfirmed={commitConfirmed}
+                  onCommitConfirmed={setCommitConfirmed}
+                  committing={committing}
+                  alreadyCommitted={alreadyCommitted}
+                />
+              )}
             </div>
           )}
         </article>
       </div>
+
+      {execution && (
+        <ExecutionReport
+          execution={execution}
+          rollbackConfirmed={rollbackConfirmed}
+          onRollbackConfirmed={setRollbackConfirmed}
+          onRollback={rollbackExecution}
+          rollingBack={rollingBack}
+        />
+      )}
     </section>
   );
 }
