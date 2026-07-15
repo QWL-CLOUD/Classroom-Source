@@ -48,3 +48,25 @@ The source backup is never mutated. The plan shows only anonymous counts, destin
 source fingerprint, and rollback coverage. Full private record content is not rendered in the UI.
 Commit and rollback execution remain disabled until the next phase adds a single-transaction commit
 workflow and explicit user confirmation.
+
+## Phase 1D safe execution and rollback
+
+Phase 1D enables the write step only after the user generates a plan and checks an explicit local
+write confirmation. Commit performs preflight conflict detection, restore-point capture, record
+insertion, post-write verification, and migration-run persistence inside one Dexie transaction.
+Any thrown error aborts the transaction, leaving zero partial domain writes.
+
+An existing v20 record with the same identifier is handled conservatively:
+
+- an identical record is reused and excluded from rollback deletion;
+- a different record blocks the entire commit before any record is inserted.
+
+The local `migrationRuns` record stores a private recovery manifest containing the source
+fingerprint, inserted identifiers, identical reused identifiers, before-images, and verified table
+counts. This manifest never appears in the public repository and the UI renders only anonymous
+counts and run identifiers.
+
+Manual rollback runs in one transaction. It deletes only records inserted by that migration run and
+only when their current content still matches the committed snapshot. A migrated record changed
+after commit blocks the complete rollback, preventing accidental deletion of newer user edits.
+Legacy `cos-*` localStorage keys remain read-only throughout commit and rollback.
