@@ -17,6 +17,8 @@ function createRepository(overrides: Partial<ClassroomRepository> = {}): Classro
     listScheduleBlocksForRange: vi.fn().mockResolvedValue([]),
     listCalendarEventsForRange: vi.fn().mockResolvedValue([]),
     listLearnerContexts: vi.fn().mockResolvedValue([]),
+    listLessonPlans: vi.fn().mockResolvedValue([]),
+    listSessionOccurrences: vi.fn().mockResolvedValue([]),
     countQuarantineRecords: vi.fn().mockResolvedValue(0),
     countCoreRecords: vi.fn().mockResolvedValue({
       schoolYears: 0,
@@ -69,7 +71,9 @@ describe('workspaceReadService', () => {
     });
     const range = { startDate: '2026-07-13', endDate: '2026-07-19' };
 
-    const snapshot = await loadWorkspaceReadSnapshot(repository, range, { kind: 'class' });
+    const snapshot = await loadWorkspaceReadSnapshot(repository, range, {
+      kind: 'class',
+    });
 
     expect(listLearnerContexts).toHaveBeenCalledWith({
       kind: 'class',
