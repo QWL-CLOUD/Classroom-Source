@@ -8,17 +8,48 @@ export function toLocalDateString(date: Date): string {
 
 export function parseLocalDate(value: string | null | undefined): Date | null {
   if (!value || !LOCAL_DATE_PATTERN.test(value)) return null;
+
   const [yearText, monthText, dayText] = value.split('-');
   const year = Number(yearText);
   const month = Number(monthText);
   const day = Number(dayText);
-  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null;
+
+  if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+    return null;
+  }
 
   const date = new Date(year, month - 1, day, 12, 0, 0, 0);
   if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
     return null;
   }
+
   return date;
+}
+
+export function assertLocalDateRange(startDate: string, endDate: string): void {
+  if (!parseLocalDate(startDate)) {
+    throw new Error(`Invalid local start date: ${startDate}`);
+  }
+
+  if (!parseLocalDate(endDate)) {
+    throw new Error(`Invalid local end date: ${endDate}`);
+  }
+
+  if (startDate > endDate) {
+    throw new Error(`Local date range starts after it ends: ${startDate} > ${endDate}`);
+  }
+}
+
+export function localDateRangesOverlap(
+  firstStartDate: string,
+  firstEndDate: string,
+  secondStartDate: string,
+  secondEndDate: string,
+): boolean {
+  assertLocalDateRange(firstStartDate, firstEndDate);
+  assertLocalDateRange(secondStartDate, secondEndDate);
+
+  return firstStartDate <= secondEndDate && secondStartDate <= firstEndDate;
 }
 
 export function todayLocalDate(): string {

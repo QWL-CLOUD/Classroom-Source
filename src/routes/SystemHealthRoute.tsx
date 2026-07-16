@@ -1,43 +1,33 @@
-import { useLiveQuery } from 'dexie-react-hooks';
 import { CheckCircle2, Database, ShieldCheck } from 'lucide-react';
-import { classroomDb } from '@/data/db/ClassroomDatabase';
+import type { CoreRecordCounts } from '@/domain/readModels/workspaceReadModels';
+import { useWorkspaceDataSummary } from '@/features/workspace/useWorkspaceReadModel';
 import styles from './SystemHealthRoute.module.css';
 
-export function SystemHealthRoute() {
-  const counts = useLiveQuery(async () => {
-    await classroomDb.open();
-    const [
-      scheduleBlocks,
-      calendarEvents,
-      lessonPlans,
-      sessions,
-      tasks,
-      migrationRuns,
-      quarantine,
-    ] = await Promise.all([
-      classroomDb.scheduleBlocks.count(),
-      classroomDb.calendarEvents.count(),
-      classroomDb.lessonPlans.count(),
-      classroomDb.sessionOccurrences.count(),
-      classroomDb.tasks.count(),
-      classroomDb.migrationRuns.count(),
-      classroomDb.quarantineRecords.count(),
-    ]);
-    return {
-      scheduleBlocks,
-      calendarEvents,
-      lessonPlans,
-      sessions,
-      tasks,
-      migrationRuns,
-      quarantine,
-    };
-  }, []);
+const countLabels: ReadonlyArray<[keyof CoreRecordCounts, string]> = [
+  ['schoolYears', 'School years'],
+  ['learnerContexts', 'Learner contexts'],
+  ['scheduleBlocks', 'Schedule blocks'],
+  ['calendarEvents', 'Calendar events'],
+  ['lessonPlans', 'Lesson plans'],
+  ['sessions', 'Sessions'],
+  ['tasks', 'Tasks'],
+  ['migrationRuns', 'Migration runs'],
+  ['quarantine', 'Quarantine records'],
+];
 
+export function SystemHealthRoute() {
+  const summaryState = useWorkspaceDataSummary();
+  const databaseStatus =
+    summaryState.status === 'ready'
+      ? 'Ready'
+      : summaryState.status === 'error'
+        ? 'Read error'
+        : 'Opening…';
   const tests = [
     { name: 'React source application mounted', detail: 'Native React route and component tree' },
     { name: 'Hash routes registered', detail: 'Today, Week, Calendar, Tasks, and System routes' },
     { name: 'IndexedDB namespace isolated', detail: 'Database name: classroom-v20' },
+    { name: 'Repository-backed read model', detail: 'Typed v20 queries with explicit states' },
     { name: 'Legacy scan is read-only', detail: 'No automatic cos-* writes or deletions' },
     {
       name: 'Privacy source scan configured',
@@ -62,7 +52,7 @@ export function SystemHealthRoute() {
         <article className="card">
           <Database size={25} />
           <span>Database</span>
-          <strong>{counts ? 'Ready' : 'Opening…'}</strong>
+          <strong>{databaseStatus}</strong>
         </article>
         <article className="card">
           <ShieldCheck size={25} />
@@ -78,8 +68,8 @@ export function SystemHealthRoute() {
         </article>
       </div>
 
-      <div className={`card ${styles.healthCard}`}>
-        <h2>Foundation checks</h2>
+      <section className={`card ${styles.healthCard}`} aria-labelledby="foundation-checks-heading">
+        <h2 id="foundation-checks-heading">Foundation checks</h2>
         <ul>
           {tests.map((test) => (
             <li key={test.name}>
@@ -92,23 +82,33 @@ export function SystemHealthRoute() {
             </li>
           ))}
         </ul>
-      </div>
+      </section>
 
-      <div className={`card ${styles.healthCard}`}>
-        <h2>Current v20 record counts</h2>
-        {!counts ? (
-          <p>Reading IndexedDB…</p>
+      <section className={`card ${styles.healthCard}`} aria-labelledby="record-counts-heading">
+        <h2 id="record-counts-heading">Current v20 record counts</h2>
+        {summaryState.status === 'loading' ? (
+          <p aria-live="polite">Reading IndexedDB…</p>
+        ) : summaryState.status === 'error' ? (
+          <p className={styles.error} role="alert">
+            Unable to read IndexedDB: {summaryState.message}
+          </p>
         ) : (
-          <dl className={styles.counts}>
-            {Object.entries(counts).map(([name, value]) => (
-              <div key={name}>
-                <dt>{name}</dt>
-                <dd>{value}</dd>
-              </div>
-            ))}
-          </dl>
+          <>
+            <p className={styles.activeSchoolYear}>
+              Active school year:{' '}
+              <strong>{summaryState.data.activeSchoolYear?.label ?? 'None configured'}</strong>
+            </p>
+            <dl className={styles.counts}>
+              {countLabels.map(([name, label]) => (
+                <div key={name}>
+                  <dt>{label}</dt>
+                  <dd>{summaryState.data.counts[name]}</dd>
+                </div>
+              ))}
+            </dl>
+          </>
         )}
-      </div>
+      </section>
     </section>
   );
 }
