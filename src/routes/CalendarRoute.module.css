@@ -359,7 +359,8 @@
     width: 100%;
   }
 
-  .navigation button {
+  .navigation button,
+  .navigation a {
     flex: 1 1 auto;
     justify-content: center;
   }
