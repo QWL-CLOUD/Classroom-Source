@@ -1,6 +1,7 @@
 import { Navigate, createHashRouter } from 'react-router-dom';
 import { AppShell } from '@/app/AppShell';
 import { CalendarRoute } from '@/routes/CalendarRoute';
+import { CalendarEventEditorRoute } from '@/routes/CalendarEventEditorRoute';
 import { ExportRoute } from '@/routes/ExportRoute';
 import { ImportRoute } from '@/routes/ImportRoute';
 import { InsightsRoute } from '@/routes/InsightsRoute';
@@ -23,6 +24,7 @@ export const router = createHashRouter([
       { path: 'today', element: <TodayRoute /> },
       { path: 'week', element: <WeekRoute /> },
       { path: 'calendar', element: <CalendarRoute /> },
+      { path: 'calendar/edit', element: <CalendarEventEditorRoute /> },
       { path: 'tasks', element: <TasksRoute /> },
       { path: 'learners', element: <LearnersRoute /> },
       { path: 'library', element: <LibraryRoute /> },

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useUiStore } from '@/app/uiStore';
+import { useEditHistory } from '@/features/editing/useEditHistory';
 import styles from './AppShell.module.css';
 
 const navigationGroups = [
@@ -55,6 +56,7 @@ const navigationGroups = [
 export function AppShell() {
   const sidebarCollapsed = useUiStore((state) => state.sidebarCollapsed);
   const toggleSidebar = useUiStore((state) => state.toggleSidebar);
+  const history = useEditHistory();
 
   return (
     <div className={styles.shell} data-sidebar-collapsed={sidebarCollapsed}>
@@ -125,12 +127,27 @@ export function AppShell() {
             />
           </label>
           <div className={styles.historyControls} aria-label="Classroom data history">
-            <button type="button" disabled aria-label="Undo" title="Nothing to undo">
+            <button
+              type="button"
+              disabled={!history.canUndo || history.busy}
+              aria-label="Undo"
+              title={history.undoLabel ? `Undo ${history.undoLabel}` : 'Nothing to undo'}
+              onClick={() => void history.undo()}
+            >
               <ChevronLeft size={20} />
             </button>
-            <button type="button" disabled aria-label="Redo" title="Nothing to redo">
+            <button
+              type="button"
+              disabled={!history.canRedo || history.busy}
+              aria-label="Redo"
+              title={history.redoLabel ? `Redo ${history.redoLabel}` : 'Nothing to redo'}
+              onClick={() => void history.redo()}
+            >
               <ChevronRight size={20} />
             </button>
+            <span className="sr-only" role="status" aria-live="polite">
+              {history.error ?? ''}
+            </span>
           </div>
         </header>
         <main className={styles.content}>
