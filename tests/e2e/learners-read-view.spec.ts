@@ -199,7 +199,7 @@ test('Learners renders active contexts and shared planning views from v20 data',
   await expect(upcomingItem.getByText('9:30 AM–10:30 AM')).toBeVisible();
   await expect(upcomingItem.getByRole('link', { name: 'View in Week' })).toHaveAttribute(
     'href',
-    '#/week?date=2026-07-20',
+    '#/week?date=2026-07-20&view=everything&focus=session-occurrence%3Aphase-2e-class-upcoming-session',
   );
   await expect(classPlanning.getByText('Synthetic past scheduled lesson')).toHaveCount(0);
 
@@ -229,7 +229,7 @@ test('Learners renders active contexts and shared planning views from v20 data',
   await expect(completedItem.getByText('Tuesday, July 14, 2026')).toBeVisible();
   await expect(completedItem.getByRole('link', { name: 'View in Week' })).toHaveAttribute(
     'href',
-    '#/week?date=2026-07-14',
+    '#/week?date=2026-07-14&view=everything&focus=session-occurrence%3Aphase-2e-individual-completed-session',
   );
 
   const accessibilityResults = await new AxeBuilder({ page }).analyze();

@@ -8,9 +8,15 @@ import {
   StickyNote,
   Users,
 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useMemo, type ChangeEvent } from 'react';
 
-import type { TodayTemporalStatus, TodayTimelineItem } from '@/features/today/todayReadModel';
+import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
+import { buildWeekHref } from '@/features/week/weekNavigation';
+import type {
+  TodayReadModel,
+  TodayTemporalStatus,
+  TodayTimelineItem,
+} from '@/features/today/todayReadModel';
 import { buildTodayReadModel } from '@/features/today/todayReadModel';
 import { TaskList } from '@/features/tasks/TaskList';
 import { useWorkspaceReadModel } from '@/features/workspace/useWorkspaceReadModel';
@@ -27,7 +33,7 @@ function getGreeting(): string {
 }
 
 function getItemTypeLabel(item: TodayTimelineItem): string {
-  if (item.sourceType === 'calendar-event') return 'Calendar';
+  if (item.sourceType === 'calendar-event') return 'Event';
   if (item.kind === 'container') return 'Schedule group';
   if (item.kind === 'routine') return 'Routine';
   if (item.kind === 'transition') return 'Transition';
@@ -42,15 +48,69 @@ function getStatusClassName(status: TodayTemporalStatus): string {
 }
 
 function getItemClassName(item: TodayTimelineItem): string {
-  const classes = [styles.timelineItem];
-  classes.push(item.sourceType === 'calendar-event' ? styles.calendarItem : styles.scheduleItem);
-  if (item.kind === 'container') classes.push(styles.containerItem);
-  if (item.spanPosition !== 'single') classes.push(styles.spanningItem);
+  const classes = [styles.timelineItem!];
+  classes.push(item.sourceType === 'calendar-event' ? styles.calendarItem! : styles.scheduleItem!);
+  if (item.kind === 'container') classes.push(styles.containerItem!);
+  if (item.spanPosition !== 'single') classes.push(styles.spanningItem!);
   return classes.join(' ');
 }
 
 function itemCountLabel(count: number): string {
   return `${count} ${count === 1 ? 'item' : 'items'}`;
+}
+
+function getStartTimeLabel(item: TodayTimelineItem): string {
+  if (item.isAllDay) return 'All day';
+
+  if (item.spanPosition === 'middle') {
+    return 'Continues';
+  }
+
+  if (item.spanPosition === 'end') {
+    return item.endMinute !== undefined ? `Until ${formatCalendarMinute(item.endMinute)}` : 'Ends';
+  }
+
+  if (item.spanPosition === 'start') {
+    return item.startMinute !== undefined ? formatCalendarMinute(item.startMinute) : 'Starts';
+  }
+
+  if (item.startMinute !== undefined) {
+    return formatCalendarMinute(item.startMinute);
+  }
+
+  if (item.endMinute !== undefined) {
+    return `Until ${formatCalendarMinute(item.endMinute)}`;
+  }
+
+  return item.timeLabel;
+}
+
+function getDurationLabel(item: TodayTimelineItem): string | null {
+  if (
+    item.spanPosition !== 'single' ||
+    item.startMinute === undefined ||
+    item.endMinute === undefined ||
+    item.endMinute <= item.startMinute
+  ) {
+    return null;
+  }
+
+  const duration = item.endMinute - item.startMinute;
+  if (duration < 60) return `${duration} min`;
+  const hours = Math.floor(duration / 60);
+  const minutes = duration % 60;
+  return minutes > 0 ? `${hours} hr ${minutes} min` : `${hours} hr`;
+}
+
+function getTodayWeekHref(date: string, today: TodayReadModel | null): string {
+  const focusItem = today?.focusItem;
+  if (!focusItem) return buildWeekHref({ date, view: 'everything' });
+
+  return buildWeekHref({
+    date,
+    view: focusItem.sourceType === 'calendar-event' ? 'events' : 'schedule',
+    focus: focusItem.occurrenceId,
+  });
 }
 
 export function TodayRoute() {
@@ -74,6 +134,7 @@ export function TodayRoute() {
         : null,
     [currentDate, currentMinute, date, state],
   );
+  const weekHref = getTodayWeekHref(date, today);
 
   return (
     <section>
@@ -110,7 +171,7 @@ export function TodayRoute() {
               className="input"
               type="date"
               value={date}
-              onChange={(event) => setDate(event.target.value)}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => setDate(event.target.value)}
             />
           </label>
         </div>
@@ -210,7 +271,7 @@ export function TodayRoute() {
                 </p>
               ) : null}
             </div>
-            <a className="button button-primary" href={`#/week?date=${date}`}>
+            <a className="button button-primary" href={weekHref}>
               <CalendarDays size={17} /> View in Week
             </a>
           </div>
@@ -218,7 +279,7 @@ export function TodayRoute() {
           {state.status === 'loading' ? (
             <div className={`card ${styles.statePanel}`} aria-live="polite">
               <Clock3 size={28} aria-hidden="true" />
-              <p>Loading Today from the v20 database…</p>
+              <p>Loading today’s schedule…</p>
             </div>
           ) : null}
 
@@ -249,65 +310,64 @@ export function TodayRoute() {
               ) : null}
 
               {today.focusItem && today.focusLabel ? (
-                <article
-                  className={`card ${styles.focusCard}`}
+                <div
+                  className={styles.focusStrip}
+                  role="status"
                   aria-label={`${today.focusLabel}: ${today.focusItem.title}`}
                 >
-                  <div className={styles.focusLabel}>{today.focusLabel}</div>
-                  <div className={styles.focusBody}>
-                    <div>
-                      <h3>{today.focusItem.title}</h3>
-                      <p>
-                        {today.focusItem.timeLabel} · {getItemTypeLabel(today.focusItem)}
-                      </p>
-                    </div>
-                    <Clock3 size={25} aria-hidden="true" />
-                  </div>
-                </article>
+                  <span className={styles.focusLabel}>{today.focusLabel}</span>
+                  <strong>{today.focusItem.title}</strong>
+                  <span>
+                    {getStartTimeLabel(today.focusItem)} · {getItemTypeLabel(today.focusItem)}
+                  </span>
+                </div>
               ) : null}
 
               {today.timelineItems.length > 0 ? (
                 <ol className={styles.timelineList} aria-label={`Timeline for ${today.label}`}>
-                  {today.timelineItems.map((item) => (
-                    <li
-                      key={item.occurrenceId}
-                      className={getItemClassName(item)}
-                      aria-label={`${item.title}, ${item.timeLabel}, ${item.statusLabel}`}
-                    >
-                      <div className={styles.timelineRail} aria-hidden="true">
-                        <span />
-                      </div>
-                      <div className={styles.timelineContent}>
-                        <div className={styles.itemMeta}>
-                          <span
-                            className={`${styles.statusBadge} ${getStatusClassName(
-                              item.temporalStatus,
-                            )}`}
-                          >
-                            {item.statusLabel}
-                          </span>
-                          <time>{item.timeLabel}</time>
+                  {today.timelineItems.map((item) => {
+                    const durationLabel = getDurationLabel(item);
+                    return (
+                      <li
+                        key={item.occurrenceId}
+                        className={getItemClassName(item)}
+                        aria-label={`${item.title}, ${item.timeLabel}, ${item.statusLabel}`}
+                      >
+                        <div className={styles.timelineTime} title={item.timeLabel}>
+                          <time>{getStartTimeLabel(item)}</time>
+                          {durationLabel ? <span>{durationLabel}</span> : null}
                         </div>
-                        <h3>{item.title}</h3>
-                        {item.parentTitle ? (
-                          <p className={styles.itemContext}>Part of {item.parentTitle}</p>
-                        ) : null}
-                        <div className={styles.itemFooter}>
-                          <span>{getItemTypeLabel(item)}</span>
-                          <span>{item.category}</span>
+                        <div className={styles.timelineRail} aria-hidden="true">
+                          <span />
                         </div>
-                      </div>
-                    </li>
-                  ))}
+                        <div className={styles.timelineContent}>
+                          <div className={styles.itemMeta}>
+                            <span
+                              className={`${styles.statusBadge} ${getStatusClassName(
+                                item.temporalStatus,
+                              )}`}
+                            >
+                              {item.statusLabel}
+                            </span>
+                            <span className={styles.itemType}>{getItemTypeLabel(item)}</span>
+                          </div>
+                          <h3>{item.title}</h3>
+                          {item.parentTitle ? (
+                            <p className={styles.itemContext}>Part of {item.parentTitle}</p>
+                          ) : null}
+                          {item.category ? (
+                            <p className={styles.itemCategory}>{item.category}</p>
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ol>
               ) : (
                 <div className={`card ${styles.scheduleEmpty}`}>
                   <Clock3 size={32} aria-hidden="true" />
                   <h3>No schedule items for this date</h3>
-                  <p>
-                    Today reads recurring Schedule Blocks and dated Calendar events from the v20
-                    database.
-                  </p>
+                  <p>Recurring schedule blocks and dated events will appear here.</p>
                   <a className="button" href={`#/calendar?date=${date}`}>
                     <CalendarDays size={17} /> Open Calendar
                   </a>

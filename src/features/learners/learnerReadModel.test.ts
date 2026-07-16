@@ -119,7 +119,7 @@ describe('buildLearnersPageReadModel', () => {
       date: '2026-07-20',
       dateLabel: 'Monday, July 20, 2026',
       timeLabel: '9:00 AM–10:00 AM',
-      weekHref: '#/week?date=2026-07-20',
+      weekHref: '#/week?date=2026-07-20&view=everything&focus=session-occurrence%3Asession-first',
       stateLabel: 'Scheduled',
     });
   });
@@ -167,7 +167,9 @@ describe('buildLearnersPageReadModel', () => {
       'Newest completed lesson',
       'Older completed lesson',
     ]);
-    expect(model.completedItems[0]?.weekHref).toBe('#/week?date=2026-07-14');
+    expect(model.completedItems[0]?.weekHref).toBe(
+      '#/week?date=2026-07-14&view=everything&focus=session-occurrence%3Asession-new',
+    );
   });
 
   it('keeps orphaned sessions visible with a safe fallback title', () => {
