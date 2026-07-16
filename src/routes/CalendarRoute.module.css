@@ -378,3 +378,48 @@
 .itemCategory {
   color: #4f5955;
 }
+
+/* Phase 2.1 Calendar month readability closure */
+.itemMeta {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  align-items: start;
+  justify-items: start;
+}
+
+.itemMeta span {
+  min-width: 0;
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.itemMeta time {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--heading);
+  font-size: clamp(9px, 0.72vw, 11px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.itemTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.3;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.itemContext,
+.itemCategory {
+  font-size: 11px;
+  line-height: 1.35;
+}
