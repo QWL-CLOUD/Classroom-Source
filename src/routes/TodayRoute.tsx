@@ -67,15 +67,11 @@ function getStartTimeLabel(item: TodayTimelineItem): string {
   }
 
   if (item.spanPosition === 'end') {
-    return item.endMinute !== undefined
-      ? `Until ${formatCalendarMinute(item.endMinute)}`
-      : 'Ends';
+    return item.endMinute !== undefined ? `Until ${formatCalendarMinute(item.endMinute)}` : 'Ends';
   }
 
   if (item.spanPosition === 'start') {
-    return item.startMinute !== undefined
-      ? formatCalendarMinute(item.startMinute)
-      : 'Starts';
+    return item.startMinute !== undefined ? formatCalendarMinute(item.startMinute) : 'Starts';
   }
 
   if (item.startMinute !== undefined) {
