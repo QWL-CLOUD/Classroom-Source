@@ -78,6 +78,23 @@
   font-weight: 700;
 }
 
+.activeSchoolYear {
+  margin: -4px 0 16px;
+  color: var(--text-secondary);
+}
+
+.activeSchoolYear strong {
+  color: var(--heading);
+}
+
+.error {
+  padding: 12px 14px;
+  border: 1px solid var(--danger-border, #c77777);
+  border-radius: 10px;
+  color: var(--danger-text, #8a2f2f);
+  background: var(--danger-soft, #fff3f3);
+}
+
 .counts {
   display: grid;
   grid-template-columns: repeat(4, minmax(120px, 1fr));

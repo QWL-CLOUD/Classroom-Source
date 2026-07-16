@@ -1,22 +1,171 @@
-import { classroomDb } from '@/data/db/ClassroomDatabase';
+import { classroomDb, type ClassroomDatabase } from '@/data/db/ClassroomDatabase';
+import {
+  calendarEventSchema,
+  learnerContextSchema,
+  scheduleBlockSchema,
+  schoolYearSchema,
+  taskSchema,
+  type CalendarEvent,
+  type LearnerContext,
+  type ScheduleBlock,
+  type SchoolYear,
+  type Task,
+} from '@/domain/models/entities';
+import type {
+  CoreRecordCounts,
+  LearnerContextQuery,
+  LocalDateRange,
+  WorkspaceDataSummary,
+} from '@/domain/readModels/workspaceReadModels';
 import type { ClassroomRepository } from '@/domain/repositories/ClassroomRepository';
-import { taskSchema, type Task } from '@/domain/models/entities';
+import { assertLocalDateRange, localDateRangesOverlap } from '@/shared/dates/localDate';
+
+const learnerKindOrder: Record<LearnerContext['kind'], number> = {
+  class: 0,
+  group: 1,
+  individual: 2,
+};
+
+function compareText(first: string, second: string): number {
+  return first.localeCompare(second, 'en', { sensitivity: 'base' }) || first.localeCompare(second);
+}
+
+function compareSchoolYears(first: SchoolYear, second: SchoolYear): number {
+  return (
+    second.startsOn.localeCompare(first.startsOn) ||
+    second.endsOn.localeCompare(first.endsOn) ||
+    compareText(first.label, second.label) ||
+    first.id.localeCompare(second.id)
+  );
+}
+
+function compareScheduleBlocks(first: ScheduleBlock, second: ScheduleBlock): number {
+  return (
+    first.startMinute - second.startMinute ||
+    first.sortOrder - second.sortOrder ||
+    compareText(first.title, second.title) ||
+    first.id.localeCompare(second.id)
+  );
+}
+
+function compareCalendarEvents(first: CalendarEvent, second: CalendarEvent): number {
+  return (
+    first.startDate.localeCompare(second.startDate) ||
+    (first.startMinute ?? -1) - (second.startMinute ?? -1) ||
+    compareText(first.title, second.title) ||
+    first.id.localeCompare(second.id)
+  );
+}
+
+function compareLearnerContexts(first: LearnerContext, second: LearnerContext): number {
+  return (
+    learnerKindOrder[first.kind] - learnerKindOrder[second.kind] ||
+    compareText(first.name, second.name) ||
+    first.id.localeCompare(second.id)
+  );
+}
 
 export class DexieClassroomRepository implements ClassroomRepository {
+  constructor(private readonly db: ClassroomDatabase = classroomDb) {}
+
   async listTasks(): Promise<Task[]> {
-    return classroomDb.tasks.orderBy('order').toArray();
+    return this.db.tasks.orderBy('order').toArray();
   }
 
   async putTask(task: Task): Promise<void> {
-    await classroomDb.tasks.put(taskSchema.parse(task));
+    await this.db.tasks.put(taskSchema.parse(task));
   }
 
   async deleteTask(id: string): Promise<void> {
-    await classroomDb.tasks.delete(id);
+    await this.db.tasks.delete(id);
   }
 
-  async countCoreRecords(): Promise<Record<string, number>> {
+  async getActiveSchoolYear(): Promise<SchoolYear | null> {
+    const schoolYears = (await this.db.schoolYears.toArray()).map((value) =>
+      schoolYearSchema.parse(value),
+    );
+
+    for (const schoolYear of schoolYears) {
+      assertLocalDateRange(schoolYear.startsOn, schoolYear.endsOn);
+    }
+
+    return (
+      schoolYears.filter((schoolYear) => schoolYear.active).sort(compareSchoolYears)[0] ?? null
+    );
+  }
+
+  async listScheduleBlocksForRange(range: LocalDateRange): Promise<ScheduleBlock[]> {
+    assertLocalDateRange(range.startDate, range.endDate);
+
+    const scheduleBlocks = (await this.db.scheduleBlocks.toArray()).map((value) =>
+      scheduleBlockSchema.parse(value),
+    );
+
+    for (const block of scheduleBlocks) {
+      if (block.effectiveFrom) {
+        assertLocalDateRange(block.effectiveFrom, block.effectiveFrom);
+      }
+      if (block.effectiveTo) {
+        assertLocalDateRange(block.effectiveTo, block.effectiveTo);
+      }
+      if (block.effectiveFrom && block.effectiveTo) {
+        assertLocalDateRange(block.effectiveFrom, block.effectiveTo);
+      }
+    }
+
+    return scheduleBlocks
+      .filter(
+        (block) =>
+          !block.archivedAt &&
+          (!block.effectiveFrom || block.effectiveFrom <= range.endDate) &&
+          (!block.effectiveTo || block.effectiveTo >= range.startDate),
+      )
+      .sort(compareScheduleBlocks);
+  }
+
+  async listCalendarEventsForRange(range: LocalDateRange): Promise<CalendarEvent[]> {
+    assertLocalDateRange(range.startDate, range.endDate);
+
+    const calendarEvents = (await this.db.calendarEvents.toArray()).map((value) =>
+      calendarEventSchema.parse(value),
+    );
+
+    return calendarEvents
+      .filter((event) =>
+        localDateRangesOverlap(
+          event.startDate,
+          event.endDate ?? event.startDate,
+          range.startDate,
+          range.endDate,
+        ),
+      )
+      .sort(compareCalendarEvents);
+  }
+
+  async listLearnerContexts(query: LearnerContextQuery = {}): Promise<LearnerContext[]> {
+    const requestedStatus = query.status ?? 'active';
+    const learnerContexts = (await this.db.learnerContexts.toArray()).map((value) =>
+      learnerContextSchema.parse(value),
+    );
+
+    return learnerContexts
+      .filter(
+        (context) =>
+          context.status === requestedStatus &&
+          (!query.schoolYearId || context.schoolYearId === query.schoolYearId) &&
+          (!query.kind || context.kind === query.kind),
+      )
+      .sort(compareLearnerContexts);
+  }
+
+  async countQuarantineRecords(): Promise<number> {
+    return this.db.quarantineRecords.count();
+  }
+
+  async countCoreRecords(): Promise<CoreRecordCounts> {
     const [
+      schoolYears,
+      learnerContexts,
       scheduleBlocks,
       calendarEvents,
       lessonPlans,
@@ -25,16 +174,20 @@ export class DexieClassroomRepository implements ClassroomRepository {
       migrationRuns,
       quarantine,
     ] = await Promise.all([
-      classroomDb.scheduleBlocks.count(),
-      classroomDb.calendarEvents.count(),
-      classroomDb.lessonPlans.count(),
-      classroomDb.sessionOccurrences.count(),
-      classroomDb.tasks.count(),
-      classroomDb.migrationRuns.count(),
-      classroomDb.quarantineRecords.count(),
+      this.db.schoolYears.count(),
+      this.db.learnerContexts.count(),
+      this.db.scheduleBlocks.count(),
+      this.db.calendarEvents.count(),
+      this.db.lessonPlans.count(),
+      this.db.sessionOccurrences.count(),
+      this.db.tasks.count(),
+      this.db.migrationRuns.count(),
+      this.db.quarantineRecords.count(),
     ]);
 
     return {
+      schoolYears,
+      learnerContexts,
       scheduleBlocks,
       calendarEvents,
       lessonPlans,
@@ -43,6 +196,15 @@ export class DexieClassroomRepository implements ClassroomRepository {
       migrationRuns,
       quarantine,
     };
+  }
+
+  async getWorkspaceDataSummary(): Promise<WorkspaceDataSummary> {
+    const [activeSchoolYear, counts] = await Promise.all([
+      this.getActiveSchoolYear(),
+      this.countCoreRecords(),
+    ]);
+
+    return { activeSchoolYear, counts };
   }
 }
 
