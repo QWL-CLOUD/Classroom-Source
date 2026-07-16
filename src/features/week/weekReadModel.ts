@@ -1,6 +1,11 @@
 import { format, getISODay } from 'date-fns';
 
-import type { CalendarEvent, ScheduleBlock } from '@/domain/models/entities';
+import type {
+  CalendarEvent,
+  LessonPlan,
+  ScheduleBlock,
+  SessionOccurrence,
+} from '@/domain/models/entities';
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
 import {
   formatLongDate,
@@ -12,7 +17,7 @@ import {
 } from '@/shared/dates/localDate';
 
 export type WeekViewFilter = 'teaching' | 'calendar' | 'personal' | 'everything';
-export type WeekItemSource = 'calendar-event' | 'schedule-block';
+export type WeekItemSource = 'calendar-event' | 'schedule-block' | 'session-occurrence';
 export type WeekSpanPosition = 'single' | 'start' | 'middle' | 'end';
 
 export interface WeekRange {
@@ -37,6 +42,7 @@ export interface WeekDayItem {
   startMinute?: number;
   endMinute?: number;
   kind?: ScheduleBlock['kind'];
+  deliveryState?: SessionOccurrence['deliveryState'];
   parentTitle?: string;
   spanPosition: WeekSpanPosition;
   sortOrder: number;
@@ -57,6 +63,7 @@ export interface WeekReadModel {
   viewFilter: WeekViewFilter;
   sourceScheduleBlockCount: number;
   sourceCalendarEventCount: number;
+  sourceSessionOccurrenceCount: number;
   visibleItemCount: number;
   hiddenDuplicateCount: number;
 }
@@ -173,6 +180,30 @@ function toCalendarEventItem(event: CalendarEvent, date: string): WeekDayItem {
   };
 }
 
+function toSessionItem(
+  session: SessionOccurrence,
+  lessonPlanById: ReadonlyMap<string, LessonPlan>,
+): WeekDayItem {
+  const plan = lessonPlanById.get(session.lessonPlanId);
+
+  return {
+    occurrenceId: `session-occurrence:${session.id}`,
+    sourceRecordId: session.id,
+    sourceType: 'session-occurrence',
+    title: plan?.title ?? 'Planned session',
+    category: plan?.subject ?? 'Planning',
+    contextId: session.contextId,
+    date: session.date,
+    timeLabel: formatMinuteRange(session.startMinute, session.endMinute),
+    isAllDay: false,
+    startMinute: session.startMinute,
+    endMinute: session.endMinute,
+    deliveryState: session.deliveryState,
+    spanPosition: 'single',
+    sortOrder: 0,
+  };
+}
+
 function isPersonalCalendarItem(item: WeekDayItem): boolean {
   if (item.sourceType !== 'calendar-event') return false;
   const classification = `${normalizeText(item.category)} ${normalizeText(item.title)}`;
@@ -237,8 +268,13 @@ function compareWeekItems(first: WeekDayItem, second: WeekDayItem): number {
 
   if (first.sortOrder !== second.sortOrder) return first.sortOrder - second.sortOrder;
 
-  const firstSourceRank = first.sourceType === 'calendar-event' ? 0 : 1;
-  const secondSourceRank = second.sourceType === 'calendar-event' ? 0 : 1;
+  const sourceRank: Record<WeekItemSource, number> = {
+    'calendar-event': 0,
+    'session-occurrence': 1,
+    'schedule-block': 2,
+  };
+  const firstSourceRank = sourceRank[first.sourceType];
+  const secondSourceRank = sourceRank[second.sourceType];
   if (firstSourceRank !== secondSourceRank) return firstSourceRank - secondSourceRank;
 
   const titleComparison = first.title.localeCompare(second.title);
@@ -273,11 +309,15 @@ export function buildWeekReadModel(
   calendarEvents: readonly CalendarEvent[],
   viewFilter: WeekViewFilter,
   currentDate: string = todayLocalDate(),
+  lessonPlans: readonly LessonPlan[] = [],
+  sessionOccurrences: readonly SessionOccurrence[] = [],
 ): WeekReadModel {
   const range = getWeekRange(anchorDate);
   const blockById = new Map(scheduleBlocks.map((block) => [block.id, block]));
+  const lessonPlanById = new Map(lessonPlans.map((plan) => [plan.id, plan]));
   const visibleScheduleBlockIds = new Set<string>();
   const visibleCalendarEventIds = new Set<string>();
+  const visibleSessionOccurrenceIds = new Set<string>();
   let hiddenDuplicateCount = 0;
 
   const days = range.dates.map((date): WeekDayReadModel => {
@@ -295,7 +335,14 @@ export function buildWeekReadModel(
         return toCalendarEventItem(event, date);
       });
 
-    const filteredItems = [...scheduleItems, ...eventItems].filter((item) =>
+    const sessionItems = sessionOccurrences
+      .filter((session) => session.date === date && session.deliveryState !== 'cancelled')
+      .map((session) => {
+        visibleSessionOccurrenceIds.add(session.id);
+        return toSessionItem(session, lessonPlanById);
+      });
+
+    const filteredItems = [...scheduleItems, ...eventItems, ...sessionItems].filter((item) =>
       itemMatchesView(item, viewFilter),
     );
     const deduplicated = removeExactDatedDuplicates(filteredItems);
@@ -318,6 +365,7 @@ export function buildWeekReadModel(
     viewFilter,
     sourceScheduleBlockCount: visibleScheduleBlockIds.size,
     sourceCalendarEventCount: visibleCalendarEventIds.size,
+    sourceSessionOccurrenceCount: visibleSessionOccurrenceIds.size,
     visibleItemCount: days.reduce((total, day) => total + day.items.length, 0),
     hiddenDuplicateCount,
   };

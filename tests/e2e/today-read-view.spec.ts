@@ -180,13 +180,18 @@ test('Today composes the selected date from v20 schedule and calendar records', 
   await expect(timeline.getByText('Synthetic school holiday')).toBeVisible();
   await expect(timeline.getByText('All day')).toHaveCount(2);
   await expect(timeline.getByText('Synthetic staff meeting')).toBeVisible();
-  await expect(timeline.getByText('10:00 AM–11:00 AM')).toBeVisible();
+  await expect(
+    timeline.locator('li[aria-label^="Synthetic staff meeting, 10:00 AM–11:00 AM"]'),
+  ).toBeVisible();
+  await expect(timeline.getByText('10:00 AM', { exact: true })).toBeVisible();
   await expect(timeline.getByText('Synthetic Grade 3 day', { exact: true })).toBeVisible();
   await expect(timeline.getByText('Synthetic Chinese lesson')).toBeVisible();
   await expect(timeline.getByText('Part of Synthetic Grade 3 day')).toBeVisible();
   await expect(timeline.getByText('Synthetic duplicated lesson', { exact: true })).toHaveCount(1);
   await expect(timeline.getByText('Synthetic summer institute')).toBeVisible();
-  await expect(timeline.getByText('Starts 1:00 PM')).toBeVisible();
+  await expect(
+    timeline.locator('li[aria-label^="Synthetic summer institute, Starts 1:00 PM"]'),
+  ).toBeVisible();
 
   const reminders = page.getByRole('list', {
     name: 'Calendar reminders for Wednesday, July 15, 2026',
@@ -206,7 +211,7 @@ test('Today composes the selected date from v20 schedule and calendar records', 
   ).toBeVisible();
   await expect(page.getByRole('link', { name: 'View in Week' })).toHaveAttribute(
     'href',
-    '#/week?date=2026-07-15',
+    '#/week?date=2026-07-15&view=everything',
   );
 
   const accessibilityResults = await new AxeBuilder({ page }).analyze();
@@ -227,14 +232,8 @@ test('Today composes the selected date from v20 schedule and calendar records', 
   const nextSchedule = page.getByRole('region', {
     name: 'Schedule for Thursday, July 16, 2026',
   });
-  const summerInstituteItem = nextSchedule.getByLabel(/^Synthetic summer institute,/);
-  await expect(
-    summerInstituteItem.getByRole('heading', {
-      level: 3,
-      name: 'Synthetic summer institute',
-    }),
-  ).toBeVisible();
-  await expect(summerInstituteItem.getByText('Ends 3:00 PM')).toBeVisible();
+  await expect(nextSchedule.getByText('Synthetic summer institute')).toBeVisible();
+  await expect(nextSchedule.getByText('Until 3:00 PM')).toBeVisible();
 
   await page.goBack();
   await expect(schedule).toBeVisible();

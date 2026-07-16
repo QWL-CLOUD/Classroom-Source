@@ -1,9 +1,12 @@
 import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
-import { useMemo, type ChangeEvent, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, type ChangeEvent, type CSSProperties } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import { useUiStore } from '@/app/uiStore';
+import { parseWeekViewQuery, toWeekViewQuery } from '@/features/week/weekNavigation';
 import type { WeekDayItem, WeekViewFilter } from '@/features/week/weekReadModel';
 import { buildWeekReadModel, getWeekRange, shiftWeek } from '@/features/week/weekReadModel';
+import { useWeekPlanningReadModel } from '@/features/week/useWeekPlanningReadModel';
 import { useWorkspaceReadModel } from '@/features/workspace/useWorkspaceReadModel';
 import { todayLocalDate } from '@/shared/dates/localDate';
 import { useDateSearchParam } from '@/shared/dates/useDateSearchParam';
@@ -11,13 +14,14 @@ import { useDateSearchParam } from '@/shared/dates/useDateSearchParam';
 import styles from './WeekRoute.module.css';
 
 const WEEK_VIEW_LABELS: Record<WeekViewFilter, string> = {
-  teaching: 'Teaching',
-  calendar: 'Calendar',
-  personal: 'Personal Agenda',
+  teaching: 'Schedule',
+  calendar: 'Events',
+  personal: 'Personal',
   everything: 'Everything',
 };
 
 function getItemTypeLabel(item: WeekDayItem): string {
+  if (item.sourceType === 'session-occurrence') return 'Session';
   if (item.sourceType === 'calendar-event') return 'Event';
   if (item.kind === 'container') return 'Schedule group';
   if (item.kind === 'routine') return 'Routine';
@@ -25,11 +29,14 @@ function getItemTypeLabel(item: WeekDayItem): string {
   return 'Schedule';
 }
 
-function getItemClassName(item: WeekDayItem): string {
-  const classes = [styles.item];
-  classes.push(item.sourceType === 'calendar-event' ? styles.calendarEvent : styles.scheduleBlock);
-  if (item.kind === 'container') classes.push(styles.containerItem);
-  if (item.spanPosition !== 'single') classes.push(styles.spanningItem);
+function getItemClassName(item: WeekDayItem, focused: boolean): string {
+  const classes = [styles.item!];
+  if (item.sourceType === 'session-occurrence') classes.push(styles.sessionItem!);
+  else if (item.sourceType === 'calendar-event') classes.push(styles.calendarEvent!);
+  else classes.push(styles.scheduleBlock!);
+  if (item.kind === 'container') classes.push(styles.containerItem!);
+  if (item.spanPosition !== 'single') classes.push(styles.spanningItem!);
+  if (focused) classes.push(styles.focusedItem!);
   return classes.join(' ');
 }
 
@@ -38,11 +45,16 @@ function itemCountLabel(count: number): string {
 }
 
 export function WeekRoute() {
-  const { date, setDate } = useDateSearchParam();
+  const { date } = useDateSearchParam();
+  const [searchParams, setSearchParams] = useSearchParams();
   const showWeekends = useUiStore((state) => state.showWeekends);
   const setShowWeekends = useUiStore((state) => state.setShowWeekends);
-  const weekView = useUiStore((state) => state.weekView);
+  const storedWeekView = useUiStore((state) => state.weekView);
   const setWeekView = useUiStore((state) => state.setWeekView);
+  const queryWeekView = parseWeekViewQuery(searchParams.get('view'));
+  const weekView = queryWeekView ?? storedWeekView;
+  const focusId = searchParams.get('focus');
+  const itemRefs = useRef(new Map<string, HTMLLIElement>());
 
   const range = useMemo(() => getWeekRange(date), [date]);
   const previousRange = useMemo(() => getWeekRange(shiftWeek(date, -1)), [date]);
@@ -51,20 +63,74 @@ export function WeekRoute() {
     startDate: range.mondayDate,
     endDate: range.sundayDate,
   });
+  const planningState = useWeekPlanningReadModel({
+    startDate: range.mondayDate,
+    endDate: range.sundayDate,
+  });
   const week = useMemo(
     () =>
-      state.status === 'ready'
+      state.status === 'ready' && planningState.status === 'ready'
         ? buildWeekReadModel(
             date,
             state.data.scheduleBlocks,
             state.data.calendarEvents,
             weekView,
             todayLocalDate(),
+            planningState.data.lessonPlans,
+            planningState.data.sessionOccurrences,
           )
         : null,
-    [date, state, weekView],
+    [date, planningState, state, weekView],
   );
   const visibleDays = week ? (showWeekends ? week.days : week.days.slice(0, 5)) : [];
+  const errorMessage =
+    state.status === 'error'
+      ? state.message
+      : planningState.status === 'error'
+        ? planningState.message
+        : null;
+  const loading = state.status === 'loading' || planningState.status === 'loading';
+
+  useEffect(() => {
+    if (queryWeekView && queryWeekView !== storedWeekView) {
+      setWeekView(queryWeekView);
+    }
+  }, [queryWeekView, setWeekView, storedWeekView]);
+
+  useEffect(() => {
+    if (!focusId || !week || showWeekends) return;
+    const focusedDayIndex = week.days.findIndex((day) =>
+      day.items.some((item) => item.occurrenceId === focusId),
+    );
+    if (focusedDayIndex >= 5) setShowWeekends(true);
+  }, [focusId, setShowWeekends, showWeekends, week]);
+
+  useEffect(() => {
+    if (!focusId || !week) return;
+    const frame = window.requestAnimationFrame(() => {
+      const target = itemRefs.current.get(focusId);
+      if (!target) return;
+      target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      target.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusId, showWeekends, week]);
+
+  function navigateToDate(nextDate: string): void {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('date', nextDate);
+    nextParams.delete('focus');
+    setSearchParams(nextParams);
+  }
+
+  function changeView(event: ChangeEvent<HTMLSelectElement>): void {
+    const nextView = event.target.value as WeekViewFilter;
+    setWeekView(nextView);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('view', toWeekViewQuery(nextView));
+    nextParams.delete('focus');
+    setSearchParams(nextParams);
+  }
 
   return (
     <section>
@@ -79,7 +145,9 @@ export function WeekRoute() {
               {week.sourceScheduleBlockCount} schedule block
               {week.sourceScheduleBlockCount === 1 ? '' : 's'} · {week.sourceCalendarEventCount}{' '}
               dated event
-              {week.sourceCalendarEventCount === 1 ? '' : 's'} · {week.visibleItemCount} visible{' '}
+              {week.sourceCalendarEventCount === 1 ? '' : 's'} · {week.sourceSessionOccurrenceCount}{' '}
+              session
+              {week.sourceSessionOccurrenceCount === 1 ? '' : 's'} · {week.visibleItemCount} visible{' '}
               {week.visibleItemCount === 1 ? 'item' : 'items'} in {WEEK_VIEW_LABELS[weekView]}
             </p>
           ) : null}
@@ -90,18 +158,18 @@ export function WeekRoute() {
             className="button"
             type="button"
             aria-label={`Previous week, ${previousRange.label}`}
-            onClick={() => setDate(previousRange.mondayDate)}
+            onClick={() => navigateToDate(previousRange.mondayDate)}
           >
             <ChevronLeft size={18} /> Previous
           </button>
-          <button className="button" type="button" onClick={() => setDate(todayLocalDate())}>
+          <button className="button" type="button" onClick={() => navigateToDate(todayLocalDate())}>
             This week
           </button>
           <button
             className="button"
             type="button"
             aria-label={`Next week, ${nextRange.label}`}
-            onClick={() => setDate(nextRange.mondayDate)}
+            onClick={() => navigateToDate(nextRange.mondayDate)}
           >
             Next <ChevronRight size={18} />
           </button>
@@ -111,22 +179,17 @@ export function WeekRoute() {
       <div className={`card ${styles.controls}`}>
         <label>
           <span>View</span>
-          <select
-            className="select"
-            value={weekView}
-            onChange={(event: ChangeEvent<HTMLSelectElement>) =>
-              setWeekView(event.target.value as WeekViewFilter)
-            }
-          >
-            <option value="teaching">Teaching</option>
-            <option value="calendar">Calendar</option>
-            <option value="personal">Personal Agenda</option>
+          <select className="select" value={weekView} onChange={changeView}>
+            <option value="teaching">Schedule</option>
+            <option value="calendar">Events</option>
+            <option value="personal">Personal</option>
             <option value="everything">Everything</option>
           </select>
         </label>
 
         <p className={styles.filterHelp}>
-          Teaching shows recurring blocks. Calendar and Personal Agenda show dated events.
+          Schedule shows recurring blocks. Events and Personal show dated events. Everything also
+          includes learner sessions.
         </p>
 
         <label className={styles.toggleLabel}>
@@ -140,30 +203,26 @@ export function WeekRoute() {
           <span className={styles.toggleTrack} aria-hidden="true" />
           Weekends
         </label>
-
-        <button className="button" type="button" disabled>
-          Lesson templates · 0
-        </button>
       </div>
 
-      {state.status === 'loading' ? (
+      {loading ? (
         <div className={`card ${styles.statePanel}`} role="status">
           <CalendarDays size={22} aria-hidden="true" />
-          <p>Loading Week from the v20 database…</p>
+          <p>Loading this week…</p>
         </div>
       ) : null}
 
-      {state.status === 'error' ? (
+      {errorMessage ? (
         <div className={`card ${styles.errorPanel}`} role="alert">
           <CalendarDays size={22} aria-hidden="true" />
           <div>
             <h2>Week could not be loaded</h2>
-            <p>{state.message}</p>
+            <p>{errorMessage}</p>
           </div>
         </div>
       ) : null}
 
-      {state.status === 'ready' && week ? (
+      {state.status === 'ready' && planningState.status === 'ready' && week ? (
         <>
           {week.hiddenDuplicateCount > 0 ? (
             <p className={styles.duplicateNote}>
@@ -181,8 +240,8 @@ export function WeekRoute() {
           <div
             className={styles.weekGrid}
             role="region"
-            tabIndex={0}
             aria-label={range.ariaLabel}
+            tabIndex={0}
             style={{ '--day-count': visibleDays.length } as CSSProperties}
           >
             {visibleDays.map((day) => (
@@ -213,26 +272,44 @@ export function WeekRoute() {
 
                 {day.items.length > 0 ? (
                   <ul className={styles.itemList} aria-label={`Items for ${day.label}`}>
-                    {day.items.map((item) => (
-                      <li key={item.occurrenceId} className={getItemClassName(item)}>
-                        <div className={styles.itemMeta}>
-                          <span>{getItemTypeLabel(item)}</span>
-                          <span>{item.timeLabel}</span>
-                        </div>
-                        <p className={styles.itemTitle}>{item.title}</p>
-                        {item.parentTitle ? (
-                          <p className={styles.itemContext}>Part of {item.parentTitle}</p>
-                        ) : null}
-                        {item.category ? (
-                          <p className={styles.itemCategory}>{item.category}</p>
-                        ) : null}
-                      </li>
-                    ))}
+                    {day.items.map((item) => {
+                      const focused = item.occurrenceId === focusId;
+                      return (
+                        <li
+                          key={item.occurrenceId}
+                          ref={(node: HTMLLIElement | null) => {
+                            if (node) itemRefs.current.set(item.occurrenceId, node);
+                            else itemRefs.current.delete(item.occurrenceId);
+                          }}
+                          className={getItemClassName(item, focused)}
+                          aria-current={focused ? 'true' : undefined}
+                          tabIndex={focused ? -1 : undefined}
+                          data-week-item={item.occurrenceId}
+                        >
+                          <div className={styles.itemMeta}>
+                            <span>{getItemTypeLabel(item)}</span>
+                            {item.deliveryState ? (
+                              <span className={styles.deliveryState}>{item.deliveryState}</span>
+                            ) : null}
+                          </div>
+                          <time className={styles.itemTime} title={item.timeLabel} data-week-time>
+                            {item.timeLabel}
+                          </time>
+                          <p className={styles.itemTitle}>{item.title}</p>
+                          {item.parentTitle ? (
+                            <p className={styles.itemContext}>Part of {item.parentTitle}</p>
+                          ) : null}
+                          {item.category ? (
+                            <p className={styles.itemCategory}>{item.category}</p>
+                          ) : null}
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : (
                   <div className={styles.dayEmpty}>
                     <p>No items in {WEEK_VIEW_LABELS[weekView]}.</p>
-                    <span>Change the view to compare recurring blocks and dated events.</span>
+                    <span>Change the view to compare schedule, events, and sessions.</span>
                   </div>
                 )}
               </article>

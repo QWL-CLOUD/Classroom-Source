@@ -199,46 +199,40 @@
   line-height: 1.5;
 }
 
-.focusCard {
+.focusStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
   margin-bottom: 14px;
-  padding: 18px 20px;
-  border-color: #9cb8aa;
+  padding: 11px 14px;
+  border: 1px solid #9cb8aa;
+  border-radius: 12px;
+  color: #4f5955;
   background: #f0f6f2;
+  font-size: 12px;
+}
+
+.focusStrip strong {
+  color: var(--heading);
+  font-size: 14px;
 }
 
 .focusLabel {
-  margin-bottom: 9px;
+  padding: 4px 8px;
+  border-radius: 999px;
   color: #355f54;
-  font-size: 11px;
+  background: #dcebe2;
+  font-size: 10px;
   font-weight: 900;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-
-.focusBody {
-  display: flex;
-  gap: 18px;
-  align-items: center;
-  justify-content: space-between;
-  color: #355f54;
-}
-
-.focusBody h3 {
-  margin: 0;
-  color: var(--heading);
-  font-size: 21px;
-}
-
-.focusBody p {
-  margin: 5px 0 0;
-  color: #4f5955;
-  font-size: 13px;
 }
 
 .timelineList {
   position: relative;
   display: grid;
-  gap: 11px;
+  gap: 12px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -247,9 +241,9 @@
 .timelineList::before {
   content: '';
   position: absolute;
-  top: 18px;
-  bottom: 18px;
-  left: 18px;
+  top: 22px;
+  bottom: 22px;
+  left: 111px;
   width: 2px;
   background: var(--border-soft);
 }
@@ -257,13 +251,40 @@
 .timelineItem {
   position: relative;
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-columns: 96px 30px minmax(0, 1fr);
+  grid-template-areas: 'time rail content';
   min-width: 0;
+}
+
+.timelineTime {
+  grid-area: time;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-end;
+  padding: 17px 10px 0 0;
+  color: var(--heading);
+  text-align: right;
+}
+
+.timelineTime time {
+  font-size: 15px;
+  font-weight: 850;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.timelineTime span {
+  color: #66706c;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .timelineRail {
   position: relative;
   z-index: 1;
+  grid-area: rail;
   display: grid;
   place-items: start center;
   padding-top: 20px;
@@ -289,8 +310,9 @@
 }
 
 .timelineContent {
+  grid-area: content;
   min-width: 0;
-  padding: 16px 18px;
+  padding: 15px 18px 16px;
   border: 1px solid var(--border);
   border-left: 4px solid #66866b;
   border-radius: 13px;
@@ -315,16 +337,9 @@
 .itemMeta {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px 10px;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 7px;
-}
-
-.itemMeta time {
-  color: #4f5955;
-  font-size: 12px;
-  font-weight: 800;
+  margin-bottom: 8px;
 }
 
 .statusBadge {
@@ -334,6 +349,12 @@
   font-weight: 900;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.itemType {
+  color: #4f5955;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .statusPast {
@@ -363,20 +384,15 @@
   font-size: 18px;
 }
 
-.itemContext {
+.itemContext,
+.itemCategory {
   margin: 5px 0 0;
   color: #4f5955;
   font-size: 12px;
   line-height: 1.45;
 }
 
-.itemFooter {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px 12px;
-  margin-top: 10px;
-  color: #4f5955;
-  font-size: 11px;
+.itemCategory {
   font-weight: 700;
 }
 
@@ -429,16 +445,24 @@
     justify-content: center;
   }
 
-  .timelineItem {
-    grid-template-columns: 28px minmax(0, 1fr);
-  }
-
-  .timelineList::before {
-    left: 13px;
-  }
-
+  .timelineList::before,
   .timelineRail {
-    padding-top: 20px;
+    display: none;
+  }
+
+  .timelineItem {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'time'
+      'content';
+  }
+
+  .timelineTime {
+    flex-direction: row;
+    gap: 8px;
+    align-items: baseline;
+    padding: 0 0 7px 4px;
+    text-align: left;
   }
 
   .timelineContent {

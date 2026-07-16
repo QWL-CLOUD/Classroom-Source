@@ -238,7 +238,7 @@ test('Week composes recurring blocks and dated events without duplicate renderin
 
   await page.getByRole('button', { name: 'Next week, Jul 20 – Jul 26' }).click();
   await expect(page.getByRole('heading', { level: 1, name: 'Week Jul 20 – Jul 26' })).toBeVisible();
-  await expect(page).toHaveURL(/#\/week\?date=2026-07-20$/);
+  await expect(page).toHaveURL(/#\/week\?date=2026-07-20&view=everything$/);
 
   await page.goBack();
   await expect(page.getByRole('heading', { level: 1, name: 'Week Jul 13 – Jul 19' })).toBeVisible();

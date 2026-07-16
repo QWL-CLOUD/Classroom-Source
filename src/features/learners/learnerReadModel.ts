@@ -1,6 +1,7 @@
 import type { LearnerContext, LessonPlan, SessionOccurrence } from '@/domain/models/entities';
 import type { LearnersReadSnapshot } from '@/domain/readModels/learnerReadModels';
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
+import { buildWeekHref } from '@/features/week/weekNavigation';
 import { formatLongDate } from '@/shared/dates/localDate';
 
 export interface LearnerContextGroup {
@@ -72,7 +73,11 @@ function sessionToPlanningItem(
     date: session.date,
     dateLabel: formatLongDate(session.date),
     timeLabel: formatSessionTime(session),
-    weekHref: `#/week?date=${session.date}`,
+    weekHref: buildWeekHref({
+      date: session.date,
+      view: 'everything',
+      focus: `session-occurrence:${session.id}`,
+    }),
   };
 }
 

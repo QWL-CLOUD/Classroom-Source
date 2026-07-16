@@ -39,7 +39,7 @@
 }
 
 .filterHelp {
-  flex: 1 1 280px;
+  flex: 1 1 360px;
   margin: 0;
   color: var(--text-secondary);
   font-size: 13px;
@@ -148,18 +148,25 @@
 
 .weekGrid {
   display: grid;
-  grid-template-columns: repeat(var(--day-count), minmax(230px, 1fr));
+  grid-template-columns: repeat(var(--day-count), minmax(255px, 1fr));
   gap: 14px;
   align-items: start;
   overflow-x: auto;
-  padding-bottom: 18px;
+  padding: 4px 2px 20px;
+  scroll-padding-inline: 2px;
+  scroll-snap-type: x proximity;
+}
+
+.weekGrid:focus-visible {
+  outline: 3px solid var(--focus-ring, #355f54);
+  outline-offset: 3px;
 }
 
 .dayColumn {
-  min-width: 230px;
-  min-height: 520px;
-  overflow: hidden;
+  min-width: 255px;
+  min-height: 500px;
   padding: 0;
+  scroll-snap-align: start;
 }
 
 .today {
@@ -167,6 +174,9 @@
 }
 
 .dayHeader {
+  position: sticky;
+  z-index: 2;
+  top: 0;
   min-height: 78px;
   display: flex;
   gap: 12px;
@@ -174,6 +184,7 @@
   justify-content: space-between;
   padding: 16px;
   border-bottom: 1px solid var(--border-soft);
+  border-radius: 16px 16px 0 0;
   background: var(--surface-card);
 }
 
@@ -216,7 +227,7 @@
 
 .itemList {
   display: grid;
-  gap: 9px;
+  gap: 10px;
   margin: 0;
   padding: 14px;
   list-style: none;
@@ -224,10 +235,10 @@
 
 .item {
   min-width: 0;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid var(--border);
-  border-left-width: 4px;
-  border-radius: 11px;
+  border-left-width: 5px;
+  border-radius: 12px;
 }
 
 .scheduleBlock {
@@ -241,6 +252,12 @@
   background: var(--surface-warm);
 }
 
+.sessionItem {
+  border-color: #c8cede;
+  border-left-color: #66779d;
+  background: #f1f3f8;
+}
+
 .containerItem {
   border-left-color: var(--accent-strong);
   background: var(--surface-soft);
@@ -250,41 +267,64 @@
   border-style: dashed;
 }
 
+.focusedItem {
+  outline: 3px solid var(--accent-strong);
+  outline-offset: 3px;
+  box-shadow: 0 8px 24px rgb(53 95 84 / 20%);
+  animation: focusPulse 900ms ease-out 1;
+}
+
 .itemMeta {
   display: flex;
-  gap: 7px;
-  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
   justify-content: space-between;
   color: #4f5955;
   font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+  font-weight: 850;
+  letter-spacing: 0.05em;
   line-height: 1.3;
   text-transform: uppercase;
 }
 
-.itemMeta span:last-child {
-  flex-shrink: 0;
+.deliveryState {
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: #4f5955;
+  background: rgb(255 255 255 / 68%);
+}
+
+.itemTime {
+  display: block;
+  width: max-content;
+  max-width: 100%;
+  margin-top: 7px;
+  overflow: visible;
   color: var(--heading);
+  font-size: 13px;
+  font-weight: 800;
   letter-spacing: 0;
+  line-height: 1.35;
   text-transform: none;
+  white-space: nowrap;
 }
 
 .itemTitle {
+  margin: 8px 0 0;
   overflow-wrap: anywhere;
-  margin: 6px 0 0;
   color: var(--heading);
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 800;
   line-height: 1.4;
 }
 
 .itemContext,
 .itemCategory {
+  margin: 4px 0 0;
   overflow-wrap: anywhere;
-  margin: 3px 0 0;
   color: #4f5955;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.4;
 }
 
@@ -293,11 +333,11 @@
 }
 
 .dayEmpty {
-  min-height: 390px;
+  min-height: 330px;
   display: grid;
   place-content: center;
   gap: 6px;
-  padding: 22px;
+  padding: 24px;
   color: #4f5955;
   text-align: center;
 }
@@ -311,6 +351,21 @@
 .dayEmpty span {
   font-size: 13px;
   line-height: 1.5;
+}
+
+@keyframes focusPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(53 95 84 / 35%);
+  }
+  100% {
+    box-shadow: 0 8px 24px rgb(53 95 84 / 20%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .focusedItem {
+    animation: none;
+  }
 }
 
 @media (max-width: 760px) {
@@ -336,16 +391,12 @@
   .filterHelp {
     flex-basis: 100%;
   }
-}
 
-/* Phase 2C keyboard-scroll focus */
-.weekGrid:focus-visible {
-  outline: 3px solid var(--focus-ring, #355f54);
-  outline-offset: 3px;
-}
+  .weekGrid {
+    grid-template-columns: repeat(var(--day-count), minmax(280px, 88vw));
+  }
 
-/* Phase 2C keyboard-scroll focus */
-.weekGrid:focus-visible {
-  outline: 3px solid var(--focus-ring, #355f54);
-  outline-offset: 3px;
+  .dayColumn {
+    min-width: min(280px, 88vw);
+  }
 }
