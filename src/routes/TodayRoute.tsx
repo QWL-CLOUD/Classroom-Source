@@ -173,7 +173,7 @@ export function TodayRoute() {
               <p className={styles.contextNote}>
                 {state.data.learnerContexts.length} active learner{' '}
                 {state.data.learnerContexts.length === 1 ? 'context is' : 'contexts are'} connected
-                to v20 and ready for the Learners phase.
+                to v20 and available in Learners.
               </p>
             ) : null}
           </article>
