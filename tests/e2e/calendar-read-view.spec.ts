@@ -133,6 +133,27 @@ test('Calendar renders migrated events and recurring schedule blocks across navi
   await expect(july15.getByText('All day')).toBeVisible();
   await expect(july15.getByText('Synthetic staff meeting')).toBeVisible();
   await expect(july15.getByText('10:00 AM–11:00 AM')).toBeVisible();
+
+  const staffMeetingCard = july15
+    .getByText('Synthetic staff meeting', { exact: true })
+    .locator('..');
+  const eventTypeLabel = staffMeetingCard.getByText('Event', { exact: true });
+  const staffMeetingTime = staffMeetingCard.getByText('10:00 AM–11:00 AM', {
+    exact: true,
+  });
+  const [cardBox, typeBox, timeBox] = await Promise.all([
+    staffMeetingCard.boundingBox(),
+    eventTypeLabel.boundingBox(),
+    staffMeetingTime.boundingBox(),
+  ]);
+
+  if (!cardBox || !typeBox || !timeBox) {
+    throw new Error('Calendar readability geometry could not be measured.');
+  }
+
+  // Calendar time label must remain inside its card and below the type label.
+  expect(timeBox.y).toBeGreaterThan(typeBox.y);
+  expect(timeBox.x + timeBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width + 1);
   await expect(july15.getByText('Synthetic Grade 3 day', { exact: true })).toBeVisible();
   await expect(july15.getByText('Synthetic Chinese lesson')).toBeVisible();
   await expect(july15.getByText('Part of Synthetic Grade 3 day')).toBeVisible();
