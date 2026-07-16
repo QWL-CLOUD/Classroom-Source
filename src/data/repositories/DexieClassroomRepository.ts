@@ -2,15 +2,23 @@ import { classroomDb, type ClassroomDatabase } from '@/data/db/ClassroomDatabase
 import {
   calendarEventSchema,
   learnerContextSchema,
+  lessonPlanSchema,
   scheduleBlockSchema,
   schoolYearSchema,
+  sessionOccurrenceSchema,
   taskSchema,
   type CalendarEvent,
   type LearnerContext,
+  type LessonPlan,
   type ScheduleBlock,
   type SchoolYear,
+  type SessionOccurrence,
   type Task,
 } from '@/domain/models/entities';
+import type {
+  LessonPlanQuery,
+  SessionOccurrenceQuery,
+} from '@/domain/readModels/learnerReadModels';
 import type {
   CoreRecordCounts,
   LearnerContextQuery,
@@ -61,6 +69,23 @@ function compareLearnerContexts(first: LearnerContext, second: LearnerContext): 
   return (
     learnerKindOrder[first.kind] - learnerKindOrder[second.kind] ||
     compareText(first.name, second.name) ||
+    first.id.localeCompare(second.id)
+  );
+}
+
+function compareLessonPlans(first: LessonPlan, second: LessonPlan): number {
+  return (
+    second.updatedAt.localeCompare(first.updatedAt) ||
+    compareText(first.title, second.title) ||
+    first.id.localeCompare(second.id)
+  );
+}
+
+function compareSessionOccurrences(first: SessionOccurrence, second: SessionOccurrence): number {
+  return (
+    first.date.localeCompare(second.date) ||
+    first.startMinute - second.startMinute ||
+    first.endMinute - second.endMinute ||
     first.id.localeCompare(second.id)
   );
 }
@@ -156,6 +181,48 @@ export class DexieClassroomRepository implements ClassroomRepository {
           (!query.kind || context.kind === query.kind),
       )
       .sort(compareLearnerContexts);
+  }
+
+  async listLessonPlans(query: LessonPlanQuery = {}): Promise<LessonPlan[]> {
+    const sourceRecords = query.contextId
+      ? await this.db.lessonPlans.where('contextId').equals(query.contextId).toArray()
+      : await this.db.lessonPlans.toArray();
+    const lessonPlans = sourceRecords.map((value) => lessonPlanSchema.parse(value));
+
+    return lessonPlans
+      .filter(
+        (plan) =>
+          (!query.contextId || plan.contextId === query.contextId) &&
+          (!query.workflowStates || query.workflowStates.includes(plan.workflowState)),
+      )
+      .sort(compareLessonPlans);
+  }
+
+  async listSessionOccurrences(query: SessionOccurrenceQuery = {}): Promise<SessionOccurrence[]> {
+    if (query.startDate) assertLocalDateRange(query.startDate, query.startDate);
+    if (query.endDate) assertLocalDateRange(query.endDate, query.endDate);
+    if (query.startDate && query.endDate) {
+      assertLocalDateRange(query.startDate, query.endDate);
+    }
+
+    const sourceRecords = query.contextId
+      ? await this.db.sessionOccurrences.where('contextId').equals(query.contextId).toArray()
+      : await this.db.sessionOccurrences.toArray();
+    const sessions = sourceRecords.map((value) => sessionOccurrenceSchema.parse(value));
+
+    for (const session of sessions) {
+      assertLocalDateRange(session.date, session.date);
+    }
+
+    return sessions
+      .filter(
+        (session) =>
+          (!query.contextId || session.contextId === query.contextId) &&
+          (!query.deliveryStates || query.deliveryStates.includes(session.deliveryState)) &&
+          (!query.startDate || session.date >= query.startDate) &&
+          (!query.endDate || session.date <= query.endDate),
+      )
+      .sort(compareSessionOccurrences);
   }
 
   async countQuarantineRecords(): Promise<number> {
