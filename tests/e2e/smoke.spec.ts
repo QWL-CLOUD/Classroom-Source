@@ -5,7 +5,7 @@ test('core routes use browser history and survive reload', async ({ page }) => {
   await page.goto('./#/today?date=2026-07-14');
   await expect(page.getByRole('heading', { level: 1, name: /^Good/ })).toBeVisible();
 
-  await page.getByRole('link', { name: 'Week' }).click();
+  await page.getByRole('link', { name: 'Week', exact: true }).click();
   await expect(page.getByRole('heading', { level: 1, name: /^Week/ })).toBeVisible();
 
   await page.reload();
