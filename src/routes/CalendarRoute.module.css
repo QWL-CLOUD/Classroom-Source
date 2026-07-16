@@ -1,0 +1,379 @@
+.monthLabel {
+  margin-left: 10px;
+  color: var(--text-secondary);
+  font:
+    700 20px/1.2 Inter,
+    sans-serif;
+  letter-spacing: 0;
+}
+
+.summary {
+  margin: 9px 0 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.navigation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 15px 18px;
+}
+
+.legend > div {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--heading);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.legend p {
+  flex: 1 1 320px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.legendMarker {
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.scheduleMarker {
+  background: var(--planned);
+}
+
+.eventMarker {
+  background: var(--surface-warm);
+  border-color: #cdbd8f;
+}
+
+.statePanel,
+.emptyPanel,
+.errorPanel {
+  display: flex;
+  gap: 13px;
+  align-items: center;
+  min-height: 112px;
+  margin-bottom: 18px;
+  padding: 22px;
+}
+
+.statePanel p,
+.emptyPanel p,
+.errorPanel p,
+.emptyPanel h2,
+.errorPanel h2 {
+  margin: 0;
+}
+
+.statePanel,
+.emptyPanel {
+  color: var(--text-secondary);
+}
+
+.emptyPanel h2,
+.errorPanel h2 {
+  margin-bottom: 5px;
+  color: var(--heading);
+  font-size: 18px;
+}
+
+.errorPanel {
+  align-items: flex-start;
+  border-color: #c98981;
+  color: #6e302b;
+  background: #fff7f5;
+}
+
+.quarantineNote {
+  margin: -4px 0 14px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.calendarCard {
+  overflow: hidden;
+  padding: 0;
+}
+
+.weekdayRow,
+.monthGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.weekdayRow {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-soft);
+}
+
+.weekdayRow div {
+  padding: 12px 10px;
+  color: var(--heading);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.monthGrid {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.day {
+  min-width: 0;
+  min-height: 168px;
+  border-right: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface-card);
+}
+
+.day:nth-child(7n) {
+  border-right: 0;
+}
+
+.day:nth-last-child(-n + 7) {
+  border-bottom: 0;
+}
+
+.day article {
+  min-height: 168px;
+  padding: 10px;
+}
+
+.adjacentMonthDay {
+  background: #f7f8f7;
+}
+
+.adjacentMonthDay .dayNumber,
+.adjacentMonthDay .mobileWeekday,
+.adjacentMonthDay .noItems {
+  color: var(--text-secondary);
+}
+
+.today {
+  box-shadow: inset 0 0 0 2px var(--accent-strong);
+}
+
+.dayHeader {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  min-height: 28px;
+  margin-bottom: 8px;
+}
+
+.mobileWeekday {
+  display: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dayNumber {
+  display: inline-grid;
+  min-width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--heading);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.today .dayNumber {
+  color: #fff;
+  background: var(--accent-strong);
+}
+
+.todayLabel {
+  color: var(--accent-strong);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.itemList {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 10px;
+}
+
+.scheduleBlock {
+  border-left-color: #66866b;
+  background: var(--planned);
+}
+
+.calendarEvent {
+  border-color: #d8c99e;
+  border-left-color: #967b35;
+  background: var(--surface-warm);
+}
+
+.containerItem {
+  border-left-color: var(--accent-strong);
+  background: var(--surface-soft);
+}
+
+.spanningItem {
+  border-style: dashed;
+}
+
+.itemMeta {
+  display: flex;
+  gap: 5px;
+  align-items: baseline;
+  justify-content: space-between;
+  color: #59635f;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.itemMeta time {
+  flex-shrink: 0;
+  color: var(--heading);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.itemTitle {
+  overflow-wrap: anywhere;
+  margin: 5px 0 0;
+  color: var(--heading);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.itemContext,
+.itemCategory {
+  overflow-wrap: anywhere;
+  margin: 3px 0 0;
+  color: #59635f;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.itemCategory {
+  font-weight: 700;
+}
+
+.noItems {
+  margin: 22px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .legend p {
+    flex-basis: 100%;
+    text-align: left;
+  }
+
+  .weekdayRow {
+    display: none;
+  }
+
+  .monthGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .day,
+  .day:nth-child(7n),
+  .day:nth-last-child(-n + 7) {
+    min-height: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .day:last-child {
+    border-bottom: 0;
+  }
+
+  .day article {
+    min-height: 0;
+    padding: 14px;
+  }
+
+  .adjacentMonthDay {
+    display: none;
+  }
+
+  .mobileWeekday {
+    display: inline;
+  }
+
+  .itemList {
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  }
+
+  .noItems {
+    margin: 8px 0 4px;
+    text-align: left;
+  }
+}
+
+@media (max-width: 620px) {
+  .monthLabel {
+    display: block;
+    margin: 7px 0 0;
+  }
+
+  .navigation {
+    width: 100%;
+  }
+
+  .navigation button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .itemList {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Phase 2B WCAG AA contrast override */
+.itemMeta,
+.itemMeta span,
+.itemMeta time,
+.itemContext,
+.itemCategory {
+  color: #4f5955;
+}
