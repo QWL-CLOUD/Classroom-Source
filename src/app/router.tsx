@@ -10,8 +10,10 @@ import { LearnersRoute } from '@/routes/LearnersRoute';
 import { LibraryRoute } from '@/routes/LibraryRoute';
 import { MigrationRoute } from '@/routes/MigrationRoute';
 import { NotFoundRoute } from '@/routes/NotFoundRoute';
+import { PlanningEditorRoute } from '@/routes/PlanningEditorRoute';
 import { ScheduleBlockEditorRoute } from '@/routes/ScheduleBlockEditorRoute';
 import { ScheduleOccurrenceEditorRoute } from '@/routes/ScheduleOccurrenceEditorRoute';
+import { SessionEditorRoute } from '@/routes/SessionEditorRoute';
 import { SettingsRoute } from '@/routes/SettingsRoute';
 import { SystemHealthRoute } from '@/routes/SystemHealthRoute';
 import { TasksRoute } from '@/routes/TasksRoute';
@@ -29,9 +31,14 @@ export const router = createHashRouter([
       { path: 'calendar', element: <CalendarRoute /> },
       { path: 'calendar/edit', element: <CalendarEventEditorRoute /> },
       { path: 'schedule/edit', element: <ScheduleBlockEditorRoute /> },
-      { path: 'schedule/occurrence/edit', element: <ScheduleOccurrenceEditorRoute /> },
+      {
+        path: 'schedule/occurrence/edit',
+        element: <ScheduleOccurrenceEditorRoute />,
+      },
       { path: 'tasks', element: <TasksRoute /> },
       { path: 'learners', element: <LearnersRoute /> },
+      { path: 'planning/edit', element: <PlanningEditorRoute /> },
+      { path: 'planning/session', element: <SessionEditorRoute /> },
       { path: 'library', element: <LibraryRoute /> },
       { path: 'insights', element: <InsightsRoute /> },
       { path: 'import', element: <ImportRoute /> },

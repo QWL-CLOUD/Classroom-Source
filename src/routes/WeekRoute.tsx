@@ -128,7 +128,11 @@ export function WeekRoute() {
     const frame = window.requestAnimationFrame(() => {
       const target = itemRefs.current.get(focusId);
       if (!target) return;
-      target.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      target.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      });
       target.focus({ preventScroll: true });
     });
     return () => window.cancelAnimationFrame(frame);
@@ -352,6 +356,15 @@ export function WeekRoute() {
                               aria-label={`Edit ${item.title} on ${day.date}`}
                             >
                               Edit occurrence
+                            </a>
+                          ) : null}
+                          {item.sourceType === 'session-occurrence' ? (
+                            <a
+                              className={styles.occurrenceEdit}
+                              href={`#/planning/session?session=${encodeURIComponent(item.sourceRecordId)}`}
+                              aria-label={`Manage ${item.title} session`}
+                            >
+                              Manage session
                             </a>
                           ) : null}
                         </li>

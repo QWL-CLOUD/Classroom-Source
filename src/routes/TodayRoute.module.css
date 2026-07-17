@@ -304,6 +304,11 @@
   box-shadow: 0 0 0 1px #967b35;
 }
 
+.sessionItem .timelineRail span {
+  background: #6d5f9a;
+  box-shadow: 0 0 0 1px #6d5f9a;
+}
+
 .containerItem .timelineRail span {
   background: var(--accent-strong);
   box-shadow: 0 0 0 1px var(--accent-strong);
@@ -317,6 +322,11 @@
   border-left: 4px solid #66866b;
   border-radius: 13px;
   background: var(--planned);
+}
+
+.sessionItem .timelineContent {
+  border-left-color: #6d5f9a;
+  background: #f2eff9;
 }
 
 .calendarItem .timelineContent {

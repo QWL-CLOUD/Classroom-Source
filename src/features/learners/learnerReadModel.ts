@@ -22,6 +22,9 @@ export interface LearnerPlanningItem {
   dateLabel?: string;
   timeLabel?: string;
   weekHref?: string;
+  editHref?: string;
+  scheduleHref?: string;
+  sessionHref?: string;
 }
 
 export interface LearnersPageReadModel {
@@ -58,6 +61,18 @@ function formatSessionTime(session: SessionOccurrence): string {
   return `${formatCalendarMinute(session.startMinute)}–${formatCalendarMinute(session.endMinute)}`;
 }
 
+function planningEditHref(planId: string): string {
+  return `#/planning/edit?plan=${encodeURIComponent(planId)}`;
+}
+
+function planningScheduleHref(planId: string): string {
+  return `#/planning/session?plan=${encodeURIComponent(planId)}`;
+}
+
+function sessionEditHref(sessionId: string): string {
+  return `#/planning/session?session=${encodeURIComponent(sessionId)}`;
+}
+
 function sessionToPlanningItem(
   session: SessionOccurrence,
   lessonPlanById: ReadonlyMap<string, LessonPlan>,
@@ -78,6 +93,8 @@ function sessionToPlanningItem(
       view: 'everything',
       focus: `session-occurrence:${session.id}`,
     }),
+    editHref: plan ? planningEditHref(plan.id) : undefined,
+    sessionHref: sessionEditHref(session.id),
   };
 }
 
@@ -149,6 +166,8 @@ export function buildLearnersPageReadModel(
       title: plan.title,
       subject: plan.subject,
       stateLabel: plan.workflowState === 'ready' ? 'Ready' : 'Draft',
+      editHref: planningEditHref(plan.id),
+      scheduleHref: planningScheduleHref(plan.id),
     }));
 
   return {

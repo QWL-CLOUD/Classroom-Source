@@ -1,9 +1,15 @@
-import type { CalendarEvent, ScheduleBlock, ScheduleException } from '@/domain/models/entities';
+import type {
+  CalendarEvent,
+  LessonPlan,
+  ScheduleBlock,
+  ScheduleException,
+  SessionOccurrence,
+} from '@/domain/models/entities';
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
 import { resolveScheduleOccurrence } from '@/features/scheduleExceptions/scheduleOccurrenceResolver';
 import { formatLongDate, parseLocalDate, todayLocalDate } from '@/shared/dates/localDate';
 
-export type TodayItemSource = 'calendar-event' | 'schedule-block';
+export type TodayItemSource = 'calendar-event' | 'schedule-block' | 'session-occurrence';
 export type TodaySpanPosition = 'single' | 'start' | 'middle' | 'end';
 export type TodayTemporalStatus = 'all-day' | 'past' | 'now' | 'upcoming';
 export type TodayFocusLabel = 'All day' | 'First item' | 'Next' | 'Now';
@@ -22,6 +28,7 @@ export interface TodayTimelineItem {
   endMinute?: number;
   kind?: ScheduleBlock['kind'];
   parentTitle?: string;
+  deliveryState?: SessionOccurrence['deliveryState'];
   spanPosition: TodaySpanPosition;
   sortOrder: number;
   temporalStatus: TodayTemporalStatus;
@@ -49,6 +56,7 @@ export interface TodayReadModel {
   focusLabel: TodayFocusLabel | null;
   sourceScheduleBlockCount: number;
   sourceCalendarEventCount: number;
+  sourceSessionOccurrenceCount: number;
   visibleItemCount: number;
   hiddenDuplicateCount: number;
 }
@@ -158,6 +166,29 @@ function toCalendarEventItem(event: CalendarEvent, date: string): TodayItemDraft
   };
 }
 
+function toSessionItem(
+  session: SessionOccurrence,
+  lessonPlanById: ReadonlyMap<string, LessonPlan>,
+): TodayItemDraft {
+  const plan = lessonPlanById.get(session.lessonPlanId);
+  return {
+    occurrenceId: `session-occurrence:${session.id}`,
+    sourceRecordId: session.id,
+    sourceType: 'session-occurrence',
+    title: plan?.title ?? 'Planned session',
+    category: plan?.subject ?? 'Planning',
+    contextId: session.contextId,
+    date: session.date,
+    timeLabel: formatMinuteRange(session.startMinute, session.endMinute),
+    isAllDay: false,
+    startMinute: session.startMinute,
+    endMinute: session.endMinute,
+    deliveryState: session.deliveryState,
+    spanPosition: 'single',
+    sortOrder: 0,
+  };
+}
+
 function duplicateSignature(item: TodayItemDraft): string | null {
   if (item.isAllDay || item.spanPosition !== 'single') return null;
   if (item.startMinute === undefined || item.endMinute === undefined) {
@@ -220,8 +251,13 @@ function compareTodayItems(first: TodayItemDraft, second: TodayItemDraft): numbe
     return first.sortOrder - second.sortOrder;
   }
 
-  const firstSourceRank = first.sourceType === 'calendar-event' ? 0 : 1;
-  const secondSourceRank = second.sourceType === 'calendar-event' ? 0 : 1;
+  const sourceRank: Record<TodayItemSource, number> = {
+    'calendar-event': 0,
+    'session-occurrence': 1,
+    'schedule-block': 2,
+  };
+  const firstSourceRank = sourceRank[first.sourceType];
+  const secondSourceRank = sourceRank[second.sourceType];
   if (firstSourceRank !== secondSourceRank) {
     return firstSourceRank - secondSourceRank;
   }
@@ -325,11 +361,14 @@ export function buildTodayReadModel(
   currentDate: string = todayLocalDate(),
   currentMinute: number = new Date().getHours() * 60 + new Date().getMinutes(),
   scheduleExceptions: readonly ScheduleException[] = [],
+  lessonPlans: readonly LessonPlan[] = [],
+  sessionOccurrences: readonly SessionOccurrence[] = [],
 ): TodayReadModel {
   requireLocalDate(selectedDate);
   requireLocalDate(currentDate);
 
   const blockById = new Map(scheduleBlocks.map((block) => [block.id, block]));
+  const lessonPlanById = new Map(lessonPlans.map((plan) => [plan.id, plan]));
   const visibleScheduleBlocks = scheduleBlocks
     .map((block) => resolveScheduleOccurrence(block, selectedDate, scheduleExceptions))
     .filter((occurrence) => occurrence !== null)
@@ -341,7 +380,15 @@ export function buildTodayReadModel(
     toScheduleItem(block, selectedDate, blockById),
   );
   const eventItems = visibleCalendarEvents.map((event) => toCalendarEventItem(event, selectedDate));
-  const deduplicated = removeExactDatedDuplicates([...scheduleItems, ...eventItems]);
+  const visibleSessions = sessionOccurrences.filter(
+    (session) => session.date === selectedDate && session.deliveryState !== 'cancelled',
+  );
+  const sessionItems = visibleSessions.map((session) => toSessionItem(session, lessonPlanById));
+  const deduplicated = removeExactDatedDuplicates([
+    ...scheduleItems,
+    ...eventItems,
+    ...sessionItems,
+  ]);
 
   const timelineItems = deduplicated.items
     .sort(compareTodayItems)
@@ -369,6 +416,7 @@ export function buildTodayReadModel(
     focusLabel: focus.label,
     sourceScheduleBlockCount: visibleScheduleBlocks.length,
     sourceCalendarEventCount: visibleCalendarEvents.length,
+    sourceSessionOccurrenceCount: visibleSessions.length,
     visibleItemCount: timelineItems.length,
     hiddenDuplicateCount: deduplicated.hiddenDuplicateCount,
   };

@@ -13,6 +13,7 @@ import {
   shiftCalendarMonth,
 } from '@/features/calendar/calendarReadModel';
 import { useScheduleExceptionsForRange } from '@/features/scheduleExceptions/useScheduleExceptionsForRange';
+import { useWeekPlanningReadModel } from '@/features/week/useWeekPlanningReadModel';
 import { useWorkspaceReadModel } from '@/features/workspace/useWorkspaceReadModel';
 import { todayLocalDate } from '@/shared/dates/localDate';
 import { useDateSearchParam } from '@/shared/dates/useDateSearchParam';
@@ -20,6 +21,7 @@ import { useDateSearchParam } from '@/shared/dates/useDateSearchParam';
 import styles from './CalendarRoute.module.css';
 
 function getItemTypeLabel(item: CalendarDayItem): string {
+  if (item.sourceType === 'session-occurrence') return 'Session';
   if (item.sourceType === 'calendar-event') return 'Event';
   if (item.kind === 'container') return 'Schedule group';
   if (item.kind === 'routine') return 'Routine';
@@ -29,7 +31,11 @@ function getItemTypeLabel(item: CalendarDayItem): string {
 
 function getItemClassName(item: CalendarDayItem): string {
   const classes = [styles.item];
-  classes.push(item.sourceType === 'calendar-event' ? styles.calendarEvent : styles.scheduleBlock);
+  if (item.sourceType === 'session-occurrence') classes.push(styles.sessionItem);
+  else
+    classes.push(
+      item.sourceType === 'calendar-event' ? styles.calendarEvent : styles.scheduleBlock,
+    );
   if (item.kind === 'container') classes.push(styles.containerItem);
   if (item.spanPosition !== 'single') classes.push(styles.spanningItem);
   return classes.join(' ');
@@ -46,6 +52,10 @@ export function CalendarRoute() {
     monthRange.gridStartDate,
     monthRange.gridEndDate,
   );
+  const planningState = useWeekPlanningReadModel({
+    startDate: monthRange.gridStartDate,
+    endDate: monthRange.gridEndDate,
+  });
   const scheduleHierarchy = useMemo<ReadonlyMap<string, ScheduleBlockHierarchyMetadata>>(
     () =>
       state.status === 'ready'
@@ -56,16 +66,18 @@ export function CalendarRoute() {
 
   const calendar = useMemo(
     () =>
-      state.status === 'ready'
+      state.status === 'ready' && planningState.status === 'ready'
         ? buildCalendarMonthReadModel(
             date,
             state.data.scheduleBlocks,
             state.data.calendarEvents,
             todayLocalDate(),
             scheduleExceptions ?? [],
+            planningState.data.lessonPlans,
+            planningState.data.sessionOccurrences,
           )
         : null,
-    [date, scheduleExceptions, state],
+    [date, planningState, scheduleExceptions, state],
   );
 
   const previousMonthDate = shiftCalendarMonth(date, -1);
@@ -86,7 +98,9 @@ export function CalendarRoute() {
               {calendar.sourceScheduleBlockCount} schedule block
               {calendar.sourceScheduleBlockCount === 1 ? '' : 's'} ·{' '}
               {calendar.sourceCalendarEventCount} dated event
-              {calendar.sourceCalendarEventCount === 1 ? '' : 's'} · {calendar.visibleItemCount}{' '}
+              {calendar.sourceCalendarEventCount === 1 ? '' : 's'} ·{' '}
+              {calendar.sourceSessionOccurrenceCount} session
+              {calendar.sourceSessionOccurrenceCount === 1 ? '' : 's'} · {calendar.visibleItemCount}{' '}
               visible occurrence
               {calendar.visibleItemCount === 1 ? '' : 's'}
             </p>
@@ -131,24 +145,34 @@ export function CalendarRoute() {
           <span className={`${styles.legendMarker} ${styles.eventMarker}`} aria-hidden="true" />
           Dated event
         </div>
+        <div>
+          <span className={`${styles.legendMarker} ${styles.sessionMarker}`} aria-hidden="true" />
+          Learner session
+        </div>
         <p>All-day events are shown before timed items. Weeks run Monday through Sunday.</p>
       </section>
 
-      {state.status === 'loading' ? (
+      {state.status === 'loading' || planningState.status === 'loading' ? (
         <div className={`card ${styles.statePanel}`} role="status">
           <CalendarDays aria-hidden="true" size={24} />
           <p>Loading Calendar from the v20 database…</p>
         </div>
       ) : null}
 
-      {state.status === 'error' ? (
+      {state.status === 'error' || planningState.status === 'error' ? (
         <div className={`card ${styles.errorPanel}`} role="alert">
           <h2>Calendar could not be loaded</h2>
-          <p>{state.message}</p>
+          <p>
+            {state.status === 'error'
+              ? state.message
+              : planningState.status === 'error'
+                ? planningState.message
+                : 'Planning data could not be loaded.'}
+          </p>
         </div>
       ) : null}
 
-      {state.status === 'ready' && calendar ? (
+      {state.status === 'ready' && planningState.status === 'ready' && calendar ? (
         <>
           {calendar.visibleItemCount === 0 ? (
             <div className={`card ${styles.emptyPanel}`} role="status">
@@ -156,8 +180,8 @@ export function CalendarRoute() {
               <div>
                 <h2>No calendar items in {calendar.range.label}</h2>
                 <p>
-                  Migrated schedule blocks and dated events will appear here when they overlap this
-                  month.
+                  Migrated schedule blocks, dated events, and learner sessions will appear here when
+                  they overlap this month.
                 </p>
               </div>
             </div>
@@ -246,6 +270,7 @@ export function CalendarRoute() {
                           >
                             <div className={styles.itemMeta}>
                               <span>{getItemTypeLabel(item)}</span>
+                              {item.deliveryState ? <span>{item.deliveryState}</span> : null}
                               <time>{item.timeLabel}</time>
                             </div>
                             <p className={styles.itemTitle}>{item.title}</p>
@@ -262,6 +287,15 @@ export function CalendarRoute() {
                                 aria-label={`Edit ${item.title} on ${day.date}`}
                               >
                                 Edit occurrence
+                              </a>
+                            ) : null}
+                            {item.sourceType === 'session-occurrence' ? (
+                              <a
+                                className={styles.occurrenceEdit}
+                                href={`#/planning/session?session=${encodeURIComponent(item.sourceRecordId)}`}
+                                aria-label={`Manage ${item.title} session`}
+                              >
+                                Manage session
                               </a>
                             ) : null}
                           </li>
