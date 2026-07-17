@@ -5,6 +5,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ZodError } from 'zod';
 
 import type { ScheduleBlock } from '@/domain/models/entities';
+import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
 import { classroomRepository } from '@/data/repositories/DexieClassroomRepository';
 import {
   createScheduleBlockEditorValues,
@@ -14,6 +15,10 @@ import {
   toScheduleBlockEditorValues,
   type ScheduleBlockEditorValues,
 } from '@/features/editing/scheduleBlockEditorModel';
+import {
+  buildScheduleBlockHierarchy,
+  getScheduleBlockDescendantIds,
+} from '@/features/editing/scheduleBlockHierarchy';
 import { scheduleBlockMutationService } from '@/features/editing/scheduleBlockMutationService';
 import { todayLocalDate } from '@/shared/dates/localDate';
 
@@ -43,7 +48,11 @@ function scheduleLabel(block: ScheduleBlock): string {
     )
     .filter(Boolean)
     .join(', ');
-  return `${weekdays} · ${block.title}`;
+  return `${weekdays} · ${formatCalendarMinute(block.startMinute)}–${formatCalendarMinute(block.endMinute)}`;
+}
+
+function childCountLabel(count: number): string {
+  return `${count} ${count === 1 ? 'child' : 'children'}`;
 }
 
 export function ScheduleBlockEditorRoute() {
@@ -72,10 +81,25 @@ export function ScheduleBlockEditorRoute() {
     );
   }, [selectedBlock, selectedId]);
 
-  const parentOptions = useMemo(
-    () => (blocks ?? []).filter((block) => block.id !== selectedId),
+  const hierarchyEntries = useMemo(() => buildScheduleBlockHierarchy(blocks ?? []), [blocks]);
+  const hierarchyById = useMemo(
+    () => new Map(hierarchyEntries.map((entry) => [entry.blockId, entry])),
+    [hierarchyEntries],
+  );
+  const descendantIds = useMemo(
+    () => getScheduleBlockDescendantIds(blocks ?? [], selectedId),
     [blocks, selectedId],
   );
+  const parentOptions = useMemo(
+    () =>
+      hierarchyEntries
+        .map((entry) => entry.block)
+        .filter((block) => block.id !== selectedId && !descendantIds.has(block.id)),
+    [descendantIds, hierarchyEntries, selectedId],
+  );
+  const selectedHierarchy = selectedId ? hierarchyById.get(selectedId) : undefined;
+  const selectedParent = values.parentId ? hierarchyById.get(values.parentId)?.block : undefined;
+  const selectedChildCount = selectedHierarchy?.directChildCount ?? 0;
   const isMissingSelection = Boolean(selectedId && blocks && !selectedBlock);
 
   function updateValue<Key extends keyof ScheduleBlockEditorValues>(
@@ -184,15 +208,38 @@ export function ScheduleBlockEditorRoute() {
           ) : null}
           {blocks && blocks.length > 0 ? (
             <ul className={styles.list}>
-              {blocks.map((block) => (
-                <li key={block.id}>
+              {hierarchyEntries.map((entry) => (
+                <li
+                  key={entry.blockId}
+                  className={entry.visualDepth > 0 ? styles.hierarchyChild : styles.hierarchyParent}
+                  data-schedule-id={entry.blockId}
+                  data-schedule-depth={entry.visualDepth}
+                  data-parent-id={entry.parentId}
+                  data-child-count={entry.directChildCount}
+                  data-group-tone={entry.groupTone}
+                >
                   <Link
-                    className={block.id === selectedId ? styles.selectedBlock : styles.blockLink}
-                    aria-current={block.id === selectedId ? 'page' : undefined}
-                    to={`/schedule/edit?id=${encodeURIComponent(block.id)}&date=${returnDate}`}
+                    className={
+                      entry.blockId === selectedId ? styles.selectedBlock : styles.blockLink
+                    }
+                    aria-current={entry.blockId === selectedId ? 'page' : undefined}
+                    to={`/schedule/edit?id=${encodeURIComponent(entry.blockId)}&date=${returnDate}`}
                   >
-                    <strong>{block.title}</strong>
-                    <span>{scheduleLabel(block)}</span>
+                    <span className={styles.blockTitleRow}>
+                      <strong>{entry.block.title}</strong>
+                      {entry.directChildCount > 0 ? (
+                        <span className={styles.childCountBadge}>
+                          {childCountLabel(entry.directChildCount)}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className={styles.scheduleMeta}>{scheduleLabel(entry.block)}</span>
+                    {entry.parentTitle ? (
+                      <span className={styles.relationshipLabel}>Part of {entry.parentTitle}</span>
+                    ) : null}
+                    {entry.parentUnavailable ? (
+                      <span className={styles.relationshipWarning}>Parent unavailable</span>
+                    ) : null}
                   </Link>
                 </li>
               ))}
@@ -216,6 +263,14 @@ export function ScheduleBlockEditorRoute() {
                 <div>
                   <span className="eyebrow">{selectedBlock ? 'Edit default' : 'New default'}</span>
                   <h2>{selectedBlock ? selectedBlock.title : 'New schedule block'}</h2>
+                  {selectedParent ? (
+                    <p className={styles.editorRelationship}>Part of {selectedParent.title}</p>
+                  ) : null}
+                  {selectedBlock && selectedChildCount > 0 ? (
+                    <p className={styles.editorRelationship}>
+                      Contains {childCountLabel(selectedChildCount)}.
+                    </p>
+                  ) : null}
                 </div>
                 <div className={styles.actions}>
                   {selectedBlock ? (
@@ -223,7 +278,10 @@ export function ScheduleBlockEditorRoute() {
                       className={styles.archiveButton}
                       type="button"
                       onClick={handleArchive}
-                      disabled={saving}
+                      disabled={saving || selectedChildCount > 0}
+                      aria-describedby={
+                        selectedChildCount > 0 ? 'archive-children-help' : undefined
+                      }
                     >
                       <Archive size={17} aria-hidden="true" />
                       Archive
@@ -235,6 +293,13 @@ export function ScheduleBlockEditorRoute() {
                   </button>
                 </div>
               </div>
+
+              {selectedBlock && selectedChildCount > 0 ? (
+                <p id="archive-children-help" className={styles.archiveHelp}>
+                  Reassign or archive {childCountLabel(selectedChildCount)} before archiving this
+                  parent.
+                </p>
+              ) : null}
 
               {errorMessages.length > 0 ? (
                 <div
@@ -401,13 +466,20 @@ export function ScheduleBlockEditorRoute() {
                     onChange={(event) => updateValue('parentId', event.target.value)}
                   >
                     <option value="">No parent</option>
-                    {parentOptions.map((block) => (
-                      <option key={block.id} value={block.id}>
-                        {block.title}
-                      </option>
-                    ))}
+                    {parentOptions.map((block) => {
+                      const childCount = hierarchyById.get(block.id)?.directChildCount ?? 0;
+                      return (
+                        <option key={block.id} value={block.id}>
+                          {block.title}
+                          {childCount > 0 ? ` (${childCountLabel(childCount)})` : ''}
+                        </option>
+                      );
+                    })}
                   </select>
-                  <small>Use a parent to show a block inside a larger schedule group.</small>
+                  <small>
+                    Use a parent to show a block inside a larger schedule group. The current block
+                    and its descendants are excluded to prevent cycles.
+                  </small>
                 </label>
 
                 <label className={`${styles.fullWidth} ${styles.visibilityToggle}`}>

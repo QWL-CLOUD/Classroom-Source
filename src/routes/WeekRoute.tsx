@@ -3,6 +3,10 @@ import { useEffect, useMemo, useRef, type ChangeEvent, type CSSProperties } from
 import { useSearchParams } from 'react-router-dom';
 
 import { useUiStore } from '@/app/uiStore';
+import {
+  buildScheduleBlockHierarchyMetadata,
+  type ScheduleBlockHierarchyMetadata,
+} from '@/features/editing/scheduleBlockHierarchy';
 import { parseWeekViewQuery, toWeekViewQuery } from '@/features/week/weekNavigation';
 import type { WeekDayItem, WeekViewFilter } from '@/features/week/weekReadModel';
 import { buildWeekReadModel, getWeekRange, shiftWeek } from '@/features/week/weekReadModel';
@@ -44,6 +48,10 @@ function itemCountLabel(count: number): string {
   return `${count} ${count === 1 ? 'item' : 'items'}`;
 }
 
+function childCountLabel(count: number): string {
+  return `${count} ${count === 1 ? 'child' : 'children'}`;
+}
+
 export function WeekRoute() {
   const { date } = useDateSearchParam();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -81,6 +89,13 @@ export function WeekRoute() {
           )
         : null,
     [date, planningState, state, weekView],
+  );
+  const scheduleHierarchy = useMemo<ReadonlyMap<string, ScheduleBlockHierarchyMetadata>>(
+    () =>
+      state.status === 'ready'
+        ? buildScheduleBlockHierarchyMetadata(state.data.scheduleBlocks)
+        : new Map<string, ScheduleBlockHierarchyMetadata>(),
+    [state],
   );
   const visibleDays = week ? (showWeekends ? week.days : week.days.slice(0, 5)) : [];
   const errorMessage =
@@ -277,6 +292,10 @@ export function WeekRoute() {
                   <ul className={styles.itemList} aria-label={`Items for ${day.label}`}>
                     {day.items.map((item) => {
                       const focused = item.occurrenceId === focusId;
+                      const hierarchy =
+                        item.sourceType === 'schedule-block'
+                          ? scheduleHierarchy.get(item.sourceRecordId)
+                          : undefined;
                       return (
                         <li
                           key={item.occurrenceId}
@@ -284,10 +303,23 @@ export function WeekRoute() {
                             if (node) itemRefs.current.set(item.occurrenceId, node);
                             else itemRefs.current.delete(item.occurrenceId);
                           }}
-                          className={getItemClassName(item, focused)}
+                          className={`${getItemClassName(item, focused)} ${
+                            hierarchy?.visualDepth ? styles.hierarchyChild : ''
+                          } ${
+                            hierarchy && hierarchy.directChildCount > 0
+                              ? styles.hierarchyParent
+                              : ''
+                          }`}
                           aria-current={focused ? 'true' : undefined}
                           tabIndex={focused ? -1 : undefined}
                           data-week-item={item.occurrenceId}
+                          data-schedule-id={
+                            item.sourceType === 'schedule-block' ? item.sourceRecordId : undefined
+                          }
+                          data-schedule-depth={hierarchy?.visualDepth}
+                          data-parent-id={hierarchy?.parentId}
+                          data-child-count={hierarchy?.directChildCount}
+                          data-group-tone={hierarchy?.groupTone}
                         >
                           <div className={styles.itemMeta}>
                             <span>{getItemTypeLabel(item)}</span>
@@ -299,6 +331,11 @@ export function WeekRoute() {
                             {item.timeLabel}
                           </time>
                           <p className={styles.itemTitle}>{item.title}</p>
+                          {hierarchy && hierarchy.directChildCount > 0 ? (
+                            <span className={styles.childCountBadge}>
+                              {childCountLabel(hierarchy.directChildCount)}
+                            </span>
+                          ) : null}
                           {item.parentTitle ? (
                             <p className={styles.itemContext}>Part of {item.parentTitle}</p>
                           ) : null}

@@ -11,6 +11,10 @@ import {
 import { useMemo, type ChangeEvent } from 'react';
 
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
+import {
+  buildScheduleBlockHierarchyMetadata,
+  type ScheduleBlockHierarchyMetadata,
+} from '@/features/editing/scheduleBlockHierarchy';
 import { buildWeekHref } from '@/features/week/weekNavigation';
 import type {
   TodayReadModel,
@@ -57,6 +61,10 @@ function getItemClassName(item: TodayTimelineItem): string {
 
 function itemCountLabel(count: number): string {
   return `${count} ${count === 1 ? 'item' : 'items'}`;
+}
+
+function childCountLabel(count: number): string {
+  return `${count} ${count === 1 ? 'child' : 'children'}`;
 }
 
 function getStartTimeLabel(item: TodayTimelineItem): string {
@@ -121,6 +129,13 @@ export function TodayRoute() {
   const now = new Date();
   const currentMinute = now.getHours() * 60 + now.getMinutes();
   const state = useWorkspaceReadModel({ startDate: date, endDate: date });
+  const scheduleHierarchy = useMemo<ReadonlyMap<string, ScheduleBlockHierarchyMetadata>>(
+    () =>
+      state.status === 'ready'
+        ? buildScheduleBlockHierarchyMetadata(state.data.scheduleBlocks)
+        : new Map<string, ScheduleBlockHierarchyMetadata>(),
+    [state],
+  );
   const today = useMemo(
     () =>
       state.status === 'ready'
@@ -327,20 +342,39 @@ export function TodayRoute() {
                 <ol className={styles.timelineList} aria-label={`Timeline for ${today.label}`}>
                   {today.timelineItems.map((item) => {
                     const durationLabel = getDurationLabel(item);
+                    const hierarchy =
+                      item.sourceType === 'schedule-block'
+                        ? scheduleHierarchy.get(item.sourceRecordId)
+                        : undefined;
                     return (
                       <li
                         key={item.occurrenceId}
-                        className={getItemClassName(item)}
+                        className={`${getItemClassName(item)} ${
+                          hierarchy?.visualDepth ? styles.hierarchyChild : ''
+                        } ${
+                          hierarchy && hierarchy.directChildCount > 0 ? styles.hierarchyParent : ''
+                        }`}
                         aria-label={`${item.title}, ${item.timeLabel}, ${item.statusLabel}`}
+                        data-schedule-id={
+                          item.sourceType === 'schedule-block' ? item.sourceRecordId : undefined
+                        }
+                        data-schedule-depth={hierarchy?.visualDepth}
+                        data-parent-id={hierarchy?.parentId}
+                        data-child-count={hierarchy?.directChildCount}
+                        data-group-tone={hierarchy?.groupTone}
                       >
-                        <div className={styles.timelineTime} title={item.timeLabel}>
+                        <div
+                          className={styles.timelineTime}
+                          title={item.timeLabel}
+                          data-timeline-time
+                        >
                           <time>{getStartTimeLabel(item)}</time>
                           {durationLabel ? <span>{durationLabel}</span> : null}
                         </div>
                         <div className={styles.timelineRail} aria-hidden="true">
                           <span />
                         </div>
-                        <div className={styles.timelineContent}>
+                        <div className={styles.timelineContent} data-timeline-content>
                           <div className={styles.itemMeta}>
                             <span
                               className={`${styles.statusBadge} ${getStatusClassName(
@@ -352,6 +386,11 @@ export function TodayRoute() {
                             <span className={styles.itemType}>{getItemTypeLabel(item)}</span>
                           </div>
                           <h3>{item.title}</h3>
+                          {hierarchy && hierarchy.directChildCount > 0 ? (
+                            <span className={styles.childCountBadge}>
+                              {childCountLabel(hierarchy.directChildCount)}
+                            </span>
+                          ) : null}
                           {item.parentTitle ? (
                             <p className={styles.itemContext}>Part of {item.parentTitle}</p>
                           ) : null}

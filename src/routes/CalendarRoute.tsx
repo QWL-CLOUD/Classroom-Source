@@ -1,5 +1,9 @@
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useMemo } from 'react';
+import {
+  buildScheduleBlockHierarchyMetadata,
+  type ScheduleBlockHierarchyMetadata,
+} from '@/features/editing/scheduleBlockHierarchy';
 
 import type { CalendarDayItem } from '@/features/calendar/calendarReadModel';
 import {
@@ -37,6 +41,13 @@ export function CalendarRoute() {
     startDate: monthRange.gridStartDate,
     endDate: monthRange.gridEndDate,
   });
+  const scheduleHierarchy = useMemo<ReadonlyMap<string, ScheduleBlockHierarchyMetadata>>(
+    () =>
+      state.status === 'ready'
+        ? buildScheduleBlockHierarchyMetadata(state.data.scheduleBlocks)
+        : new Map<string, ScheduleBlockHierarchyMetadata>(),
+    [state],
+  );
 
   const calendar = useMemo(
     () =>
@@ -188,7 +199,45 @@ export function CalendarRoute() {
                     {day.items.length > 0 ? (
                       <ul className={styles.itemList} aria-label={`Items for ${day.label}`}>
                         {day.items.map((item) => (
-                          <li key={item.occurrenceId} className={getItemClassName(item)}>
+                          <li
+                            key={item.occurrenceId}
+                            className={`${getItemClassName(item)} ${
+                              item.sourceType === 'schedule-block' &&
+                              scheduleHierarchy.get(item.sourceRecordId)?.visualDepth
+                                ? styles.hierarchyChild
+                                : ''
+                            } ${
+                              item.sourceType === 'schedule-block' &&
+                              (scheduleHierarchy.get(item.sourceRecordId)?.directChildCount ?? 0) >
+                                0
+                                ? styles.hierarchyParent
+                                : ''
+                            }`}
+                            data-calendar-item={item.occurrenceId}
+                            data-schedule-id={
+                              item.sourceType === 'schedule-block' ? item.sourceRecordId : undefined
+                            }
+                            data-schedule-depth={
+                              item.sourceType === 'schedule-block'
+                                ? scheduleHierarchy.get(item.sourceRecordId)?.visualDepth
+                                : undefined
+                            }
+                            data-parent-id={
+                              item.sourceType === 'schedule-block'
+                                ? scheduleHierarchy.get(item.sourceRecordId)?.parentId
+                                : undefined
+                            }
+                            data-child-count={
+                              item.sourceType === 'schedule-block'
+                                ? scheduleHierarchy.get(item.sourceRecordId)?.directChildCount
+                                : undefined
+                            }
+                            data-group-tone={
+                              item.sourceType === 'schedule-block'
+                                ? scheduleHierarchy.get(item.sourceRecordId)?.groupTone
+                                : undefined
+                            }
+                          >
                             <div className={styles.itemMeta}>
                               <span>{getItemTypeLabel(item)}</span>
                               <time>{item.timeLabel}</time>
