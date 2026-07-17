@@ -33,6 +33,8 @@
 .contextIdentity,
 .dateControls,
 .dateControls label,
+.planningActions,
+.itemActions,
 .sessionTime,
 .unscheduledNote {
   display: flex;
@@ -423,6 +425,35 @@
 
   .dateControls input,
   .itemHeading a {
+    width: 100%;
+  }
+}
+
+.planningActions,
+.itemActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.itemActions {
+  max-width: 520px;
+}
+
+@media (max-width: 900px) {
+  .planningActions,
+  .itemActions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 620px) {
+  .planningActions,
+  .planningActions > *,
+  .itemActions,
+  .itemActions > * {
     width: 100%;
   }
 }

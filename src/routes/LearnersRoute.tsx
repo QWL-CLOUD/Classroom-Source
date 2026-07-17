@@ -2,9 +2,11 @@ import {
   AlertTriangle,
   BookOpen,
   CalendarDays,
+  CalendarPlus,
   CheckCircle2,
   Clock3,
   Layers3,
+  Pencil,
   UserRound,
   Users,
 } from 'lucide-react';
@@ -48,11 +50,28 @@ function PlanningItemCard({ item }: { item: LearnerPlanningItem }) {
             <span className={styles.stateBadge}>{item.stateLabel}</span>
             <h3>{item.title}</h3>
           </div>
-          {item.weekHref ? (
-            <a className="button" href={item.weekHref}>
-              <CalendarDays aria-hidden="true" size={16} /> View in Week
-            </a>
-          ) : null}
+          <div className={styles.itemActions}>
+            {item.weekHref ? (
+              <a className="button" href={item.weekHref}>
+                <CalendarDays aria-hidden="true" size={16} /> View in Week
+              </a>
+            ) : null}
+            {item.scheduleHref ? (
+              <a className="button button-primary" href={item.scheduleHref}>
+                <CalendarPlus aria-hidden="true" size={16} /> Schedule
+              </a>
+            ) : null}
+            {item.sessionHref ? (
+              <a className="button" href={item.sessionHref}>
+                <CalendarPlus aria-hidden="true" size={16} /> Manage session
+              </a>
+            ) : null}
+            {item.editHref ? (
+              <a className="button" href={item.editHref}>
+                <Pencil aria-hidden="true" size={16} /> Edit plan
+              </a>
+            ) : null}
+          </div>
         </div>
 
         {item.subject ? <p className={styles.subject}>{item.subject}</p> : null}
@@ -235,26 +254,34 @@ export function LearnersRoute() {
                     <p className="page-eyebrow">Planning</p>
                     <h2>{planningViewLabels[planningView]}</h2>
                   </div>
-                  {planningView === 'upcoming' ? (
-                    <div className={styles.dateControls}>
-                      <label>
-                        <span>From</span>
-                        <input
-                          className="input"
-                          type="date"
-                          value={anchorDate}
-                          onChange={(event) => updateSearchParam('date', event.target.value)}
-                        />
-                      </label>
-                      <button
-                        className="button"
-                        type="button"
-                        onClick={() => updateSearchParam('date', todayLocalDate())}
-                      >
-                        Today
-                      </button>
-                    </div>
-                  ) : null}
+                  <div className={styles.planningActions}>
+                    {planningView === 'upcoming' ? (
+                      <div className={styles.dateControls}>
+                        <label>
+                          <span>From</span>
+                          <input
+                            className="input"
+                            type="date"
+                            value={anchorDate}
+                            onChange={(event) => updateSearchParam('date', event.target.value)}
+                          />
+                        </label>
+                        <button
+                          className="button"
+                          type="button"
+                          onClick={() => updateSearchParam('date', todayLocalDate())}
+                        >
+                          Today
+                        </button>
+                      </div>
+                    ) : null}
+                    <a
+                      className="button button-primary"
+                      href={`#/planning/edit?context=${encodeURIComponent(model.selectedContext.id)}`}
+                    >
+                      <CalendarPlus aria-hidden="true" size={16} /> New plan
+                    </a>
+                  </div>
                 </div>
 
                 <div className={styles.tabs} role="tablist" aria-label="Learner planning views">

@@ -8,7 +8,13 @@ import {
   startOfWeek,
 } from 'date-fns';
 
-import type { CalendarEvent, ScheduleBlock, ScheduleException } from '@/domain/models/entities';
+import type {
+  CalendarEvent,
+  LessonPlan,
+  ScheduleBlock,
+  ScheduleException,
+  SessionOccurrence,
+} from '@/domain/models/entities';
 import {
   formatLongDate,
   parseLocalDate,
@@ -37,7 +43,7 @@ export interface CalendarMonthRange {
   dates: string[];
 }
 
-export type CalendarItemSource = 'calendar-event' | 'schedule-block';
+export type CalendarItemSource = 'calendar-event' | 'schedule-block' | 'session-occurrence';
 export type CalendarSpanPosition = 'single' | 'start' | 'middle' | 'end';
 
 export interface CalendarDayItem {
@@ -53,6 +59,7 @@ export interface CalendarDayItem {
   endMinute?: number;
   kind?: ScheduleBlock['kind'];
   parentTitle?: string;
+  deliveryState?: SessionOccurrence['deliveryState'];
   spanPosition: CalendarSpanPosition;
   sortOrder: number;
 }
@@ -72,6 +79,7 @@ export interface CalendarMonthReadModel {
   days: CalendarDayReadModel[];
   sourceScheduleBlockCount: number;
   sourceCalendarEventCount: number;
+  sourceSessionOccurrenceCount: number;
   visibleItemCount: number;
 }
 
@@ -201,6 +209,28 @@ function toCalendarEventItem(event: CalendarEvent, date: string): CalendarDayIte
   };
 }
 
+function toSessionItem(
+  session: SessionOccurrence,
+  lessonPlanById: ReadonlyMap<string, LessonPlan>,
+): CalendarDayItem {
+  const plan = lessonPlanById.get(session.lessonPlanId);
+  return {
+    occurrenceId: `session-occurrence:${session.id}`,
+    sourceRecordId: session.id,
+    sourceType: 'session-occurrence',
+    title: plan?.title ?? 'Planned session',
+    category: plan?.subject ?? 'Planning',
+    date: session.date,
+    timeLabel: formatMinuteRange(session.startMinute, session.endMinute),
+    isAllDay: false,
+    startMinute: session.startMinute,
+    endMinute: session.endMinute,
+    deliveryState: session.deliveryState,
+    spanPosition: 'single',
+    sortOrder: 0,
+  };
+}
+
 function compareCalendarItems(first: CalendarDayItem, second: CalendarDayItem): number {
   const firstAllDayRank = first.isAllDay ? 0 : 1;
   const secondAllDayRank = second.isAllDay ? 0 : 1;
@@ -216,7 +246,12 @@ function compareCalendarItems(first: CalendarDayItem, second: CalendarDayItem): 
 
   if (first.sortOrder !== second.sortOrder) return first.sortOrder - second.sortOrder;
 
-  const sourceComparison = first.sourceType.localeCompare(second.sourceType);
+  const sourceRank: Record<CalendarItemSource, number> = {
+    'calendar-event': 0,
+    'session-occurrence': 1,
+    'schedule-block': 2,
+  };
+  const sourceComparison = sourceRank[first.sourceType] - sourceRank[second.sourceType];
   if (sourceComparison !== 0) return sourceComparison;
 
   const titleComparison = first.title.localeCompare(second.title);
@@ -231,11 +266,15 @@ export function buildCalendarMonthReadModel(
   calendarEvents: readonly CalendarEvent[],
   currentDate: string = todayLocalDate(),
   scheduleExceptions: readonly ScheduleException[] = [],
+  lessonPlans: readonly LessonPlan[] = [],
+  sessionOccurrences: readonly SessionOccurrence[] = [],
 ): CalendarMonthReadModel {
   const range = getCalendarMonthRange(anchorDate);
   const blockById = new Map(scheduleBlocks.map((block) => [block.id, block]));
+  const lessonPlanById = new Map(lessonPlans.map((plan) => [plan.id, plan]));
   const visibleScheduleBlockIds = new Set<string>();
   const visibleCalendarEventIds = new Set<string>();
+  const visibleSessionOccurrenceIds = new Set<string>();
 
   const days = range.dates.map((date): CalendarDayReadModel => {
     const scheduleItems = scheduleBlocks
@@ -253,6 +292,13 @@ export function buildCalendarMonthReadModel(
         return toCalendarEventItem(event, date);
       });
 
+    const sessionItems = sessionOccurrences
+      .filter((session) => session.date === date && session.deliveryState !== 'cancelled')
+      .map((session) => {
+        visibleSessionOccurrenceIds.add(session.id);
+        return toSessionItem(session, lessonPlanById);
+      });
+
     const parsed = requireLocalDate(date);
 
     return {
@@ -262,7 +308,7 @@ export function buildCalendarMonthReadModel(
       dayNumber: format(parsed, 'd'),
       inCurrentMonth: date >= range.monthStartDate && date <= range.monthEndDate,
       isToday: date === currentDate,
-      items: [...scheduleItems, ...eventItems].sort(compareCalendarItems),
+      items: [...scheduleItems, ...eventItems, ...sessionItems].sort(compareCalendarItems),
     };
   });
 
@@ -271,6 +317,7 @@ export function buildCalendarMonthReadModel(
     days,
     sourceScheduleBlockCount: visibleScheduleBlockIds.size,
     sourceCalendarEventCount: visibleCalendarEventIds.size,
+    sourceSessionOccurrenceCount: visibleSessionOccurrenceIds.size,
     visibleItemCount: days.reduce((total, day) => total + day.items.length, 0),
   };
 }

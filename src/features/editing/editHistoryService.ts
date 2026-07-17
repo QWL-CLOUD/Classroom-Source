@@ -38,10 +38,14 @@ export class EditHistoryService {
   async undo(): Promise<void> {
     const nextState = await this.db.transaction(
       'rw',
-      this.db.calendarEvents,
-      this.db.scheduleBlocks,
-      this.db.scheduleExceptions,
-      this.db.changeLog,
+      [
+        this.db.calendarEvents,
+        this.db.scheduleBlocks,
+        this.db.scheduleExceptions,
+        this.db.lessonPlans,
+        this.db.sessionOccurrences,
+        this.db.changeLog,
+      ],
       async () => {
         const logs = await this.listLogs();
         const target = findUndoTarget(logs);
@@ -66,10 +70,14 @@ export class EditHistoryService {
   async redo(): Promise<void> {
     const nextState = await this.db.transaction(
       'rw',
-      this.db.calendarEvents,
-      this.db.scheduleBlocks,
-      this.db.scheduleExceptions,
-      this.db.changeLog,
+      [
+        this.db.calendarEvents,
+        this.db.scheduleBlocks,
+        this.db.scheduleExceptions,
+        this.db.lessonPlans,
+        this.db.sessionOccurrences,
+        this.db.changeLog,
+      ],
       async () => {
         const logs = await this.listLogs();
         const target = findRedoTarget(logs);

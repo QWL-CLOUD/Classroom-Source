@@ -16,6 +16,7 @@ import {
   type ScheduleBlockHierarchyMetadata,
 } from '@/features/editing/scheduleBlockHierarchy';
 import { buildWeekHref } from '@/features/week/weekNavigation';
+import { useWeekPlanningReadModel } from '@/features/week/useWeekPlanningReadModel';
 import type {
   TodayReadModel,
   TodayTemporalStatus,
@@ -38,6 +39,7 @@ function getGreeting(): string {
 }
 
 function getItemTypeLabel(item: TodayTimelineItem): string {
+  if (item.sourceType === 'session-occurrence') return 'Session';
   if (item.sourceType === 'calendar-event') return 'Event';
   if (item.kind === 'container') return 'Schedule group';
   if (item.kind === 'routine') return 'Routine';
@@ -54,7 +56,11 @@ function getStatusClassName(status: TodayTemporalStatus): string {
 
 function getItemClassName(item: TodayTimelineItem): string {
   const classes = [styles.timelineItem!];
-  classes.push(item.sourceType === 'calendar-event' ? styles.calendarItem! : styles.scheduleItem!);
+  if (item.sourceType === 'session-occurrence') classes.push(styles.sessionItem!);
+  else
+    classes.push(
+      item.sourceType === 'calendar-event' ? styles.calendarItem! : styles.scheduleItem!,
+    );
   if (item.kind === 'container') classes.push(styles.containerItem!);
   if (item.spanPosition !== 'single') classes.push(styles.spanningItem!);
   return classes.join(' ');
@@ -117,7 +123,12 @@ function getTodayWeekHref(date: string, today: TodayReadModel | null): string {
 
   return buildWeekHref({
     date,
-    view: focusItem.sourceType === 'calendar-event' ? 'events' : 'schedule',
+    view:
+      focusItem.sourceType === 'calendar-event'
+        ? 'events'
+        : focusItem.sourceType === 'session-occurrence'
+          ? 'everything'
+          : 'schedule',
     focus: focusItem.occurrenceId,
   });
 }
@@ -131,6 +142,10 @@ export function TodayRoute() {
   const currentMinute = now.getHours() * 60 + now.getMinutes();
   const state = useWorkspaceReadModel({ startDate: date, endDate: date });
   const scheduleExceptions = useScheduleExceptionsForRange(date, date);
+  const planningState = useWeekPlanningReadModel({
+    startDate: date,
+    endDate: date,
+  });
   const scheduleHierarchy = useMemo<ReadonlyMap<string, ScheduleBlockHierarchyMetadata>>(
     () =>
       state.status === 'ready'
@@ -140,7 +155,7 @@ export function TodayRoute() {
   );
   const today = useMemo(
     () =>
-      state.status === 'ready'
+      state.status === 'ready' && planningState.status === 'ready'
         ? buildTodayReadModel(
             date,
             state.data.scheduleBlocks,
@@ -148,9 +163,11 @@ export function TodayRoute() {
             currentDate,
             currentMinute,
             scheduleExceptions ?? [],
+            planningState.data.lessonPlans,
+            planningState.data.sessionOccurrences,
           )
         : null,
-    [currentDate, currentMinute, date, scheduleExceptions, state],
+    [currentDate, currentMinute, date, planningState, scheduleExceptions, state],
   );
   const weekHref = getTodayWeekHref(date, today);
 
@@ -212,13 +229,13 @@ export function TodayRoute() {
             </div>
             <p className={styles.panelIntro}>Calendar events attached to the selected date.</p>
 
-            {state.status === 'loading' ? (
+            {state.status === 'loading' || planningState.status === 'loading' ? (
               <p className={styles.mutedText}>Loading reminders…</p>
             ) : null}
             {state.status === 'error' ? (
               <p className={styles.inlineError}>Reminders could not be loaded.</p>
             ) : null}
-            {state.status === 'ready' && today ? (
+            {state.status === 'ready' && planningState.status === 'ready' && today ? (
               today.reminderItems.length > 0 ? (
                 <ul
                   className={styles.reminderList}
@@ -285,6 +302,8 @@ export function TodayRoute() {
                   {today.sourceScheduleBlockCount === 1 ? 'block' : 'blocks'} ·{' '}
                   {today.sourceCalendarEventCount} dated{' '}
                   {today.sourceCalendarEventCount === 1 ? 'event' : 'events'} ·{' '}
+                  {today.sourceSessionOccurrenceCount} session
+                  {today.sourceSessionOccurrenceCount === 1 ? '' : 's'} ·{' '}
                   {itemCountLabel(today.visibleItemCount)} visible
                 </p>
               ) : null}
@@ -301,12 +320,18 @@ export function TodayRoute() {
             </div>
           ) : null}
 
-          {state.status === 'error' ? (
+          {state.status === 'error' || planningState.status === 'error' ? (
             <div className={`card ${styles.errorPanel}`} role="alert" aria-live="assertive">
               <AlertTriangle size={24} aria-hidden="true" />
               <div>
                 <h3>Today could not be loaded</h3>
-                <p>{state.message}</p>
+                <p>
+                  {state.status === 'error'
+                    ? state.message
+                    : planningState.status === 'error'
+                      ? planningState.message
+                      : 'Planning data could not be loaded.'}
+                </p>
               </div>
             </div>
           ) : null}
@@ -358,6 +383,7 @@ export function TodayRoute() {
                           hierarchy && hierarchy.directChildCount > 0 ? styles.hierarchyParent : ''
                         }`}
                         aria-label={`${item.title}, ${item.timeLabel}, ${item.statusLabel}`}
+                        data-today-item={item.occurrenceId}
                         data-schedule-id={
                           item.sourceType === 'schedule-block' ? item.sourceRecordId : undefined
                         }
@@ -409,6 +435,15 @@ export function TodayRoute() {
                               Edit occurrence
                             </a>
                           ) : null}
+                          {item.sourceType === 'session-occurrence' ? (
+                            <a
+                              className={styles.occurrenceEdit}
+                              href={`#/planning/session?session=${encodeURIComponent(item.sourceRecordId)}`}
+                              aria-label={`Manage ${item.title} session`}
+                            >
+                              Manage session
+                            </a>
+                          ) : null}
                         </div>
                       </li>
                     );
@@ -418,7 +453,9 @@ export function TodayRoute() {
                 <div className={`card ${styles.scheduleEmpty}`}>
                   <Clock3 size={32} aria-hidden="true" />
                   <h3>No schedule items for this date</h3>
-                  <p>Recurring schedule blocks and dated events will appear here.</p>
+                  <p>
+                    Recurring schedule blocks, dated events, and learner sessions will appear here.
+                  </p>
                   <a className="button" href={`#/calendar?date=${date}`}>
                     <CalendarDays size={17} /> Open Calendar
                   </a>

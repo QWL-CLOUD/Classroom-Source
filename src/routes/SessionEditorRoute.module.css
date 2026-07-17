@@ -1,0 +1,144 @@
+.editor,
+.statePanel,
+.errorPanel {
+  padding: 22px;
+}
+
+.editorHeader,
+.actions,
+.statusStrip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.editorHeader {
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.editorHeader h2,
+.errorPanel h1 {
+  margin: 0;
+  color: var(--heading);
+}
+
+.editorHeader p:last-child,
+.errorPanel p {
+  margin: 5px 0 0;
+  color: #4f5955;
+}
+
+.statusStrip {
+  margin-bottom: 18px;
+  padding: 11px 13px;
+  border: 1px solid #9cb8aa;
+  border-radius: 11px;
+  color: #4f5955;
+  background: #f0f6f2;
+  font-size: 13px;
+}
+
+.statusStrip strong {
+  color: #23483f;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.formGrid label {
+  display: grid;
+  gap: 7px;
+  color: var(--heading);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.formGrid input,
+.formGrid select {
+  width: 100%;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  background: #fff;
+  font: inherit;
+}
+
+.formGrid input:disabled {
+  color: #4f5955;
+  background: var(--surface-soft);
+}
+
+.formGrid input:focus,
+.formGrid select:focus {
+  outline: 3px solid rgb(53 95 84 / 25%);
+  border-color: var(--accent-strong);
+}
+
+.inheritanceNote,
+.warning,
+.error {
+  margin: 16px 0 0;
+  padding: 11px 13px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.inheritanceNote {
+  border: 1px solid #a9bba9;
+  color: #355145;
+  background: #f0f6f1;
+}
+
+.warning,
+.error,
+.errorPanel {
+  color: #6e302b;
+  background: #fff0ed;
+}
+
+.warning {
+  border: 1px solid #d39a91;
+}
+
+.actions {
+  margin-top: 20px;
+}
+
+.dangerButton {
+  min-height: 40px;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border: 1px solid #a94d45;
+  border-radius: 10px;
+  color: #fff;
+  background: #8f3f38;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.statePanel {
+  color: #4f5955;
+}
+
+@media (max-width: 680px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .editorHeader,
+  .actions,
+  .actions > * {
+    width: 100%;
+  }
+}
