@@ -96,6 +96,9 @@ export function CalendarRoute() {
           >
             Next <ChevronRight aria-hidden="true" size={18} />
           </button>
+          <a className="button" href={`#/schedule/edit?date=${date}`}>
+            Manage schedule
+          </a>
           <a className="button button-primary" href={`#/calendar/edit?date=${date}`}>
             <CalendarDays aria-hidden="true" size={18} /> Manage events
           </a>
