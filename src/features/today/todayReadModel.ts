@@ -1,7 +1,6 @@
-import { getISODay } from 'date-fns';
-
-import type { CalendarEvent, ScheduleBlock } from '@/domain/models/entities';
+import type { CalendarEvent, ScheduleBlock, ScheduleException } from '@/domain/models/entities';
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
+import { resolveScheduleOccurrence } from '@/features/scheduleExceptions/scheduleOccurrenceResolver';
 import { formatLongDate, parseLocalDate, todayLocalDate } from '@/shared/dates/localDate';
 
 export type TodayItemSource = 'calendar-event' | 'schedule-block';
@@ -106,16 +105,6 @@ function getEventTimeLabel(event: CalendarEvent, spanPosition: TodaySpanPosition
   }
 
   return 'Continues';
-}
-
-function scheduleBlockOccursOnDate(block: ScheduleBlock, date: string): boolean {
-  if (block.effectiveFrom && date < block.effectiveFrom) return false;
-  if (block.effectiveTo && date > block.effectiveTo) return false;
-  if (block.effectiveFrom && block.effectiveTo && block.effectiveFrom > block.effectiveTo) {
-    return false;
-  }
-
-  return block.weekdays.includes(getISODay(requireLocalDate(date)));
 }
 
 function calendarEventOccursOnDate(event: CalendarEvent, date: string): boolean {
@@ -335,18 +324,19 @@ export function buildTodayReadModel(
   calendarEvents: readonly CalendarEvent[],
   currentDate: string = todayLocalDate(),
   currentMinute: number = new Date().getHours() * 60 + new Date().getMinutes(),
+  scheduleExceptions: readonly ScheduleException[] = [],
 ): TodayReadModel {
   requireLocalDate(selectedDate);
   requireLocalDate(currentDate);
 
   const blockById = new Map(scheduleBlocks.map((block) => [block.id, block]));
-  const visibleScheduleBlocks = scheduleBlocks.filter((block) =>
-    scheduleBlockOccursOnDate(block, selectedDate),
-  );
+  const visibleScheduleBlocks = scheduleBlocks
+    .map((block) => resolveScheduleOccurrence(block, selectedDate, scheduleExceptions))
+    .filter((occurrence) => occurrence !== null)
+    .map((occurrence) => occurrence.block);
   const visibleCalendarEvents = calendarEvents.filter((event) =>
     calendarEventOccursOnDate(event, selectedDate),
   );
-
   const scheduleItems = visibleScheduleBlocks.map((block) =>
     toScheduleItem(block, selectedDate, blockById),
   );

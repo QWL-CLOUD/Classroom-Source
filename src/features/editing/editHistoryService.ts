@@ -40,12 +40,12 @@ export class EditHistoryService {
       'rw',
       this.db.calendarEvents,
       this.db.scheduleBlocks,
+      this.db.scheduleExceptions,
       this.db.changeLog,
       async () => {
         const logs = await this.listLogs();
         const target = findUndoTarget(logs);
         if (!target) return deriveEditHistoryState(logs);
-
         await applySupportedEditCommand(
           this.db,
           parseSupportedEditCommand(target.commandType, target.inverseJson),
@@ -60,7 +60,6 @@ export class EditHistoryService {
         );
       },
     );
-
     notifyEditHistoryChanged(nextState);
   }
 
@@ -69,12 +68,12 @@ export class EditHistoryService {
       'rw',
       this.db.calendarEvents,
       this.db.scheduleBlocks,
+      this.db.scheduleExceptions,
       this.db.changeLog,
       async () => {
         const logs = await this.listLogs();
         const target = findRedoTarget(logs);
         if (!target) return deriveEditHistoryState(logs);
-
         await applySupportedEditCommand(
           this.db,
           parseSupportedEditCommand(target.commandType, target.forwardJson),
@@ -89,7 +88,6 @@ export class EditHistoryService {
         );
       },
     );
-
     notifyEditHistoryChanged(nextState);
   }
 

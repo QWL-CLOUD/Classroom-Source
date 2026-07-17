@@ -11,6 +11,7 @@ import { LibraryRoute } from '@/routes/LibraryRoute';
 import { MigrationRoute } from '@/routes/MigrationRoute';
 import { NotFoundRoute } from '@/routes/NotFoundRoute';
 import { ScheduleBlockEditorRoute } from '@/routes/ScheduleBlockEditorRoute';
+import { ScheduleOccurrenceEditorRoute } from '@/routes/ScheduleOccurrenceEditorRoute';
 import { SettingsRoute } from '@/routes/SettingsRoute';
 import { SystemHealthRoute } from '@/routes/SystemHealthRoute';
 import { TasksRoute } from '@/routes/TasksRoute';
@@ -28,6 +29,7 @@ export const router = createHashRouter([
       { path: 'calendar', element: <CalendarRoute /> },
       { path: 'calendar/edit', element: <CalendarEventEditorRoute /> },
       { path: 'schedule/edit', element: <ScheduleBlockEditorRoute /> },
+      { path: 'schedule/occurrence/edit', element: <ScheduleOccurrenceEditorRoute /> },
       { path: 'tasks', element: <TasksRoute /> },
       { path: 'learners', element: <LearnersRoute /> },
       { path: 'library', element: <LibraryRoute /> },
