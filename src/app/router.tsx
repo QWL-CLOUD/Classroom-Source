@@ -1,4 +1,5 @@
 import { Navigate, createHashRouter } from 'react-router-dom';
+
 import { AppShell } from '@/app/AppShell';
 import { CalendarRoute } from '@/routes/CalendarRoute';
 import { CalendarEventEditorRoute } from '@/routes/CalendarEventEditorRoute';
@@ -9,6 +10,7 @@ import { LearnersRoute } from '@/routes/LearnersRoute';
 import { LibraryRoute } from '@/routes/LibraryRoute';
 import { MigrationRoute } from '@/routes/MigrationRoute';
 import { NotFoundRoute } from '@/routes/NotFoundRoute';
+import { ScheduleBlockEditorRoute } from '@/routes/ScheduleBlockEditorRoute';
 import { SettingsRoute } from '@/routes/SettingsRoute';
 import { SystemHealthRoute } from '@/routes/SystemHealthRoute';
 import { TasksRoute } from '@/routes/TasksRoute';
@@ -20,11 +22,12 @@ export const router = createHashRouter([
     path: '/',
     element: <AppShell />,
     children: [
-      { index: true, element: <Navigate replace to="/today" /> },
+      { index: true, element: <Navigate to="/today" replace /> },
       { path: 'today', element: <TodayRoute /> },
       { path: 'week', element: <WeekRoute /> },
       { path: 'calendar', element: <CalendarRoute /> },
       { path: 'calendar/edit', element: <CalendarEventEditorRoute /> },
+      { path: 'schedule/edit', element: <ScheduleBlockEditorRoute /> },
       { path: 'tasks', element: <TasksRoute /> },
       { path: 'learners', element: <LearnersRoute /> },
       { path: 'library', element: <LibraryRoute /> },

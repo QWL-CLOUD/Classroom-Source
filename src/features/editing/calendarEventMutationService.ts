@@ -5,9 +5,9 @@ import {
   type CalendarEvent,
   type ChangeLog,
 } from '@/domain/models/entities';
+
 import {
   deleteCalendarEventCommand,
-  isCalendarEventChangeLog,
   putCalendarEventCommand,
   serializeCalendarEventCommand,
   type CalendarEventCommandPair,
@@ -16,6 +16,7 @@ import {
   parseCalendarEventEditorValues,
   type CalendarEventEditorValues,
 } from './calendarEventEditorModel';
+import { clearSupportedRedoBranch } from './editCommandRegistry';
 import { notifyEditHistoryChanged } from './editHistorySignal';
 
 export interface CalendarEventMutationDependencies {
@@ -42,7 +43,6 @@ export class CalendarEventMutationService {
       ...fields,
       source: 'user',
     });
-
     const log = await this.commit('calendar-event.create', `Create “${record.title}”`, {
       forward: putCalendarEventCommand(record),
       inverse: deleteCalendarEventCommand(record.id),
@@ -53,7 +53,6 @@ export class CalendarEventMutationService {
 
   async update(id: string, values: CalendarEventEditorValues): Promise<CalendarEvent> {
     const fields = parseCalendarEventEditorValues(values);
-
     const result = await this.db.transaction(
       'rw',
       this.db.calendarEvents,
@@ -61,15 +60,18 @@ export class CalendarEventMutationService {
       async () => {
         const existingValue = await this.db.calendarEvents.get(id);
         if (!existingValue) throw new Error('Calendar event no longer exists.');
-
         const existing = calendarEventSchema.parse(existingValue);
-        const updated = calendarEventSchema.parse({ ...existing, ...fields, id });
+        const updated = calendarEventSchema.parse({
+          ...existing,
+          ...fields,
+          id,
+        });
         const log = this.createChangeLog('calendar-event.update', `Edit “${updated.title}”`, {
           forward: putCalendarEventCommand(updated),
           inverse: putCalendarEventCommand(existing),
         });
 
-        await this.clearRedoBranch();
+        await clearSupportedRedoBranch(this.db);
         await this.db.calendarEvents.put(updated);
         await this.db.changeLog.put(log);
         return { updated, log };
@@ -98,7 +100,7 @@ export class CalendarEventMutationService {
           },
         );
 
-        await this.clearRedoBranch();
+        await clearSupportedRedoBranch(this.db);
         await this.db.calendarEvents.delete(id);
         await this.db.changeLog.put(nextLog);
         return nextLog;
@@ -114,7 +116,7 @@ export class CalendarEventMutationService {
     commands: CalendarEventCommandPair,
   ): Promise<ChangeLog> {
     return this.db.transaction('rw', this.db.calendarEvents, this.db.changeLog, async () => {
-      await this.clearRedoBranch();
+      await clearSupportedRedoBranch(this.db);
       const forward = commands.forward;
       if (forward.action === 'put') {
         if (
@@ -132,23 +134,6 @@ export class CalendarEventMutationService {
       await this.db.changeLog.put(log);
       return log;
     });
-  }
-
-  private async clearRedoBranch(): Promise<void> {
-    const values = await this.db.changeLog
-      .where('commandType')
-      .startsWith('calendar-event.')
-      .toArray();
-    const redoIds: string[] = [];
-
-    for (const value of values) {
-      const parsed = changeLogSchema.safeParse(value);
-      if (parsed.success && isCalendarEventChangeLog(parsed.data) && parsed.data.undoneAt) {
-        redoIds.push(parsed.data.id);
-      }
-    }
-
-    if (redoIds.length > 0) await this.db.changeLog.bulkDelete(redoIds);
   }
 
   private createChangeLog(

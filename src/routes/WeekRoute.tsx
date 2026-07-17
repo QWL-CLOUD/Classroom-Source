@@ -173,6 +173,9 @@ export function WeekRoute() {
           >
             Next <ChevronRight size={18} />
           </button>
+          <a className="button button-primary" href={`#/schedule/edit?date=${date}`}>
+            Manage schedule
+          </a>
         </div>
       </header>
 

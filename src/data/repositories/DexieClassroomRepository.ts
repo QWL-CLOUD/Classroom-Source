@@ -119,6 +119,26 @@ export class DexieClassroomRepository implements ClassroomRepository {
     );
   }
 
+  async listScheduleBlocks(): Promise<ScheduleBlock[]> {
+    const scheduleBlocks = (await this.db.scheduleBlocks.toArray()).map((value) =>
+      scheduleBlockSchema.parse(value),
+    );
+
+    for (const block of scheduleBlocks) {
+      if (block.effectiveFrom) {
+        assertLocalDateRange(block.effectiveFrom, block.effectiveFrom);
+      }
+      if (block.effectiveTo) {
+        assertLocalDateRange(block.effectiveTo, block.effectiveTo);
+      }
+      if (block.effectiveFrom && block.effectiveTo) {
+        assertLocalDateRange(block.effectiveFrom, block.effectiveTo);
+      }
+    }
+
+    return scheduleBlocks.filter((block) => !block.archivedAt).sort(compareScheduleBlocks);
+  }
+
   async listScheduleBlocksForRange(range: LocalDateRange): Promise<ScheduleBlock[]> {
     assertLocalDateRange(range.startDate, range.endDate);
 

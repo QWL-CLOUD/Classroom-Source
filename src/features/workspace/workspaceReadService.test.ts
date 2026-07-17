@@ -14,6 +14,7 @@ function createRepository(overrides: Partial<ClassroomRepository> = {}): Classro
     putTask: vi.fn().mockResolvedValue(undefined),
     deleteTask: vi.fn().mockResolvedValue(undefined),
     getActiveSchoolYear: vi.fn().mockResolvedValue(null),
+    listScheduleBlocks: vi.fn().mockResolvedValue([]),
     listScheduleBlocksForRange: vi.fn().mockResolvedValue([]),
     listCalendarEventsForRange: vi.fn().mockResolvedValue([]),
     listLearnerContexts: vi.fn().mockResolvedValue([]),
