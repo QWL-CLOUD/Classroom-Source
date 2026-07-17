@@ -56,6 +56,11 @@ function PlanningItemCard({ item }: { item: LearnerPlanningItem }) {
                 <CalendarDays aria-hidden="true" size={16} /> View in Week
               </a>
             ) : null}
+            {item.calendarHref ? (
+              <a className="button" href={item.calendarHref}>
+                <CalendarDays aria-hidden="true" size={16} /> View in Calendar
+              </a>
+            ) : null}
             {item.scheduleHref ? (
               <a className="button button-primary" href={item.scheduleHref}>
                 <CalendarPlus aria-hidden="true" size={16} /> Schedule

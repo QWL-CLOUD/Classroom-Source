@@ -25,6 +25,7 @@ export interface LearnerPlanningItem {
   editHref?: string;
   scheduleHref?: string;
   sessionHref?: string;
+  calendarHref?: string;
 }
 
 export interface LearnersPageReadModel {
@@ -95,6 +96,7 @@ function sessionToPlanningItem(
     }),
     editHref: plan ? planningEditHref(plan.id) : undefined,
     sessionHref: sessionEditHref(session.id),
+    calendarHref: `#/calendar?date=${session.date}`,
   };
 }
 

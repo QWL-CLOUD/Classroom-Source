@@ -120,6 +120,7 @@ describe('buildLearnersPageReadModel', () => {
       dateLabel: 'Monday, July 20, 2026',
       timeLabel: '9:00 AM–10:00 AM',
       weekHref: '#/week?date=2026-07-20&view=everything&focus=session-occurrence%3Asession-first',
+      calendarHref: '#/calendar?date=2026-07-20',
       stateLabel: 'Scheduled',
     });
   });
