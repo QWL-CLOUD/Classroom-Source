@@ -10,6 +10,7 @@ import {
 import { parseWeekViewQuery, toWeekViewQuery } from '@/features/week/weekNavigation';
 import type { WeekDayItem, WeekViewFilter } from '@/features/week/weekReadModel';
 import { buildWeekReadModel, getWeekRange, shiftWeek } from '@/features/week/weekReadModel';
+import { useScheduleExceptionsForRange } from '@/features/scheduleExceptions/useScheduleExceptionsForRange';
 import { useWeekPlanningReadModel } from '@/features/week/useWeekPlanningReadModel';
 import { useWorkspaceReadModel } from '@/features/workspace/useWorkspaceReadModel';
 import { todayLocalDate } from '@/shared/dates/localDate';
@@ -75,6 +76,7 @@ export function WeekRoute() {
     startDate: range.mondayDate,
     endDate: range.sundayDate,
   });
+  const scheduleExceptions = useScheduleExceptionsForRange(range.mondayDate, range.sundayDate);
   const week = useMemo(
     () =>
       state.status === 'ready' && planningState.status === 'ready'
@@ -86,9 +88,10 @@ export function WeekRoute() {
             todayLocalDate(),
             planningState.data.lessonPlans,
             planningState.data.sessionOccurrences,
+            scheduleExceptions ?? [],
           )
         : null,
-    [date, planningState, state, weekView],
+    [date, planningState, scheduleExceptions, state, weekView],
   );
   const scheduleHierarchy = useMemo<ReadonlyMap<string, ScheduleBlockHierarchyMetadata>>(
     () =>
@@ -341,6 +344,15 @@ export function WeekRoute() {
                           ) : null}
                           {item.category ? (
                             <p className={styles.itemCategory}>{item.category}</p>
+                          ) : null}
+                          {item.sourceType === 'schedule-block' ? (
+                            <a
+                              className={styles.occurrenceEdit}
+                              href={`#/schedule/occurrence/edit?block=${encodeURIComponent(item.sourceRecordId)}&date=${day.date}&return=week`}
+                              aria-label={`Edit ${item.title} on ${day.date}`}
+                            >
+                              Edit occurrence
+                            </a>
                           ) : null}
                         </li>
                       );

@@ -1,12 +1,14 @@
-import { format, getISODay } from 'date-fns';
+import { format } from 'date-fns';
 
 import type {
   CalendarEvent,
   LessonPlan,
   ScheduleBlock,
+  ScheduleException,
   SessionOccurrence,
 } from '@/domain/models/entities';
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
+import { resolveScheduleOccurrence } from '@/features/scheduleExceptions/scheduleOccurrenceResolver';
 import {
   formatLongDate,
   getMonday,
@@ -116,17 +118,6 @@ function getEventTimeLabel(event: CalendarEvent, spanPosition: WeekSpanPosition)
   }
 
   return 'Continues';
-}
-
-function scheduleBlockOccursOnDate(block: ScheduleBlock, date: string): boolean {
-  if (!block.showInWeek) return false;
-  if (block.effectiveFrom && date < block.effectiveFrom) return false;
-  if (block.effectiveTo && date > block.effectiveTo) return false;
-  if (block.effectiveFrom && block.effectiveTo && block.effectiveFrom > block.effectiveTo) {
-    return false;
-  }
-
-  return block.weekdays.includes(getISODay(requireLocalDate(date)));
 }
 
 function calendarEventOccursOnDate(event: CalendarEvent, date: string): boolean {
@@ -311,6 +302,7 @@ export function buildWeekReadModel(
   currentDate: string = todayLocalDate(),
   lessonPlans: readonly LessonPlan[] = [],
   sessionOccurrences: readonly SessionOccurrence[] = [],
+  scheduleExceptions: readonly ScheduleException[] = [],
 ): WeekReadModel {
   const range = getWeekRange(anchorDate);
   const blockById = new Map(scheduleBlocks.map((block) => [block.id, block]));
@@ -322,10 +314,13 @@ export function buildWeekReadModel(
 
   const days = range.dates.map((date): WeekDayReadModel => {
     const scheduleItems = scheduleBlocks
-      .filter((block) => scheduleBlockOccursOnDate(block, date))
-      .map((block) => {
-        visibleScheduleBlockIds.add(block.id);
-        return toScheduleItem(block, date, blockById);
+      .map((block) =>
+        resolveScheduleOccurrence(block, date, scheduleExceptions, { requireShowInWeek: true }),
+      )
+      .filter((occurrence) => occurrence !== null)
+      .map((occurrence) => {
+        visibleScheduleBlockIds.add(occurrence.block.id);
+        return toScheduleItem(occurrence.block, date, blockById);
       });
 
     const eventItems = calendarEvents

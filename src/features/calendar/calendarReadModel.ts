@@ -4,18 +4,18 @@ import {
   endOfMonth,
   endOfWeek,
   format,
-  getISODay,
   startOfMonth,
   startOfWeek,
 } from 'date-fns';
 
-import type { CalendarEvent, ScheduleBlock } from '@/domain/models/entities';
+import type { CalendarEvent, ScheduleBlock, ScheduleException } from '@/domain/models/entities';
 import {
   formatLongDate,
   parseLocalDate,
   toLocalDateString,
   todayLocalDate,
 } from '@/shared/dates/localDate';
+import { resolveScheduleOccurrence } from '@/features/scheduleExceptions/scheduleOccurrenceResolver';
 
 export const CALENDAR_WEEKDAY_LABELS = [
   'Monday',
@@ -152,16 +152,6 @@ function getEventTimeLabel(event: CalendarEvent, spanPosition: CalendarSpanPosit
   return 'Continues';
 }
 
-function scheduleBlockOccursOnDate(block: ScheduleBlock, date: string): boolean {
-  if (block.effectiveFrom && date < block.effectiveFrom) return false;
-  if (block.effectiveTo && date > block.effectiveTo) return false;
-  if (block.effectiveFrom && block.effectiveTo && block.effectiveFrom > block.effectiveTo) {
-    return false;
-  }
-
-  return block.weekdays.includes(getISODay(requireLocalDate(date)));
-}
-
 function calendarEventOccursOnDate(event: CalendarEvent, date: string): boolean {
   return event.startDate <= date && date <= getCalendarEventEndDate(event);
 }
@@ -240,6 +230,7 @@ export function buildCalendarMonthReadModel(
   scheduleBlocks: readonly ScheduleBlock[],
   calendarEvents: readonly CalendarEvent[],
   currentDate: string = todayLocalDate(),
+  scheduleExceptions: readonly ScheduleException[] = [],
 ): CalendarMonthReadModel {
   const range = getCalendarMonthRange(anchorDate);
   const blockById = new Map(scheduleBlocks.map((block) => [block.id, block]));
@@ -248,10 +239,11 @@ export function buildCalendarMonthReadModel(
 
   const days = range.dates.map((date): CalendarDayReadModel => {
     const scheduleItems = scheduleBlocks
-      .filter((block) => scheduleBlockOccursOnDate(block, date))
-      .map((block) => {
-        visibleScheduleBlockIds.add(block.id);
-        return toScheduleItem(block, date, blockById);
+      .map((block) => resolveScheduleOccurrence(block, date, scheduleExceptions))
+      .filter((occurrence) => occurrence !== null)
+      .map((occurrence) => {
+        visibleScheduleBlockIds.add(occurrence.block.id);
+        return toScheduleItem(occurrence.block, date, blockById);
       });
 
     const eventItems = calendarEvents

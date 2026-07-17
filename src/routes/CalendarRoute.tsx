@@ -12,6 +12,7 @@ import {
   getCalendarMonthRange,
   shiftCalendarMonth,
 } from '@/features/calendar/calendarReadModel';
+import { useScheduleExceptionsForRange } from '@/features/scheduleExceptions/useScheduleExceptionsForRange';
 import { useWorkspaceReadModel } from '@/features/workspace/useWorkspaceReadModel';
 import { todayLocalDate } from '@/shared/dates/localDate';
 import { useDateSearchParam } from '@/shared/dates/useDateSearchParam';
@@ -41,6 +42,10 @@ export function CalendarRoute() {
     startDate: monthRange.gridStartDate,
     endDate: monthRange.gridEndDate,
   });
+  const scheduleExceptions = useScheduleExceptionsForRange(
+    monthRange.gridStartDate,
+    monthRange.gridEndDate,
+  );
   const scheduleHierarchy = useMemo<ReadonlyMap<string, ScheduleBlockHierarchyMetadata>>(
     () =>
       state.status === 'ready'
@@ -57,9 +62,10 @@ export function CalendarRoute() {
             state.data.scheduleBlocks,
             state.data.calendarEvents,
             todayLocalDate(),
+            scheduleExceptions ?? [],
           )
         : null,
-    [date, state],
+    [date, scheduleExceptions, state],
   );
 
   const previousMonthDate = shiftCalendarMonth(date, -1);
@@ -248,6 +254,15 @@ export function CalendarRoute() {
                             ) : null}
                             {item.category ? (
                               <p className={styles.itemCategory}>{item.category}</p>
+                            ) : null}
+                            {item.sourceType === 'schedule-block' ? (
+                              <a
+                                className={styles.occurrenceEdit}
+                                href={`#/schedule/occurrence/edit?block=${encodeURIComponent(item.sourceRecordId)}&date=${day.date}&return=calendar`}
+                                aria-label={`Edit ${item.title} on ${day.date}`}
+                              >
+                                Edit occurrence
+                              </a>
                             ) : null}
                           </li>
                         ))}

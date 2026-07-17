@@ -22,6 +22,7 @@ import type {
   TodayTimelineItem,
 } from '@/features/today/todayReadModel';
 import { buildTodayReadModel } from '@/features/today/todayReadModel';
+import { useScheduleExceptionsForRange } from '@/features/scheduleExceptions/useScheduleExceptionsForRange';
 import { TaskList } from '@/features/tasks/TaskList';
 import { useWorkspaceReadModel } from '@/features/workspace/useWorkspaceReadModel';
 import { formatLongDate, shiftDays, todayLocalDate } from '@/shared/dates/localDate';
@@ -129,6 +130,7 @@ export function TodayRoute() {
   const now = new Date();
   const currentMinute = now.getHours() * 60 + now.getMinutes();
   const state = useWorkspaceReadModel({ startDate: date, endDate: date });
+  const scheduleExceptions = useScheduleExceptionsForRange(date, date);
   const scheduleHierarchy = useMemo<ReadonlyMap<string, ScheduleBlockHierarchyMetadata>>(
     () =>
       state.status === 'ready'
@@ -145,9 +147,10 @@ export function TodayRoute() {
             state.data.calendarEvents,
             currentDate,
             currentMinute,
+            scheduleExceptions ?? [],
           )
         : null,
-    [currentDate, currentMinute, date, state],
+    [currentDate, currentMinute, date, scheduleExceptions, state],
   );
   const weekHref = getTodayWeekHref(date, today);
 
@@ -396,6 +399,15 @@ export function TodayRoute() {
                           ) : null}
                           {item.category ? (
                             <p className={styles.itemCategory}>{item.category}</p>
+                          ) : null}
+                          {item.sourceType === 'schedule-block' ? (
+                            <a
+                              className={styles.occurrenceEdit}
+                              href={`#/schedule/occurrence/edit?block=${encodeURIComponent(item.sourceRecordId)}&date=${date}&return=today`}
+                              aria-label={`Edit ${item.title} on ${date}`}
+                            >
+                              Edit occurrence
+                            </a>
                           ) : null}
                         </div>
                       </li>

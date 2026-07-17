@@ -4,6 +4,7 @@ import {
   learnerContextSchema,
   lessonPlanSchema,
   scheduleBlockSchema,
+  scheduleExceptionSchema,
   schoolYearSchema,
   sessionOccurrenceSchema,
   taskSchema,
@@ -11,6 +12,7 @@ import {
   type LearnerContext,
   type LessonPlan,
   type ScheduleBlock,
+  type ScheduleException,
   type SchoolYear,
   type SessionOccurrence,
   type Task,
@@ -166,6 +168,20 @@ export class DexieClassroomRepository implements ClassroomRepository {
           (!block.effectiveTo || block.effectiveTo >= range.startDate),
       )
       .sort(compareScheduleBlocks);
+  }
+
+  async listScheduleExceptionsForRange(range: LocalDateRange): Promise<ScheduleException[]> {
+    assertLocalDateRange(range.startDate, range.endDate);
+    const values = await this.db.scheduleExceptions
+      .where('date')
+      .between(range.startDate, range.endDate, true, true)
+      .toArray();
+    return values
+      .map((value) => scheduleExceptionSchema.parse(value))
+      .sort(
+        (first, second) =>
+          first.date.localeCompare(second.date) || first.id.localeCompare(second.id),
+      );
   }
 
   async listCalendarEventsForRange(range: LocalDateRange): Promise<CalendarEvent[]> {
