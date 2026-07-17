@@ -142,3 +142,57 @@
     width: 100%;
   }
 }
+
+.schedulingSection,
+.contentSection {
+  display: grid;
+  gap: 15px;
+}
+
+.contentSection {
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+}
+
+.sectionHeading h3,
+.contentHeader h3 {
+  margin: 0;
+  color: var(--heading);
+}
+
+.contentHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.contentHeader > div:first-child {
+  max-width: 720px;
+}
+
+.contentHeader p:last-child {
+  margin: 5px 0 0;
+  color: #4f5955;
+  line-height: 1.5;
+}
+
+.contentSourceBadge {
+  width: fit-content;
+  padding: 5px 9px;
+  border: 1px solid #a8b9b0;
+  border-radius: 999px;
+  color: #334b43;
+  background: #eef5f1;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+@media (max-width: 680px) {
+  .contentHeader,
+  .contentHeader > .button {
+    width: 100%;
+  }
+}

@@ -80,6 +80,13 @@ function PlanningItemCard({ item }: { item: LearnerPlanningItem }) {
         </div>
 
         {item.subject ? <p className={styles.subject}>{item.subject}</p> : null}
+        {item.contentSummary ? (
+          <p className={styles.contentSummary}>
+            <BookOpen aria-hidden="true" size={15} />
+            <span>{item.contentSummary}</span>
+            {item.contentSourceLabel ? <strong>{item.contentSourceLabel}</strong> : null}
+          </p>
+        ) : null}
         {item.dateLabel && item.timeLabel ? (
           <p className={styles.sessionTime}>
             <CalendarDays aria-hidden="true" size={15} />

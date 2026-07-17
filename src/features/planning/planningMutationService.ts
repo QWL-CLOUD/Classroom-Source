@@ -264,7 +264,7 @@ export class PlanningMutationService {
         };
         const log = this.createChangeLog(
           'planning.session.update',
-          `Reschedule “${plan.title}”`,
+          `Edit session “${plan.title}”`,
           commands,
         );
 

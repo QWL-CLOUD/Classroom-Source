@@ -457,3 +457,21 @@
     width: 100%;
   }
 }
+
+.contentSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 8px 0 0;
+  color: #43564f;
+  font-size: 12px;
+}
+
+.contentSummary strong {
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #5b4779;
+  background: #eee8f7;
+  font-size: 10px;
+}

@@ -1,14 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
+import type { LessonPlan, SessionOccurrence } from '@/domain/models/entities';
+
 import {
+  createLessonFlowStepEditorValues,
   createLessonPlanEditorValues,
   createSessionEditorValues,
   parseLessonPlanEditorValues,
   parseSessionEditorValues,
+  resolveSessionLessonContent,
+  toSessionEditorValues,
 } from './planningEditorModel';
 
 describe('planning editor models', () => {
-  it('normalizes optional lesson-plan fields', () => {
+  it('normalizes optional lesson-plan fields and ordered lesson-flow steps', () => {
     expect(
       parseLessonPlanEditorValues({
         ...createLessonPlanEditorValues(),
@@ -17,6 +22,15 @@ describe('planning editor models', () => {
         workflowState: 'ready',
         durationMinutes: '45',
         learningTarget: ' Compare fractions. ',
+        lessonFlow: [
+          {
+            ...createLessonFlowStepEditorValues('guided-practice'),
+            id: 'step-1',
+            title: '  Sort fraction cards  ',
+            durationMinutes: '12',
+            details: ' Work with a partner. ',
+          },
+        ],
       }),
     ).toEqual({
       title: 'Fractions review',
@@ -26,6 +40,59 @@ describe('planning editor models', () => {
       durationMinutes: 45,
       learningTarget: 'Compare fractions.',
       notes: undefined,
+      lessonFlow: [
+        {
+          id: 'step-1',
+          title: 'Sort fraction cards',
+          phase: 'guided-practice',
+          durationMinutes: 12,
+          details: 'Work with a partner.',
+          teacherNotes: undefined,
+        },
+      ],
+    });
+  });
+
+  it('keeps sessions live-linked until a content override is saved', () => {
+    const plan: LessonPlan = {
+      id: 'plan',
+      contextId: 'context',
+      title: 'Bridge lesson',
+      subject: 'Language',
+      workflowState: 'ready',
+      lessonFlow: [
+        {
+          id: 'plan-step',
+          title: 'Notice cognates',
+          phase: 'instruction',
+          durationMinutes: 10,
+        },
+      ],
+      createdAt: '2026-07-17T12:00:00.000Z',
+      updatedAt: '2026-07-17T12:00:00.000Z',
+    };
+    const session: SessionOccurrence = {
+      id: 'session',
+      lessonPlanId: plan.id,
+      contextId: plan.contextId,
+      date: '2026-07-17',
+      startMinute: 540,
+      endMinute: 600,
+      deliveryState: 'scheduled',
+    };
+
+    expect(resolveSessionLessonContent(plan, session)).toMatchObject({
+      source: 'plan',
+      content: { lessonFlow: [{ title: 'Notice cognates' }] },
+    });
+
+    const customValues = toSessionEditorValues(session, plan);
+    customValues.contentMode = 'custom';
+    customValues.lessonFlow[0]!.title = 'Practice cognate pairs';
+    const parsed = parseSessionEditorValues(customValues);
+
+    expect(parsed.contentOverride).toMatchObject({
+      lessonFlow: [{ title: 'Practice cognate pairs' }],
     });
   });
 

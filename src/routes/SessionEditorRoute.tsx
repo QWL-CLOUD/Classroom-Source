@@ -1,4 +1,4 @@
-import { ArrowLeft, CheckCircle2, RotateCcw, Save, Undo2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Copy, RefreshCcw, RotateCcw, Save, Undo2 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -15,10 +15,15 @@ import {
   type ScheduleBlock,
   type SessionOccurrence,
 } from '@/domain/models/entities';
+import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
 import { minuteToTime } from '@/features/editing/calendarEventEditorModel';
+import { LessonFlowEditor, LessonFlowPreview } from '@/features/planning/LessonFlowEditor';
 import {
+  createLessonContentEditorValues,
   createSessionEditorValues,
+  resolveSessionLessonContent,
   toSessionEditorValues,
+  type LessonContentEditorValues,
   type SessionEditorValues,
 } from '@/features/planning/planningEditorModel';
 import {
@@ -27,7 +32,6 @@ import {
 } from '@/features/planning/planningMutationService';
 import { resolveScheduleOccurrence } from '@/features/scheduleExceptions/scheduleOccurrenceResolver';
 import { useScheduleExceptionsForRange } from '@/features/scheduleExceptions/useScheduleExceptionsForRange';
-import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
 import { formatLongDate, parseLocalDate, todayLocalDate } from '@/shared/dates/localDate';
 
 import styles from './SessionEditorRoute.module.css';
@@ -68,19 +72,28 @@ function SessionEditorForm({
   const { context, plan, session, scheduleBlocks } = snapshot;
   const defaultBlockId = session?.scheduleBlockId ?? plan?.preferredScheduleBlockId ?? '';
   const defaultBlock = scheduleBlocks.find((block) => block.id === defaultBlockId);
-  const [values, setValues] = useState<SessionEditorValues>(() =>
-    session
-      ? toSessionEditorValues(session)
+  const [values, setValues] = useState<SessionEditorValues>(() => {
+    if (!plan) {
+      return createSessionEditorValues(
+        initialDate,
+        defaultBlockId,
+        defaultBlock?.startMinute ?? 540,
+        defaultBlock?.endMinute ?? 600,
+      );
+    }
+    return session
+      ? toSessionEditorValues(session, plan)
       : createSessionEditorValues(
           initialDate,
           defaultBlockId,
           defaultBlock?.startMinute ?? 540,
           defaultBlock?.endMinute ??
             (defaultBlock?.startMinute !== undefined
-              ? defaultBlock.startMinute + (plan?.durationMinutes ?? 60)
+              ? defaultBlock.startMinute + (plan.durationMinutes ?? 60)
               : 600),
-        ),
-  );
+          plan,
+        );
+  });
   const [saving, setSaving] = useState(false);
   const [unscheduleArmed, setUnscheduleArmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +132,7 @@ function SessionEditorForm({
   if (!context || !plan) return null;
   const selectedContext = context;
   const selectedPlan = plan;
+  const inheritedContent = resolveSessionLessonContent(selectedPlan).content;
 
   function update<K extends keyof SessionEditorValues>(
     key: K,
@@ -127,6 +141,30 @@ function SessionEditorForm({
     setValues((current) => ({ ...current, [key]: value }));
     setError(null);
     setUnscheduleArmed(false);
+  }
+
+  function updateContent(content: LessonContentEditorValues): void {
+    setValues((current) => ({ ...current, ...content }));
+    setError(null);
+    setUnscheduleArmed(false);
+  }
+
+  function customizeContent(): void {
+    setValues((current) => ({
+      ...current,
+      contentMode: 'custom',
+      ...createLessonContentEditorValues(inheritedContent),
+    }));
+    setError(null);
+  }
+
+  function restoreInheritedContent(): void {
+    setValues((current) => ({
+      ...current,
+      contentMode: 'inherit',
+      ...createLessonContentEditorValues(inheritedContent),
+    }));
+    setError(null);
   }
 
   async function save(): Promise<void> {
@@ -210,71 +248,129 @@ function SessionEditorForm({
         </div>
       ) : null}
 
-      <div className={styles.formGrid}>
-        <label>
-          <span>Date</span>
-          <input
-            type="date"
-            value={values.date}
-            onChange={(event) => update('date', event.target.value)}
-          />
-        </label>
+      <section className={styles.schedulingSection} aria-labelledby="session-schedule-heading">
+        <div className={styles.sectionHeading}>
+          <div>
+            <p className="page-eyebrow">Schedule</p>
+            <h3 id="session-schedule-heading">Date and time</h3>
+          </div>
+        </div>
 
-        <label>
-          <span>Schedule block</span>
-          <select
-            value={values.scheduleBlockId}
-            onChange={(event) => update('scheduleBlockId', event.target.value)}
-          >
-            <option value="">Manual time</option>
-            {scheduleBlocks.map((block) => (
-              <option key={block.id} value={block.id}>
-                {block.title}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className={styles.formGrid}>
+          <label>
+            <span>Date</span>
+            <input
+              type="date"
+              value={values.date}
+              onChange={(event) => update('date', event.target.value)}
+            />
+          </label>
 
-        <label>
-          <span>Start time</span>
-          <input
-            type="time"
-            value={values.startTime}
-            disabled={Boolean(values.scheduleBlockId)}
-            onChange={(event) => update('startTime', event.target.value)}
-          />
-        </label>
+          <label>
+            <span>Schedule block</span>
+            <select
+              value={values.scheduleBlockId}
+              onChange={(event) => update('scheduleBlockId', event.target.value)}
+            >
+              <option value="">Manual time</option>
+              {scheduleBlocks.map((block) => (
+                <option key={block.id} value={block.id}>
+                  {block.title}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <label>
-          <span>End time</span>
-          <input
-            type="time"
-            value={values.endTime}
-            disabled={Boolean(values.scheduleBlockId)}
-            onChange={(event) => update('endTime', event.target.value)}
-          />
-        </label>
-      </div>
+          <label>
+            <span>Start time</span>
+            <input
+              type="time"
+              value={values.startTime}
+              disabled={Boolean(values.scheduleBlockId)}
+              onChange={(event) => update('startTime', event.target.value)}
+            />
+          </label>
 
-      {selectedBlock ? (
-        resolvedOccurrence ? (
-          <p className={styles.inheritanceNote}>
-            Time inherited from {resolvedOccurrence.block.title} on {formatLongDate(values.date)}:{' '}
-            {formatCalendarMinute(resolvedOccurrence.block.startMinute)}–
-            {formatCalendarMinute(resolvedOccurrence.block.endMinute)}.
-          </p>
+          <label>
+            <span>End time</span>
+            <input
+              type="time"
+              value={values.endTime}
+              disabled={Boolean(values.scheduleBlockId)}
+              onChange={(event) => update('endTime', event.target.value)}
+            />
+          </label>
+        </div>
+
+        {selectedBlock ? (
+          resolvedOccurrence ? (
+            <p className={styles.inheritanceNote}>
+              Time inherited from {resolvedOccurrence.block.title} on {formatLongDate(values.date)}:{' '}
+              {formatCalendarMinute(resolvedOccurrence.block.startMinute)}–
+              {formatCalendarMinute(resolvedOccurrence.block.endMinute)}.
+            </p>
+          ) : (
+            <p className={styles.warning} role="alert">
+              {occurrenceResolution.error ??
+                'This schedule block does not occur on the selected date. Choose another date, another block, or Manual time.'}
+            </p>
+          )
         ) : (
-          <p className={styles.warning} role="alert">
-            {occurrenceResolution.error ??
-              'This schedule block does not occur on the selected date. Choose another date, another block, or Manual time.'}
+          <p className={styles.inheritanceNote}>
+            Manual sessions keep the date and time entered here without changing the recurring
+            schedule.
           </p>
-        )
-      ) : (
-        <p className={styles.inheritanceNote}>
-          Manual sessions keep the date and time entered here without changing the recurring
-          schedule.
-        </p>
-      )}
+        )}
+      </section>
+
+      <section className={styles.contentSection} aria-labelledby="session-content-heading">
+        <div className={styles.contentHeader}>
+          <div>
+            <p className="page-eyebrow">Teaching content</p>
+            <h3 id="session-content-heading">Session lesson flow</h3>
+            <p>
+              {values.contentMode === 'inherit'
+                ? 'Inherited from the planning item. Plan edits continue to flow into this session.'
+                : 'Customized for this occurrence. Future plan edits will not replace these details.'}
+            </p>
+          </div>
+          {values.contentMode === 'inherit' ? (
+            <button className="button" type="button" disabled={saving} onClick={customizeContent}>
+              <Copy aria-hidden="true" size={16} /> Customize this session
+            </button>
+          ) : (
+            <button
+              className="button"
+              type="button"
+              disabled={saving}
+              onClick={restoreInheritedContent}
+            >
+              <RefreshCcw aria-hidden="true" size={16} /> Use plan content
+            </button>
+          )}
+        </div>
+
+        <div className={styles.contentSourceBadge} role="status">
+          {values.contentMode === 'inherit'
+            ? 'Plan content · live inheritance'
+            : 'Session override'}
+        </div>
+
+        {values.contentMode === 'inherit' ? (
+          <LessonFlowPreview content={inheritedContent} />
+        ) : (
+          <LessonFlowEditor
+            idPrefix="session-content"
+            values={{
+              learningTarget: values.learningTarget,
+              notes: values.notes,
+              lessonFlow: values.lessonFlow,
+            }}
+            disabled={saving}
+            onChange={updateContent}
+          />
+        )}
+      </section>
 
       {error ? (
         <p className={styles.error} role="alert">
@@ -389,7 +485,7 @@ export function SessionEditorRoute() {
         <div>
           <p className="page-eyebrow">Phase 3C</p>
           <h1>Session</h1>
-          <p>Assign a date and time, then keep completion synchronized across Classroom.</p>
+          <p>Schedule the lesson, inherit its teaching flow, or customize this occurrence.</p>
         </div>
       </header>
       <SessionEditorForm
