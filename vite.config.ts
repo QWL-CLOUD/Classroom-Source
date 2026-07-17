@@ -6,8 +6,8 @@ import { configDefaults } from 'vitest/config';
 
 const rootDirectory = path.dirname(fileURLToPath(import.meta.url));
 
-export default defineConfig(({ command }) => ({
-  base: command === 'build' ? '/Classroom-Source/' : '/',
+export default defineConfig(({ command, mode }) => ({
+  base: command === 'build' || mode === 'production' ? '/Classroom-Source/' : '/',
   plugins: [react()],
   resolve: {
     alias: {
