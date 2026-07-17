@@ -365,6 +365,13 @@ export function TodayRoute() {
                         data-parent-id={hierarchy?.parentId}
                         data-child-count={hierarchy?.directChildCount}
                         data-group-tone={hierarchy?.groupTone}
+                        data-hierarchy-role={
+                          hierarchy?.directChildCount
+                            ? 'parent'
+                            : hierarchy?.visualDepth
+                              ? 'child'
+                              : undefined
+                        }
                       >
                         <div
                           className={styles.timelineTime}
@@ -388,6 +395,23 @@ export function TodayRoute() {
                             </span>
                             <span className={styles.itemType}>{getItemTypeLabel(item)}</span>
                           </div>
+                          {hierarchy &&
+                          (hierarchy.directChildCount > 0 || hierarchy.visualDepth) ? (
+                            <div className={styles.hierarchyBanner}>
+                              <span className={styles.hierarchyRole}>
+                                {hierarchy.directChildCount > 0 ? 'Parent block' : 'Child block'}
+                              </span>
+                              <span className={styles.hierarchyDetail}>
+                                {hierarchy.directChildCount > 0
+                                  ? `${childCountLabel(hierarchy.directChildCount)} scheduled inside`
+                                  : hierarchy.parentUnavailable
+                                    ? 'Parent unavailable'
+                                    : `Inside ${
+                                        hierarchy.parentTitle ?? item.parentTitle ?? 'parent block'
+                                      }`}
+                              </span>
+                            </div>
+                          ) : null}
                           <h3>{item.title}</h3>
                           {hierarchy && hierarchy.directChildCount > 0 ? (
                             <span className={styles.childCountBadge}>

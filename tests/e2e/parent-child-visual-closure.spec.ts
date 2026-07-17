@@ -166,12 +166,25 @@ test('Week, Today, and Calendar preserve hierarchy cues without shifting the Tod
   const todayParent = page.locator('[data-schedule-id="visual-parent"]');
   const todayChild = page.locator('[data-schedule-id="visual-arrival"]');
   await expect(todayChild).toHaveAttribute('data-schedule-depth', '1');
+  await expect(todayParent).toHaveAttribute('data-hierarchy-role', 'parent');
+  await expect(todayChild).toHaveAttribute('data-hierarchy-role', 'child');
+  await expect(todayParent.getByText('Parent block', { exact: true })).toBeVisible();
+  await expect(todayChild.getByText('Child block', { exact: true })).toBeVisible();
+  await expect(todayChild.getByText('Inside Synthetic Grade 3 Day', { exact: true })).toBeVisible();
   const parentTime = await todayParent.locator('[data-timeline-time]').boundingBox();
   const childTime = await todayChild.locator('[data-timeline-time]').boundingBox();
   const parentContent = await todayParent.locator('[data-timeline-content]').boundingBox();
   const childContent = await todayChild.locator('[data-timeline-content]').boundingBox();
   expect(parentTime?.x).toBe(childTime?.x);
-  expect((childContent?.x ?? 0) - (parentContent?.x ?? 0)).toBeGreaterThanOrEqual(8);
+  expect((childContent?.x ?? 0) - (parentContent?.x ?? 0)).toBeGreaterThanOrEqual(24);
+
+  const todayAccessibilityResults = await new AxeBuilder({ page }).analyze();
+  expect(
+    todayAccessibilityResults.violations,
+    todayAccessibilityResults.violations
+      .map((violation) => `${violation.id}: ${violation.help}`)
+      .join('\n'),
+  ).toEqual([]);
 
   await page.goto('./#/calendar?date=2026-07-13');
   const calendarParent = page.locator(

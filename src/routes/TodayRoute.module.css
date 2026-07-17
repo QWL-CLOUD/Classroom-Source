@@ -474,54 +474,86 @@
 .hierarchyChild {
   --hierarchy-surface: var(--surface-soft);
   --hierarchy-line: var(--border);
+  --hierarchy-ink: var(--heading);
 }
 
 .hierarchyParent[data-group-tone='0'],
 .hierarchyChild[data-group-tone='0'] {
   --hierarchy-surface: #edf3ef;
-  --hierarchy-line: #879b8d;
+  --hierarchy-line: #6f8d79;
 }
 
 .hierarchyParent[data-group-tone='1'],
 .hierarchyChild[data-group-tone='1'] {
   --hierarchy-surface: #f1f3e9;
-  --hierarchy-line: #979d7f;
+  --hierarchy-line: #818a61;
 }
 
 .hierarchyParent[data-group-tone='2'],
 .hierarchyChild[data-group-tone='2'] {
   --hierarchy-surface: #f4eee6;
-  --hierarchy-line: #aa927c;
+  --hierarchy-line: #94745d;
 }
 
 .hierarchyParent[data-group-tone='3'],
 .hierarchyChild[data-group-tone='3'] {
   --hierarchy-surface: #f1eaee;
-  --hierarchy-line: #9b8791;
+  --hierarchy-line: #896b79;
 }
 
 .hierarchyParent[data-group-tone='4'],
 .hierarchyChild[data-group-tone='4'] {
   --hierarchy-surface: #eaf0f3;
-  --hierarchy-line: #82939d;
+  --hierarchy-line: #667f8e;
 }
 
 .hierarchyParent[data-group-tone='5'],
 .hierarchyChild[data-group-tone='5'] {
   --hierarchy-surface: #f2ece7;
-  --hierarchy-line: #9f8c80;
+  --hierarchy-line: #8a7061;
 }
 
-.hierarchyParent .timelineContent,
-.hierarchyChild .timelineContent {
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--hierarchy-surface) 50%, transparent);
+.hierarchyParent .timelineRail span {
+  width: 16px;
+  height: 16px;
+  background: var(--hierarchy-line);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--hierarchy-line) 35%, transparent);
+}
+
+.hierarchyChild .timelineRail span {
+  width: 10px;
+  height: 10px;
+  background: var(--hierarchy-line);
+  box-shadow: 0 0 0 1px var(--hierarchy-line);
+}
+
+.hierarchyParent .timelineContent {
+  border: 2px solid var(--hierarchy-line);
+  border-left-width: 6px;
+  border-radius: 14px;
+  background: var(--hierarchy-surface);
+  box-shadow: 0 8px 20px rgb(52 69 77 / 10%);
 }
 
 .hierarchyChild .timelineContent {
-  margin-left: 12px;
-  padding-left: 12px;
-  border-left: 4px solid var(--hierarchy-line);
+  position: relative;
+  margin-left: 28px;
+  padding-left: 16px;
+  border: 1px solid color-mix(in srgb, var(--hierarchy-line) 72%, white);
+  border-left: 5px solid var(--hierarchy-line);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--hierarchy-surface) 82%, white);
+  box-shadow: 0 5px 14px rgb(52 69 77 / 7%);
+}
+
+.hierarchyChild .timelineContent::before {
+  content: '';
+  position: absolute;
+  top: 28px;
+  left: -29px;
+  width: 24px;
+  height: 2px;
+  background: var(--hierarchy-line);
 }
 
 .hierarchyParent :where(.itemType, .itemContext, .itemCategory),
@@ -529,17 +561,57 @@
   color: var(--text);
 }
 
+.hierarchyBanner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 9px;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 9px;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--hierarchy-line) 48%, white);
+  border-radius: 8px;
+  background: color-mix(in srgb, white 72%, transparent);
+  line-height: 1.35;
+}
+
+.hierarchyRole {
+  color: #33454d;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hierarchyDetail {
+  color: #4f5955;
+  font-size: 11px;
+  font-weight: 750;
+}
+
 .childCountBadge {
   display: inline-flex;
   width: fit-content;
-  margin-top: 5px;
-  padding: 2px 7px;
-  border: 1px solid color-mix(in srgb, var(--hierarchy-line) 60%, transparent);
+  margin-top: 7px;
+  padding: 3px 8px;
+  border: 1px solid color-mix(in srgb, var(--hierarchy-line) 68%, white);
   border-radius: 999px;
-  color: var(--heading);
+  color: #33454d;
   font-size: 10px;
-  font-weight: 800;
-  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  font-weight: 850;
+  background: color-mix(in srgb, white 78%, transparent);
+}
+
+@media (max-width: 680px) {
+  .hierarchyChild .timelineContent {
+    margin-left: 18px;
+  }
+
+  .hierarchyChild .timelineContent::before {
+    left: -19px;
+    width: 14px;
+  }
 }
 
 .occurrenceEdit {
