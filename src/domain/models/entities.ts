@@ -93,6 +93,32 @@ export const lessonSeriesSchema = z.object({
   subject: z.string().default(''),
 });
 
+export const lessonFlowPhaseSchema = z.enum([
+  'opening',
+  'instruction',
+  'guided-practice',
+  'independent-practice',
+  'assessment',
+  'closure',
+  'transition',
+  'other',
+]);
+
+export const lessonFlowStepSchema = z.object({
+  id: idSchema,
+  title: z.string().min(1),
+  phase: lessonFlowPhaseSchema.default('instruction'),
+  durationMinutes: z.number().int().positive().max(1440).optional(),
+  details: z.string().optional(),
+  teacherNotes: z.string().optional(),
+});
+
+export const lessonContentSchema = z.object({
+  learningTarget: z.string().optional(),
+  notes: z.string().optional(),
+  lessonFlow: z.array(lessonFlowStepSchema).default([]),
+});
+
 export const lessonPlanSchema = z.object({
   id: idSchema,
   contextId: idSchema,
@@ -105,6 +131,7 @@ export const lessonPlanSchema = z.object({
   durationMinutes: z.number().int().positive().optional(),
   learningTarget: z.string().optional(),
   notes: z.string().optional(),
+  lessonFlow: z.array(lessonFlowStepSchema).optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
 });
@@ -121,6 +148,7 @@ export const sessionOccurrenceSchema = z
     deliveryState: z.enum(['scheduled', 'completed', 'cancelled']),
     completedAt: timestampSchema.optional(),
     reflectionId: idSchema.optional(),
+    contentOverride: lessonContentSchema.optional(),
   })
   .refine((value) => value.endMinute > value.startMinute, {
     message: 'endMinute must be after startMinute',
@@ -192,6 +220,9 @@ export type ScheduleBlock = z.infer<typeof scheduleBlockSchema>;
 export type ScheduleException = z.infer<typeof scheduleExceptionSchema>;
 export type CalendarEvent = z.infer<typeof calendarEventSchema>;
 export type LessonSeries = z.infer<typeof lessonSeriesSchema>;
+export type LessonFlowPhase = z.infer<typeof lessonFlowPhaseSchema>;
+export type LessonFlowStep = z.infer<typeof lessonFlowStepSchema>;
+export type LessonContent = z.infer<typeof lessonContentSchema>;
 export type LessonPlan = z.infer<typeof lessonPlanSchema>;
 export type SessionOccurrence = z.infer<typeof sessionOccurrenceSchema>;
 export type Task = z.infer<typeof taskSchema>;

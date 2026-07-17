@@ -125,6 +125,46 @@ describe('buildLearnersPageReadModel', () => {
     });
   });
 
+  it('summarizes inherited and customized lesson flow on planning cards', () => {
+    const plan = {
+      ...lessonPlan('plan-flow', 'Flow lesson', 'ready', '2026-07-10T12:00:00.000Z'),
+      lessonFlow: [
+        {
+          id: 'step-one',
+          title: 'Opening',
+          phase: 'opening' as const,
+          durationMinutes: 5,
+        },
+        {
+          id: 'step-two',
+          title: 'Practice',
+          phase: 'guided-practice' as const,
+          durationMinutes: 15,
+        },
+      ],
+    };
+    const scheduled = {
+      ...session('session-flow', plan.id, '2026-07-20', 'scheduled'),
+      contentOverride: {
+        lessonFlow: [
+          {
+            id: 'custom-step',
+            title: 'Custom practice',
+            phase: 'guided-practice' as const,
+            durationMinutes: 12,
+          },
+        ],
+      },
+    };
+
+    const model = buildLearnersPageReadModel(snapshot([plan], [scheduled]), '2026-07-15');
+
+    expect(model.upcomingItems[0]).toMatchObject({
+      contentSummary: '1 step · 12 min',
+      contentSourceLabel: 'Customized session',
+    });
+  });
+
   it('keeps plans unscheduled until they have a scheduled or completed occurrence', () => {
     const plans = [
       lessonPlan('plan-ready', 'Ready plan', 'ready', '2026-07-12T12:00:00.000Z'),

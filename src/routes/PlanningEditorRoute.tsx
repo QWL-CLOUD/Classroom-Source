@@ -15,9 +15,11 @@ import {
   type ScheduleBlock,
   type SessionOccurrence,
 } from '@/domain/models/entities';
+import { LessonFlowEditor } from '@/features/planning/LessonFlowEditor';
 import {
   createLessonPlanEditorValues,
   toLessonPlanEditorValues,
+  type LessonContentEditorValues,
   type LessonPlanEditorValues,
 } from '@/features/planning/planningEditorModel';
 import {
@@ -190,25 +192,22 @@ function PlanningEditorForm({
             onChange={(event) => update('durationMinutes', event.target.value)}
           />
         </label>
-
-        <label className={styles.fullWidth}>
-          <span>Learning target</span>
-          <textarea
-            rows={3}
-            value={values.learningTarget}
-            onChange={(event) => update('learningTarget', event.target.value)}
-          />
-        </label>
-
-        <label className={styles.fullWidth}>
-          <span>Notes</span>
-          <textarea
-            rows={5}
-            value={values.notes}
-            onChange={(event) => update('notes', event.target.value)}
-          />
-        </label>
       </div>
+
+      <LessonFlowEditor
+        idPrefix="planning-item"
+        values={{
+          learningTarget: values.learningTarget,
+          notes: values.notes,
+          lessonFlow: values.lessonFlow,
+        }}
+        disabled={saving}
+        onChange={(content: LessonContentEditorValues) => {
+          setValues((current) => ({ ...current, ...content }));
+          setError(null);
+          setDeleteArmed(false);
+        }}
+      />
 
       {activeSession ? (
         <p className={styles.notice} role="status">

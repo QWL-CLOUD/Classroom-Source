@@ -1,6 +1,10 @@
 import type { LearnerContext, LessonPlan, SessionOccurrence } from '@/domain/models/entities';
 import type { LearnersReadSnapshot } from '@/domain/readModels/learnerReadModels';
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
+import {
+  lessonFlowDurationMinutes,
+  resolveSessionLessonContent,
+} from '@/features/planning/planningEditorModel';
 import { buildWeekHref } from '@/features/week/weekNavigation';
 import { formatLongDate } from '@/shared/dates/localDate';
 
@@ -26,6 +30,8 @@ export interface LearnerPlanningItem {
   scheduleHref?: string;
   sessionHref?: string;
   calendarHref?: string;
+  contentSummary?: string;
+  contentSourceLabel?: string;
 }
 
 export interface LearnersPageReadModel {
@@ -74,11 +80,19 @@ function sessionEditHref(sessionId: string): string {
   return `#/planning/session?session=${encodeURIComponent(sessionId)}`;
 }
 
+function contentSummary(stepCount: number, durationMinutes: number): string | undefined {
+  if (stepCount === 0) return undefined;
+  return `${stepCount} ${stepCount === 1 ? 'step' : 'steps'}${
+    durationMinutes > 0 ? ` · ${durationMinutes} min` : ''
+  }`;
+}
+
 function sessionToPlanningItem(
   session: SessionOccurrence,
   lessonPlanById: ReadonlyMap<string, LessonPlan>,
 ): LearnerPlanningItem {
   const plan = lessonPlanById.get(session.lessonPlanId);
+  const resolvedContent = plan ? resolveSessionLessonContent(plan, session) : null;
 
   return {
     id: session.id,
@@ -97,6 +111,13 @@ function sessionToPlanningItem(
     editHref: plan ? planningEditHref(plan.id) : undefined,
     sessionHref: sessionEditHref(session.id),
     calendarHref: `#/calendar?date=${session.date}`,
+    contentSummary: resolvedContent
+      ? contentSummary(
+          resolvedContent.content.lessonFlow.length,
+          lessonFlowDurationMinutes(resolvedContent.content.lessonFlow),
+        )
+      : undefined,
+    contentSourceLabel: resolvedContent?.source === 'session' ? 'Customized session' : undefined,
   };
 }
 
@@ -170,6 +191,10 @@ export function buildLearnersPageReadModel(
       stateLabel: plan.workflowState === 'ready' ? 'Ready' : 'Draft',
       editHref: planningEditHref(plan.id),
       scheduleHref: planningScheduleHref(plan.id),
+      contentSummary: contentSummary(
+        plan.lessonFlow?.length ?? 0,
+        lessonFlowDurationMinutes(plan.lessonFlow ?? []),
+      ),
     }));
 
   return {

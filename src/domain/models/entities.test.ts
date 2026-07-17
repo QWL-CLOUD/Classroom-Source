@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { scheduleBlockSchema, sessionOccurrenceSchema } from './entities';
+import { lessonPlanSchema, scheduleBlockSchema, sessionOccurrenceSchema } from './entities';
 
 describe('domain schemas', () => {
   it('accepts a Friday-only schedule block as ordinary recurrence data', () => {
@@ -30,5 +30,18 @@ describe('domain schemas', () => {
         deliveryState: 'scheduled',
       }),
     ).toThrow();
+  });
+  it('keeps legacy lesson plans compatible without requiring lesson flow', () => {
+    const plan = lessonPlanSchema.parse({
+      id: 'lesson-1',
+      contextId: 'class-1',
+      title: 'Legacy lesson',
+      subject: '',
+      workflowState: 'draft',
+      createdAt: '2026-07-17T12:00:00.000Z',
+      updatedAt: '2026-07-17T12:00:00.000Z',
+    });
+
+    expect(plan.lessonFlow).toBeUndefined();
   });
 });

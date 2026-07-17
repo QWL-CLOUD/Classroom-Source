@@ -5,7 +5,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ClassroomDatabase } from '@/data/db/ClassroomDatabase';
 import { EditHistoryService } from '@/features/editing/editHistoryService';
 
-import { createLessonPlanEditorValues, createSessionEditorValues } from './planningEditorModel';
+import {
+  createLessonFlowStepEditorValues,
+  createLessonPlanEditorValues,
+  createSessionEditorValues,
+  toSessionEditorValues,
+} from './planningEditorModel';
 import { PlanningMutationService } from './planningMutationService';
 
 let database: ClassroomDatabase;
@@ -91,6 +96,47 @@ describe('planning mutation service', () => {
 
     await history.redo();
     expect((await database.sessionOccurrences.get(session.id))?.deliveryState).toBe('completed');
+  });
+
+  it('stores a session override independently and restores it through undo', async () => {
+    const plan = await service.createPlan('context', {
+      ...createLessonPlanEditorValues(),
+      title: 'Flow lesson',
+      lessonFlow: [
+        {
+          ...createLessonFlowStepEditorValues('opening'),
+          id: 'opening-step',
+          title: 'Plan opening',
+          durationMinutes: '8',
+        },
+      ],
+    });
+    const session = await service.schedulePlan(
+      plan.id,
+      createSessionEditorValues('2026-07-17', 'block', 540, 600, plan),
+    );
+    expect(session.contentOverride).toBeUndefined();
+
+    const customValues = toSessionEditorValues(session, plan);
+    customValues.contentMode = 'custom';
+    customValues.lessonFlow[0]!.title = 'Session opening';
+    await service.updateSession(session.id, customValues);
+
+    expect(await database.sessionOccurrences.get(session.id)).toMatchObject({
+      contentOverride: {
+        lessonFlow: [{ title: 'Session opening' }],
+      },
+    });
+
+    await history.undo();
+    expect((await database.sessionOccurrences.get(session.id))?.contentOverride).toBeUndefined();
+
+    await history.redo();
+    expect(await database.sessionOccurrences.get(session.id)).toMatchObject({
+      contentOverride: {
+        lessonFlow: [{ title: 'Session opening' }],
+      },
+    });
   });
 
   it('does not overwrite an existing plan when a generated ID collides', async () => {

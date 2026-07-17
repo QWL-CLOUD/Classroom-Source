@@ -95,7 +95,7 @@ test('Planning item becomes one synchronized scheduled and completed session', a
   await planCard.getByRole('link', { name: 'Schedule' }).click();
 
   await expect(page.getByRole('heading', { level: 1, name: 'Session' })).toBeVisible();
-  await page.getByLabel('Date').fill('2026-07-10');
+  await page.getByRole('textbox', { name: 'Date', exact: true }).fill('2026-07-10');
   await expect(page.getByLabel('Schedule block')).toHaveValue('phase-3c-block');
   await expect(page.getByLabel('Start time')).toHaveValue('09:00');
   await expect(page.getByLabel('End time')).toHaveValue('10:00');
@@ -154,6 +154,92 @@ test('Planning item becomes one synchronized scheduled and completed session', a
   await page.getByRole('button', { name: 'Redo' }).click();
   await completedPlanning.getByRole('tab', { name: /Completed/ }).click();
   await expect(completedPlanning.getByLabel('Synthetic bridge lesson, Completed')).toBeVisible();
+
+  const accessibilityResults = await new AxeBuilder({ page }).analyze();
+  expect(
+    accessibilityResults.violations,
+    accessibilityResults.violations
+      .map((violation) => `${violation.id}: ${violation.help}`)
+      .join('\n'),
+  ).toEqual([]);
+});
+
+test('Lesson flow inherits into a session, supports an override, and can return to plan content', async ({
+  page,
+}) => {
+  await page.goto('./#/learners?date=2026-07-17');
+  await seed(page);
+  await page.reload();
+
+  const planning = page.getByRole('region', {
+    name: 'Planning for Synthetic planning class',
+  });
+  await planning.getByRole('link', { name: 'New plan' }).click();
+
+  await page.getByLabel('Title').fill('Synthetic lesson flow');
+  await page.getByLabel('Planning state').selectOption('ready');
+  await page.getByLabel('Preferred schedule block').selectOption('phase-3c-block');
+
+  await page.getByRole('button', { name: 'Add step' }).click();
+  await page.getByLabel('Step title').fill('Welcome and notice');
+  await page.getByLabel('Phase').selectOption('opening');
+  await page.getByLabel('Minutes', { exact: true }).fill('5');
+  await page.getByLabel('Student activity and directions').fill('Notice the example together.');
+
+  await page.getByRole('button', { name: 'Add step' }).click();
+  await page.getByLabel('Step title').nth(1).fill('Guided partner practice');
+  await page.getByLabel('Phase').nth(1).selectOption('guided-practice');
+  await page.getByLabel('Minutes', { exact: true }).nth(1).fill('15');
+  await page.getByLabel('Student activity and directions').nth(1).fill('Practice with a partner.');
+
+  await page.getByRole('button', { name: 'Save and schedule' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Session' })).toBeVisible();
+  await page.getByRole('textbox', { name: 'Date', exact: true }).fill('2026-07-17');
+  await expect(page.getByText('Plan content · live inheritance')).toBeVisible();
+  await expect(page.getByText('Welcome and notice', { exact: true })).toBeVisible();
+  await expect(page.getByText('Guided partner practice', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Schedule session' }).click();
+
+  const upcoming = page.getByRole('region', {
+    name: 'Planning for Synthetic planning class',
+  });
+  const inheritedCard = upcoming.getByLabel('Synthetic lesson flow, Scheduled');
+  await expect(inheritedCard.getByText('2 steps · 20 min')).toBeVisible();
+  await inheritedCard.getByRole('link', { name: 'Manage session' }).click();
+
+  await page.getByRole('button', { name: 'Customize this session' }).click();
+  await expect(page.getByText('Session override')).toBeVisible();
+  await page.getByLabel('Step title').first().fill('Session-specific welcome');
+  await page.getByRole('button', { name: 'Save session' }).click();
+
+  const customizedCard = page
+    .getByRole('region', { name: 'Planning for Synthetic planning class' })
+    .getByLabel('Synthetic lesson flow, Scheduled');
+  await expect(customizedCard.getByText('Customized session')).toBeVisible();
+  await customizedCard.getByRole('link', { name: 'Edit plan' }).click();
+
+  await page.getByLabel('Step title').first().fill('Revised plan opening');
+  await page.getByRole('button', { name: 'Save plan' }).click();
+  const afterPlanEdit = page
+    .getByRole('region', { name: 'Planning for Synthetic planning class' })
+    .getByLabel('Synthetic lesson flow, Scheduled');
+  await afterPlanEdit.getByRole('link', { name: 'Manage session' }).click();
+
+  await expect(page.getByText('Session-specific welcome', { exact: true })).toBeVisible();
+  await expect(page.getByText('Revised plan opening', { exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Use plan content' }).click();
+  await expect(page.getByText('Revised plan opening', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Save session' }).click();
+
+  const resetCard = page
+    .getByRole('region', { name: 'Planning for Synthetic planning class' })
+    .getByLabel('Synthetic lesson flow, Scheduled');
+  await expect(resetCard.getByText('Customized session')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(resetCard.getByText('Customized session')).toBeVisible();
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(resetCard.getByText('Customized session')).toHaveCount(0);
 
   const accessibilityResults = await new AxeBuilder({ page }).analyze();
   expect(
