@@ -68,7 +68,7 @@ async function seed(page: Page): Promise<void> {
 }
 
 test('Planning item becomes one synchronized scheduled and completed session', async ({ page }) => {
-  await page.goto('./#/learners?date=2026-07-17');
+  await page.goto('./#/learners?date=2026-07-10');
   await seed(page);
   await page.reload();
 
@@ -95,7 +95,7 @@ test('Planning item becomes one synchronized scheduled and completed session', a
   await planCard.getByRole('link', { name: 'Schedule' }).click();
 
   await expect(page.getByRole('heading', { level: 1, name: 'Session' })).toBeVisible();
-  await page.getByLabel('Date').fill('2026-07-17');
+  await page.getByLabel('Date').fill('2026-07-10');
   await expect(page.getByLabel('Schedule block')).toHaveValue('phase-3c-block');
   await expect(page.getByLabel('Start time')).toHaveValue('09:00');
   await expect(page.getByLabel('End time')).toHaveValue('10:00');
@@ -103,27 +103,35 @@ test('Planning item becomes one synchronized scheduled and completed session', a
   await page.getByRole('button', { name: 'Schedule session' }).click();
 
   await expect(page).toHaveURL(/planning=upcoming/);
+  await expect(page).toHaveURL(/date=2026-07-10/);
   const upcomingPlanning = page.getByRole('region', {
     name: 'Planning for Synthetic planning class',
   });
   const sessionCard = upcomingPlanning.getByLabel('Synthetic bridge lesson, Scheduled');
-  await expect(sessionCard.getByText('Friday, July 17, 2026')).toBeVisible();
+  await expect(sessionCard.getByText('Friday, July 10, 2026')).toBeVisible();
   await expect(sessionCard.getByText('9:00 AM–10:00 AM')).toBeVisible();
+  await sessionCard.getByRole('link', { name: 'View in Calendar' }).click();
+  await expect(page).toHaveURL(/#\/calendar\?date=2026-07-10/);
+  await expect(
+    page.locator('[data-calendar-item^="session-occurrence:"]').filter({
+      hasText: 'Synthetic bridge lesson',
+    }),
+  ).toBeVisible();
 
-  await page.goto('./#/today?date=2026-07-17');
+  await page.goto('./#/today?date=2026-07-10');
   const todaySession = page
     .locator('[data-today-item^="session-occurrence:"]')
     .filter({ hasText: 'Synthetic bridge lesson' });
   await expect(todaySession).toBeVisible();
   await expect(todaySession.getByText('Session', { exact: true })).toBeVisible();
 
-  await page.goto('./#/week?date=2026-07-17&view=everything');
+  await page.goto('./#/week?date=2026-07-10&view=everything');
   const weekSession = page.locator('[data-week-item^="session-occurrence:"]').filter({
     hasText: 'Synthetic bridge lesson',
   });
   await expect(weekSession).toBeVisible();
 
-  await page.goto('./#/calendar?date=2026-07-17');
+  await page.goto('./#/calendar?date=2026-07-10');
   const calendarSession = page.locator('[data-calendar-item^="session-occurrence:"]').filter({
     hasText: 'Synthetic bridge lesson',
   });

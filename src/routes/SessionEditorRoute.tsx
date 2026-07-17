@@ -46,8 +46,14 @@ function getErrorMessage(cause: unknown): string {
   return cause instanceof Error ? cause.message : 'The session could not be saved.';
 }
 
-function learnerHref(contextId: string, view: 'upcoming' | 'unscheduled' | 'completed'): string {
-  return `#/learners?context=${encodeURIComponent(contextId)}&planning=${view}`;
+function learnerHref(
+  contextId: string,
+  view: 'upcoming' | 'unscheduled' | 'completed',
+  date?: string,
+): string {
+  const params = new URLSearchParams({ context: contextId, planning: view });
+  if (date) params.set('date', date);
+  return `#/learners?${params.toString()}`;
 }
 
 function SessionEditorForm({
@@ -131,7 +137,7 @@ function SessionEditorForm({
       const saved = session
         ? await service.updateSession(session.id, values)
         : await service.schedulePlan(selectedPlan.id, values);
-      window.location.hash = learnerHref(saved.contextId, 'upcoming');
+      window.location.hash = learnerHref(saved.contextId, 'upcoming', saved.date);
     } catch (cause) {
       setError(getErrorMessage(cause));
       setSaving(false);
@@ -150,6 +156,7 @@ function SessionEditorForm({
       window.location.hash = learnerHref(
         updated.contextId,
         updated.deliveryState === 'completed' ? 'completed' : 'upcoming',
+        updated.date,
       );
     } catch (cause) {
       setError(getErrorMessage(cause));
@@ -167,7 +174,7 @@ function SessionEditorForm({
     setError(null);
     try {
       await service.unscheduleSession(session.id);
-      window.location.hash = learnerHref(selectedContext.id, 'unscheduled');
+      window.location.hash = learnerHref(selectedContext.id, 'unscheduled', session.date);
     } catch (cause) {
       setError(getErrorMessage(cause));
       setSaving(false);
@@ -185,7 +192,10 @@ function SessionEditorForm({
           <h2>{selectedPlan.title}</h2>
           <p>{selectedContext.name}</p>
         </div>
-        <a className="button" href={learnerHref(selectedContext.id, backView)}>
+        <a
+          className="button"
+          href={learnerHref(selectedContext.id, backView, session?.date ?? initialDate)}
+        >
           <ArrowLeft aria-hidden="true" size={17} /> Back to Learners
         </a>
       </div>
