@@ -135,6 +135,9 @@ function PlanningEditorForm({
   const currentSeries = plan?.seriesId
     ? (lessonSeries.find((series) => series.id === plan.seriesId) ?? null)
     : null;
+  const assignableLessonSeries = lessonSeries.filter(
+    (series) => series.lifecycleState === 'active' || series.id === currentSeries?.id,
+  );
   const currentSeriesPlans = currentSeries
     ? seriesPlans
         .filter((candidate) => candidate.seriesId === currentSeries.id)
@@ -304,9 +307,10 @@ function PlanningEditorForm({
           <span>Lesson series</span>
           <select value={seriesChoice} onChange={(event) => updateSeriesChoice(event.target.value)}>
             <option value="">No series</option>
-            {lessonSeries.map((series) => (
+            {assignableLessonSeries.map((series) => (
               <option key={series.id} value={series.id}>
                 {series.title}
+                {series.lifecycleState === 'archived' ? ' (Archived)' : ''}
               </option>
             ))}
             <option value="__new__">Create a new series…</option>

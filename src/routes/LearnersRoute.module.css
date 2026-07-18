@@ -283,7 +283,8 @@
   gap: 11px;
 }
 
-.planningItem {
+.planningItem,
+.seriesItem {
   padding: 16px;
   border: 1px solid var(--border-soft);
   border-radius: 14px;
@@ -317,6 +318,48 @@
   font-weight: 900;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+}
+
+.renameField {
+  min-width: min(360px, 100%);
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  color: #4f5955;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.renameField input {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  background: #fff;
+  font: inherit;
+}
+
+.renameField input:focus {
+  outline: 3px solid rgb(53 95 84 / 25%);
+  border-color: var(--accent-strong);
+}
+
+.seriesMetrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.seriesMetrics span {
+  padding: 5px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  color: #43564f;
+  background: #f5f7f5;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .subject,

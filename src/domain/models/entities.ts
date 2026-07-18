@@ -91,6 +91,9 @@ export const lessonSeriesSchema = z.object({
   contextId: idSchema,
   title: z.string().min(1),
   subject: z.string().default(''),
+  lifecycleState: z.enum(['active', 'archived']).default('active'),
+  archivedAt: timestampSchema.optional(),
+  updatedAt: timestampSchema.optional(),
 });
 
 export const lessonFlowPhaseSchema = z.enum([

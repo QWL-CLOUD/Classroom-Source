@@ -42,6 +42,17 @@ export interface LearnerPlanningItem {
   seriesPositionLabel?: string;
 }
 
+export interface LearnerLessonSeriesItem {
+  id: string;
+  title: string;
+  subject: string;
+  lifecycleState: LessonSeries['lifecycleState'];
+  linkedPlanCount: number;
+  unscheduledPlanCount: number;
+  scheduledSessionCount: number;
+  completedSessionCount: number;
+}
+
 export interface LearnersPageReadModel {
   contextGroups: LearnerContextGroup[];
   selectedContext: LearnerContext | null;
@@ -49,6 +60,7 @@ export interface LearnersPageReadModel {
   upcomingItems: LearnerPlanningItem[];
   unscheduledItems: LearnerPlanningItem[];
   completedItems: LearnerPlanningItem[];
+  seriesItems: LearnerLessonSeriesItem[];
   contextCounts: Record<LearnerContext['kind'], number>;
 }
 
@@ -292,6 +304,47 @@ export function buildLearnersPageReadModel(
         seriesPositionLabel: seriesMetadata?.positionLabel,
       };
     });
+  const seriesItems = snapshot.lessonSeries
+    .map((series): LearnerLessonSeriesItem => {
+      const linkedPlans = snapshot.lessonPlans.filter((plan) => plan.seriesId === series.id);
+      const linkedPlanIds = new Set(linkedPlans.map((plan) => plan.id));
+      const linkedSessions = snapshot.sessions.filter((session) =>
+        linkedPlanIds.has(session.lessonPlanId),
+      );
+      const activeSessionPlanIds = new Set(
+        linkedSessions
+          .filter(
+            (session) =>
+              session.deliveryState === 'scheduled' || session.deliveryState === 'completed',
+          )
+          .map((session) => session.lessonPlanId),
+      );
+      return {
+        id: series.id,
+        title: series.title,
+        subject: series.subject,
+        lifecycleState: series.lifecycleState,
+        linkedPlanCount: linkedPlans.length,
+        unscheduledPlanCount: linkedPlans.filter((plan) => !activeSessionPlanIds.has(plan.id))
+          .length,
+        scheduledSessionCount: linkedSessions.filter(
+          (session) => session.deliveryState === 'scheduled',
+        ).length,
+        completedSessionCount: linkedSessions.filter(
+          (session) => session.deliveryState === 'completed',
+        ).length,
+      };
+    })
+    .sort(
+      (first, second) =>
+        (first.lifecycleState === second.lifecycleState
+          ? 0
+          : first.lifecycleState === 'active'
+            ? -1
+            : 1) ||
+        compareText(first.title, second.title) ||
+        first.id.localeCompare(second.id),
+    );
 
   return {
     contextGroups,
@@ -300,6 +353,7 @@ export function buildLearnersPageReadModel(
     upcomingItems,
     unscheduledItems,
     completedItems,
+    seriesItems,
     contextCounts,
   };
 }

@@ -14,6 +14,7 @@ const series: LessonSeries = {
   contextId: 'context',
   title: 'Synthetic unit',
   subject: 'Language',
+  lifecycleState: 'active',
 };
 
 const block: ScheduleBlock = {
