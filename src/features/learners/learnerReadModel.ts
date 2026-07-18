@@ -62,6 +62,7 @@ export interface LearnersPageReadModel {
   completedItems: LearnerPlanningItem[];
   seriesItems: LearnerLessonSeriesItem[];
   contextCounts: Record<LearnerContext['kind'], number>;
+  contextStatusCounts: Record<LearnerContext['status'], number>;
 }
 
 const contextKindLabels: Record<LearnerContext['kind'], string> = {
@@ -235,16 +236,23 @@ function compareUnscheduled(
 export function buildLearnersPageReadModel(
   snapshot: LearnersReadSnapshot,
   anchorDate: string,
+  contextStatus: LearnerContext['status'] = 'active',
 ): LearnersPageReadModel {
+  const visibleContexts = snapshot.contexts.filter((context) => context.status === contextStatus);
   const contextGroups = (['class', 'group', 'individual'] as const).map((kind) => ({
     kind,
     label: contextKindLabels[kind],
-    contexts: snapshot.contexts.filter((context) => context.kind === kind),
+    contexts: visibleContexts.filter((context) => context.kind === kind),
   }));
+  const activeContexts = snapshot.contexts.filter((context) => context.status === 'active');
   const contextCounts = {
-    class: snapshot.contexts.filter((context) => context.kind === 'class').length,
-    group: snapshot.contexts.filter((context) => context.kind === 'group').length,
-    individual: snapshot.contexts.filter((context) => context.kind === 'individual').length,
+    class: activeContexts.filter((context) => context.kind === 'class').length,
+    group: activeContexts.filter((context) => context.kind === 'group').length,
+    individual: activeContexts.filter((context) => context.kind === 'individual').length,
+  };
+  const contextStatusCounts = {
+    active: activeContexts.length,
+    archived: snapshot.contexts.filter((context) => context.status === 'archived').length,
   };
   const lessonPlanById = new Map(snapshot.lessonPlans.map((plan) => [plan.id, plan] as const));
   const seriesById = new Map(snapshot.lessonSeries.map((series) => [series.id, series] as const));
@@ -348,12 +356,14 @@ export function buildLearnersPageReadModel(
 
   return {
     contextGroups,
-    selectedContext: snapshot.selectedContext,
+    selectedContext:
+      snapshot.selectedContext?.status === contextStatus ? snapshot.selectedContext : null,
     activeSchoolYearLabel: snapshot.activeSchoolYear?.label ?? 'No active school year',
     upcomingItems,
     unscheduledItems,
     completedItems,
     seriesItems,
     contextCounts,
+    contextStatusCounts,
   };
 }

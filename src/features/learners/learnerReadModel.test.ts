@@ -375,4 +375,28 @@ describe('buildLearnersPageReadModel', () => {
       }),
     ]);
   });
+
+  it('separates active and archived context navigation while preserving active summary counts', () => {
+    const archivedContext: LearnerContext = {
+      id: 'archived-group',
+      kind: 'group',
+      name: 'Archived synthetic group',
+      schoolYearId: schoolYear.id,
+      status: 'archived',
+    };
+    const archivedSnapshot = {
+      ...snapshot([], []),
+      contexts: [...contexts, archivedContext],
+      selectedContext: archivedContext,
+    };
+
+    const model = buildLearnersPageReadModel(archivedSnapshot, '2026-07-15', 'archived');
+
+    expect(model.contextGroups.find((group) => group.kind === 'group')?.contexts).toEqual([
+      archivedContext,
+    ]);
+    expect(model.selectedContext?.id).toBe('archived-group');
+    expect(model.contextCounts).toEqual({ class: 1, group: 1, individual: 1 });
+    expect(model.contextStatusCounts).toEqual({ active: 3, archived: 1 });
+  });
 });

@@ -73,7 +73,18 @@ describe('loadLearnersReadSnapshot', () => {
         status: 'active',
       },
     ];
-    const listLearnerContexts = vi.fn().mockResolvedValue(contexts);
+    const archivedContext: LearnerContext = {
+      id: 'archived-context',
+      kind: 'individual',
+      name: 'Archived learner',
+      schoolYearId: schoolYear.id,
+      status: 'archived',
+    };
+    const listLearnerContexts = vi
+      .fn()
+      .mockImplementation((query) =>
+        Promise.resolve(query?.status === 'archived' ? [archivedContext] : contexts),
+      );
     const listLessonSeries = vi.fn().mockResolvedValue([]);
     const listLessonPlans = vi.fn().mockResolvedValue([]);
     const listSessionOccurrences = vi.fn().mockResolvedValue([]);
@@ -87,9 +98,19 @@ describe('loadLearnersReadSnapshot', () => {
 
     const result = await loadLearnersReadSnapshot(repository, 'group-context');
 
-    expect(listLearnerContexts).toHaveBeenCalledWith({
+    expect(listLearnerContexts).toHaveBeenNthCalledWith(1, {
       schoolYearId: 'school-year-current',
+      status: 'active',
     });
+    expect(listLearnerContexts).toHaveBeenNthCalledWith(2, {
+      schoolYearId: 'school-year-current',
+      status: 'archived',
+    });
+    expect(result.contexts.map((context) => context.id)).toEqual([
+      'class-context',
+      'group-context',
+      'archived-context',
+    ]);
     expect(result.selectedContext?.id).toBe('group-context');
     expect(listLessonSeries).toHaveBeenCalledWith({
       contextId: 'group-context',
@@ -125,5 +146,35 @@ describe('loadLearnersReadSnapshot', () => {
       lessonPlans: [],
       sessions: [],
     });
+  });
+
+  it('loads an archived context when requested and prefers archived contexts for that view', async () => {
+    const activeContext: LearnerContext = {
+      id: 'active-context',
+      kind: 'class',
+      name: 'Active context',
+      schoolYearId: 'school-year-current',
+      status: 'active',
+    };
+    const archivedContext: LearnerContext = {
+      id: 'archived-context',
+      kind: 'group',
+      name: 'Archived context',
+      schoolYearId: 'school-year-current',
+      status: 'archived',
+    };
+    const repository = createRepository({
+      listLearnerContexts: vi
+        .fn()
+        .mockImplementation((query) =>
+          Promise.resolve(query?.status === 'archived' ? [archivedContext] : [activeContext]),
+        ),
+    });
+
+    const preferred = await loadLearnersReadSnapshot(repository, undefined, 'archived');
+    const requested = await loadLearnersReadSnapshot(repository, 'archived-context');
+
+    expect(preferred.selectedContext?.id).toBe('archived-context');
+    expect(requested.selectedContext?.id).toBe('archived-context');
   });
 });

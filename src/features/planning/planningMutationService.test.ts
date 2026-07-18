@@ -588,4 +588,26 @@ describe('planning mutation service', () => {
     expect(await database.sessionOccurrences.get(session.id)).toBeUndefined();
     expect(await database.lessonPlans.get(second.id)).toMatchObject({ sequence: 0 });
   });
+
+  it('requires an active learner context for new Plans and new Sessions', async () => {
+    await database.learnerContexts.update('context', { status: 'archived' });
+
+    await expect(
+      service.createPlan('context', {
+        ...createLessonPlanEditorValues(),
+        title: 'Blocked archived plan',
+      }),
+    ).rejects.toThrow('Restore this learner context before creating a new plan.');
+
+    await database.learnerContexts.update('context', { status: 'active' });
+    const plan = await service.createPlan('context', {
+      ...createLessonPlanEditorValues(),
+      title: 'Existing plan',
+    });
+    await database.learnerContexts.update('context', { status: 'archived' });
+
+    await expect(
+      service.schedulePlan(plan.id, createSessionEditorValues('2026-07-17', 'block')),
+    ).rejects.toThrow('Restore this learner context before scheduling a new session.');
+  });
 });
