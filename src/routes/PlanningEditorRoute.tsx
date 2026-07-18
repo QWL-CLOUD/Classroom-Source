@@ -26,6 +26,7 @@ import {
   type SessionOccurrence,
 } from '@/domain/models/entities';
 import { LessonFlowEditor } from '@/features/planning/LessonFlowEditor';
+import { formatLessonSeriesPositionLabel } from '@/features/planning/lessonSeriesPresentation';
 import {
   createLessonPlanEditorValues,
   toLessonPlanEditorValues,
@@ -316,9 +317,11 @@ function PlanningEditorForm({
           <div>
             <ListOrdered aria-hidden="true" size={18} />
             <p>
-              <strong>{currentSeries.title}</strong>
               <span>
-                Lesson {currentSeriesIndex + 1} of {currentSeriesPlans.length}
+                {formatLessonSeriesPositionLabel(
+                  `Lesson ${currentSeriesIndex + 1} of ${currentSeriesPlans.length}`,
+                  currentSeries.title,
+                )}
               </span>
             </p>
           </div>

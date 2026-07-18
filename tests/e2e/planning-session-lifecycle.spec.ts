@@ -381,15 +381,22 @@ test('Lesson series preserves one ordered plan sequence with undoable reordering
   });
   const firstCard = seriesPlanning.getByLabel('Series lesson one, Draft');
   const secondCard = seriesPlanning.getByLabel('Series lesson two, Draft');
-  await expect(firstCard.getByText('Synthetic lesson series')).toBeVisible();
-  await expect(firstCard.getByText('Lesson 1 of 2')).toBeVisible();
-  await expect(secondCard.getByText('Lesson 2 of 2')).toBeVisible();
+  await expect(
+    firstCard.getByText('Lesson 1 of 2 in “Synthetic lesson series”', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    secondCard.getByText('Lesson 2 of 2 in “Synthetic lesson series”', { exact: true }),
+  ).toBeVisible();
 
   await secondCard.getByRole('link', { name: 'Edit plan' }).click();
   const seriesPosition = page.getByRole('region', { name: 'Lesson series position' });
-  await expect(seriesPosition.getByText('Lesson 2 of 2')).toBeVisible();
+  await expect(
+    seriesPosition.getByText('Lesson 2 of 2 in “Synthetic lesson series”', { exact: true }),
+  ).toBeVisible();
   await seriesPosition.getByRole('button', { name: 'Move earlier' }).click();
-  await expect(seriesPosition.getByText('Lesson 1 of 2')).toBeVisible();
+  await expect(
+    seriesPosition.getByText('Lesson 1 of 2 in “Synthetic lesson series”', { exact: true }),
+  ).toBeVisible();
   await page.getByRole('link', { name: 'Back to Learners' }).click();
 
   const reorderedPlanning = page.getByRole('region', {
@@ -397,18 +404,26 @@ test('Lesson series preserves one ordered plan sequence with undoable reordering
   });
   await reorderedPlanning.getByRole('tab', { name: /Unscheduled/ }).click();
   await expect(
-    reorderedPlanning.getByLabel('Series lesson two, Draft').getByText('Lesson 1 of 2'),
+    reorderedPlanning
+      .getByLabel('Series lesson two, Draft')
+      .getByText('Lesson 1 of 2 in “Synthetic lesson series”', { exact: true }),
   ).toBeVisible();
   await expect(
-    reorderedPlanning.getByLabel('Series lesson one, Draft').getByText('Lesson 2 of 2'),
+    reorderedPlanning
+      .getByLabel('Series lesson one, Draft')
+      .getByText('Lesson 2 of 2 in “Synthetic lesson series”', { exact: true }),
   ).toBeVisible();
 
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect(
-    reorderedPlanning.getByLabel('Series lesson one, Draft').getByText('Lesson 1 of 2'),
+    reorderedPlanning
+      .getByLabel('Series lesson one, Draft')
+      .getByText('Lesson 1 of 2 in “Synthetic lesson series”', { exact: true }),
   ).toBeVisible();
   await expect(
-    reorderedPlanning.getByLabel('Series lesson two, Draft').getByText('Lesson 2 of 2'),
+    reorderedPlanning
+      .getByLabel('Series lesson two, Draft')
+      .getByText('Lesson 2 of 2 in “Synthetic lesson series”', { exact: true }),
   ).toBeVisible();
 
   const accessibilityResults = await new AxeBuilder({ page }).analyze();
