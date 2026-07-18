@@ -55,8 +55,14 @@ function getErrorMessage(cause: unknown): string {
   return cause instanceof Error ? cause.message : 'The planning item could not be saved.';
 }
 
-function learnerHref(contextId: string, view: 'upcoming' | 'unscheduled' | 'completed'): string {
-  return `#/learners?context=${encodeURIComponent(contextId)}&planning=${view}`;
+function learnerHref(
+  contextId: string,
+  view: 'upcoming' | 'unscheduled' | 'completed',
+  date?: string,
+): string {
+  const params = new URLSearchParams({ context: contextId, planning: view });
+  if (date) params.set('date', date);
+  return `#/learners?${params.toString()}`;
 }
 
 function PlanningEditorForm({
@@ -91,6 +97,7 @@ function PlanningEditorForm({
       : activeSession
         ? 'upcoming'
         : 'unscheduled';
+  const learnerDate = learnerView === 'upcoming' ? activeSession?.date : undefined;
 
   const seriesChoice =
     values.seriesMode === 'new'
@@ -171,7 +178,7 @@ function PlanningEditorForm({
       if (scheduleAfterSave) {
         navigate(`/planning/session?plan=${encodeURIComponent(saved.id)}`);
       } else {
-        window.location.hash = learnerHref(selectedContext.id, learnerView);
+        window.location.hash = learnerHref(selectedContext.id, learnerView, learnerDate);
       }
     } catch (cause) {
       setError(getErrorMessage(cause));
@@ -204,7 +211,7 @@ function PlanningEditorForm({
           <h2>{plan ? 'Edit plan' : 'New plan'}</h2>
           <p>{selectedContext.name}</p>
         </div>
-        <a className="button" href={learnerHref(selectedContext.id, learnerView)}>
+        <a className="button" href={learnerHref(selectedContext.id, learnerView, learnerDate)}>
           <ArrowLeft aria-hidden="true" size={17} /> Back to Learners
         </a>
       </div>

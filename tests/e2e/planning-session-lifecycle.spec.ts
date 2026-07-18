@@ -220,6 +220,7 @@ test('Lesson flow inherits into a session, supports an override, and can return 
 
   await page.getByLabel('Step title').first().fill('Revised plan opening');
   await page.getByRole('button', { name: 'Save plan' }).click();
+  await expect(page).toHaveURL(/planning=upcoming&date=2026-07-17/);
   const afterPlanEdit = page
     .getByRole('region', { name: 'Planning for Synthetic planning class' })
     .getByLabel('Synthetic lesson flow, Scheduled');
