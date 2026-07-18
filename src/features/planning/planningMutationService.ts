@@ -35,6 +35,11 @@ import {
   type LessonSeriesAssignment,
   type SessionEditorValues,
 } from './planningEditorModel';
+import {
+  buildSeriesBumpPreview,
+  seriesBumpRequestSchema,
+  type SeriesBumpPreview,
+} from './seriesBumpPlanner';
 
 export interface PlanningMutationDependencies {
   createId?: () => string;
@@ -548,6 +553,80 @@ export class PlanningMutationService {
     this.notifyNewChange(log);
   }
 
+  async previewSeriesBump(sessionId: string): Promise<SeriesBumpPreview> {
+    const request = seriesBumpRequestSchema.parse({ sessionId });
+    return this.db.transaction(
+      'r',
+      this.db.lessonSeries,
+      this.db.lessonPlans,
+      this.db.sessionOccurrences,
+      this.db.scheduleBlocks,
+      this.db.scheduleExceptions,
+      async () => this.buildSeriesBumpPreview(request.sessionId),
+    );
+  }
+
+  async bumpSeries(sessionId: string, expectedPreviewToken: string): Promise<SeriesBumpPreview> {
+    const request = seriesBumpRequestSchema.parse({ sessionId, expectedPreviewToken });
+    const result = await this.db.transaction(
+      'rw',
+      [
+        this.db.lessonSeries,
+        this.db.lessonPlans,
+        this.db.sessionOccurrences,
+        this.db.scheduleBlocks,
+        this.db.scheduleExceptions,
+        this.db.changeLog,
+      ],
+      async (): Promise<CommitResult<SeriesBumpPreview>> => {
+        const preview = await this.buildSeriesBumpPreview(request.sessionId);
+        if (preview.previewToken !== request.expectedPreviewToken) {
+          throw new Error('The Bump preview is out of date. Preview the change again.');
+        }
+        if (!preview.canCommit) {
+          throw new Error(preview.blockingIssues[0] ?? 'This lesson series cannot be bumped.');
+        }
+
+        const originals = (
+          await Promise.all(
+            preview.items.map((item) => this.db.sessionOccurrences.get(item.sessionId)),
+          )
+        ).map((value) => {
+          if (!value) throw new Error('A session in the Bump preview no longer exists.');
+          return sessionOccurrenceSchema.parse(value);
+        });
+        const originalsById = new Map(originals.map((session) => [session.id, session] as const));
+        const updatedSessions = preview.items.map((item) => {
+          const original = originalsById.get(item.sessionId);
+          if (!original) throw new Error('A session in the Bump preview no longer exists.');
+          return sessionOccurrenceSchema.parse({
+            ...original,
+            date: item.toDate,
+            startMinute: item.toStartMinute,
+            endMinute: item.toEndMinute,
+          });
+        });
+        const commands: PlanningCommandPair = {
+          forward: createPlanningCommand(updatedSessions.map(putSessionOperation)),
+          inverse: createPlanningCommand(originals.map(putSessionOperation)),
+        };
+        const log = this.createChangeLog(
+          'planning.series.bump',
+          `Bump “${preview.seriesTitle}” from “${preview.selectedPlanTitle}”`,
+          commands,
+        );
+
+        await clearSupportedRedoBranch(this.db);
+        await this.applyOperations(commands.forward.operations);
+        await this.db.changeLog.put(log);
+        return { value: preview, log };
+      },
+    );
+
+    this.notifyNewChange(result.log);
+    return result.value;
+  }
+
   private async setDeliveryState(
     id: string,
     deliveryState: 'scheduled' | 'completed',
@@ -585,6 +664,39 @@ export class PlanningMutationService {
 
     this.notifyNewChange(result.log);
     return result.value;
+  }
+
+  private async buildSeriesBumpPreview(sessionId: string): Promise<SeriesBumpPreview> {
+    const selectedSession = await this.requireSession(sessionId);
+    const selectedPlan = await this.requirePlan(selectedSession.lessonPlanId);
+    if (!selectedPlan.seriesId) {
+      throw new Error('Assign this lesson to a Lesson Series before using Bump.');
+    }
+    if (!selectedSession.scheduleBlockId) {
+      throw new Error('Bump requires a session attached to a Schedule Block.');
+    }
+
+    const series = await this.requireSeries(selectedPlan.seriesId);
+    const blockValue = await this.db.scheduleBlocks.get(selectedSession.scheduleBlockId);
+    if (!blockValue) throw new Error('The Session Schedule Block no longer exists.');
+    const scheduleBlock = scheduleBlockSchema.parse(blockValue);
+    const seriesPlans = await this.listSeriesPlans(series.id, selectedPlan.contextId);
+    const sessions = (
+      await this.db.sessionOccurrences.where('contextId').equals(selectedPlan.contextId).toArray()
+    ).map((value) => sessionOccurrenceSchema.parse(value));
+    const scheduleExceptions = (
+      await this.db.scheduleExceptions.where('scheduleBlockId').equals(scheduleBlock.id).toArray()
+    ).map((value) => scheduleExceptionSchema.parse(value));
+
+    return buildSeriesBumpPreview({
+      selectedSession,
+      selectedPlan,
+      series,
+      seriesPlans,
+      sessions,
+      scheduleBlock,
+      scheduleExceptions,
+    });
   }
 
   private async resolveSessionFields(

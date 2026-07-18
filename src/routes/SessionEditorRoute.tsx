@@ -1,4 +1,15 @@
-import { ArrowLeft, CheckCircle2, Copy, RefreshCcw, RotateCcw, Save, Undo2 } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle2,
+  Copy,
+  FastForward,
+  RefreshCcw,
+  RotateCcw,
+  Save,
+  Undo2,
+  X,
+} from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -30,6 +41,7 @@ import {
   planningMutationService,
   type PlanningMutationService,
 } from '@/features/planning/planningMutationService';
+import type { SeriesBumpPreview } from '@/features/planning/seriesBumpPlanner';
 import { resolveScheduleOccurrence } from '@/features/scheduleExceptions/scheduleOccurrenceResolver';
 import { useScheduleExceptionsForRange } from '@/features/scheduleExceptions/useScheduleExceptionsForRange';
 import { formatLongDate, parseLocalDate, todayLocalDate } from '@/shared/dates/localDate';
@@ -95,6 +107,8 @@ function SessionEditorForm({
         );
   });
   const [saving, setSaving] = useState(false);
+  const [bumpLoading, setBumpLoading] = useState(false);
+  const [bumpPreview, setBumpPreview] = useState<SeriesBumpPreview | null>(null);
   const [unscheduleArmed, setUnscheduleArmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const exceptionDate = parseLocalDate(values.date) ? values.date : initialDate;
@@ -140,12 +154,14 @@ function SessionEditorForm({
   ): void {
     setValues((current) => ({ ...current, [key]: value }));
     setError(null);
+    setBumpPreview(null);
     setUnscheduleArmed(false);
   }
 
   function updateContent(content: LessonContentEditorValues): void {
     setValues((current) => ({ ...current, ...content }));
     setError(null);
+    setBumpPreview(null);
     setUnscheduleArmed(false);
   }
 
@@ -218,6 +234,62 @@ function SessionEditorForm({
       setSaving(false);
     }
   }
+
+  async function previewBump(): Promise<void> {
+    if (!session || saving || bumpLoading) return;
+    setBumpLoading(true);
+    setError(null);
+    try {
+      setBumpPreview(await service.previewSeriesBump(session.id));
+    } catch (cause) {
+      setError(getErrorMessage(cause));
+    } finally {
+      setBumpLoading(false);
+    }
+  }
+
+  async function confirmBump(): Promise<void> {
+    if (!session || !bumpPreview || !bumpPreview.canCommit || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const committed = await service.bumpSeries(session.id, bumpPreview.previewToken);
+      const selectedMove = committed.items.find((item) => item.sessionId === session.id);
+      window.location.hash = learnerHref(
+        selectedContext.id,
+        'upcoming',
+        selectedMove?.toDate ?? session.date,
+      );
+    } catch (cause) {
+      setError(getErrorMessage(cause));
+      setSaving(false);
+      setBumpPreview(null);
+    }
+  }
+
+  const bumpBlock = session?.scheduleBlockId
+    ? scheduleBlocks.find((block) => block.id === session.scheduleBlockId)
+    : undefined;
+  const hasUnsavedScheduleChanges = Boolean(
+    session &&
+    (values.date !== session.date ||
+      values.scheduleBlockId !== (session.scheduleBlockId ?? '') ||
+      values.startTime !== minuteToTime(session.startMinute) ||
+      values.endTime !== minuteToTime(session.endMinute)),
+  );
+  const bumpUnavailableReason = !session
+    ? null
+    : session.deliveryState !== 'scheduled'
+      ? 'Completed sessions cannot start a Bump.'
+      : hasUnsavedScheduleChanges
+        ? 'Save this Session date and time before previewing Bump.'
+        : !selectedPlan.seriesId
+          ? 'Assign this plan to a Lesson Series before using Bump.'
+          : !session.scheduleBlockId
+            ? 'Attach this session to a Schedule Block before using Bump.'
+            : !bumpBlock?.bumpEnabled
+              ? 'Enable Bump on this Schedule Block before shifting the lesson series.'
+              : null;
 
   const backView =
     session?.deliveryState === 'completed' ? 'completed' : session ? 'upcoming' : 'unscheduled';
@@ -322,6 +394,107 @@ function SessionEditorForm({
           </p>
         )}
       </section>
+
+      {session ? (
+        <section className={styles.bumpSection} aria-labelledby="series-bump-heading">
+          <div className={styles.bumpHeader}>
+            <div>
+              <p className="page-eyebrow">Lesson Series</p>
+              <h3 id="series-bump-heading">Bump this lesson forward</h3>
+              <p>
+                Preview one-occurrence shifts for this Session and later scheduled lessons in the
+                same Series. Nothing changes until you confirm.
+              </p>
+            </div>
+            {!bumpPreview ? (
+              <button
+                className="button"
+                type="button"
+                disabled={saving || bumpLoading || Boolean(bumpUnavailableReason)}
+                onClick={() => void previewBump()}
+              >
+                <FastForward aria-hidden="true" size={16} />
+                {bumpLoading ? 'Building preview…' : 'Preview bump'}
+              </button>
+            ) : null}
+          </div>
+
+          {bumpUnavailableReason ? (
+            <p className={styles.bumpUnavailable}>{bumpUnavailableReason}</p>
+          ) : null}
+
+          {bumpPreview ? (
+            <div className={styles.bumpPreview} role="region" aria-label="Bump preview">
+              <div className={styles.bumpPreviewHeading}>
+                <div>
+                  <strong>{bumpPreview.seriesTitle}</strong>
+                  <span>
+                    {bumpPreview.items.length}{' '}
+                    {bumpPreview.items.length === 1 ? 'session' : 'sessions'} affected
+                  </span>
+                </div>
+                <button
+                  className="button"
+                  type="button"
+                  disabled={saving}
+                  onClick={() => setBumpPreview(null)}
+                >
+                  <X aria-hidden="true" size={16} /> Cancel preview
+                </button>
+              </div>
+
+              <ol className={styles.bumpList}>
+                {bumpPreview.items.map((item) => (
+                  <li key={item.sessionId}>
+                    <div>
+                      <strong>
+                        Lesson {item.seriesPosition}: {item.planTitle}
+                      </strong>
+                      {item.adjustedOccurrence ? <span>Adjusted occurrence</span> : null}
+                    </div>
+                    <p>
+                      {formatLongDate(item.fromDate)} · {formatCalendarMinute(item.fromStartMinute)}
+                      –{formatCalendarMinute(item.fromEndMinute)}
+                    </p>
+                    <p className={styles.bumpTarget}>
+                      → {formatLongDate(item.toDate)} · {formatCalendarMinute(item.toStartMinute)}–
+                      {formatCalendarMinute(item.toEndMinute)}
+                    </p>
+                  </li>
+                ))}
+              </ol>
+
+              {bumpPreview.blockingIssues.length > 0 ? (
+                <div className={styles.bumpIssues} role="alert">
+                  <AlertTriangle aria-hidden="true" size={18} />
+                  <div>
+                    <strong>Bump cannot be committed</strong>
+                    <ul>
+                      {bumpPreview.blockingIssues.map((issue) => (
+                        <li key={issue}>{issue}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                <p className={styles.bumpReady} role="status">
+                  Preview ready. The entire shift will be saved as one undoable change.
+                </p>
+              )}
+
+              <button
+                className="button button-primary"
+                type="button"
+                disabled={saving || !bumpPreview.canCommit}
+                onClick={() => void confirmBump()}
+              >
+                <FastForward aria-hidden="true" size={16} />
+                {saving ? 'Bumping…' : 'Confirm bump'}
+              </button>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className={styles.contentSection} aria-labelledby="session-content-heading">
         <div className={styles.contentHeader}>

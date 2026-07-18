@@ -196,3 +196,141 @@
     width: 100%;
   }
 }
+
+.bumpSection {
+  display: grid;
+  gap: 15px;
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+}
+
+.bumpHeader,
+.bumpPreviewHeading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.bumpHeader h3 {
+  margin: 0;
+  color: var(--heading);
+}
+
+.bumpHeader p:last-child {
+  max-width: 720px;
+  margin: 5px 0 0;
+  color: #4f5955;
+  line-height: 1.5;
+}
+
+.bumpUnavailable,
+.bumpReady {
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px solid #c4b78d;
+  border-radius: 10px;
+  color: #5b5031;
+  background: #fff9e8;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.bumpPreview {
+  display: grid;
+  gap: 15px;
+  padding: 16px;
+  border: 1px solid #9cb8aa;
+  border-radius: 12px;
+  background: #f7faf8;
+}
+
+.bumpPreviewHeading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.bumpPreviewHeading strong {
+  color: var(--heading);
+}
+
+.bumpPreviewHeading span {
+  color: #4f5955;
+  font-size: 13px;
+}
+
+.bumpList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.bumpList li {
+  padding: 12px 13px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.bumpList li > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bumpList li span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: #5b5031;
+  background: #fff2c7;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.bumpList p {
+  margin: 7px 0 0;
+  color: #4f5955;
+  font-size: 13px;
+}
+
+.bumpList .bumpTarget {
+  color: #23483f;
+  font-weight: 800;
+}
+
+.bumpIssues {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 13px;
+  border: 1px solid #d39a91;
+  border-radius: 10px;
+  color: #6e302b;
+  background: #fff0ed;
+}
+
+.bumpIssues ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+}
+
+.bumpReady {
+  border-color: #9cb8aa;
+  color: #355145;
+  background: #f0f6f1;
+}
+
+@media (max-width: 680px) {
+  .bumpHeader,
+  .bumpHeader > .button,
+  .bumpPreviewHeading,
+  .bumpPreviewHeading > .button,
+  .bumpPreview > .button {
+    width: 100%;
+  }
+}

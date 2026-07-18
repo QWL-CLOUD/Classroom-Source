@@ -32,9 +32,9 @@ const records = {
       startMinute: 540,
       endMinute: 600,
       effectiveFrom: '2026-07-01',
-      effectiveTo: '2026-07-31',
+      effectiveTo: '2026-08-31',
       planningEnabled: true,
-      bumpEnabled: false,
+      bumpEnabled: true,
       showInWeek: true,
       sortOrder: 0,
     },
@@ -65,6 +65,106 @@ async function seed(page: Page): Promise<void> {
       database.close();
     }
   }, records);
+}
+
+async function seedBumpScenario(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('classroom-v20');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+
+    const values = {
+      lessonSeries: [
+        {
+          id: 'phase-3c-bump-series',
+          contextId: 'phase-3c-context',
+          title: 'Synthetic bump unit',
+          subject: 'Language',
+        },
+      ],
+      lessonPlans: [
+        {
+          id: 'phase-3c-bump-plan-1',
+          contextId: 'phase-3c-context',
+          title: 'Bump lesson one',
+          subject: 'Language',
+          workflowState: 'ready',
+          seriesId: 'phase-3c-bump-series',
+          sequence: 0,
+          preferredScheduleBlockId: 'phase-3c-block',
+          createdAt: '2026-07-01T12:00:00.000Z',
+          updatedAt: '2026-07-01T12:00:00.000Z',
+        },
+        {
+          id: 'phase-3c-bump-plan-2',
+          contextId: 'phase-3c-context',
+          title: 'Bump lesson two',
+          subject: 'Language',
+          workflowState: 'ready',
+          seriesId: 'phase-3c-bump-series',
+          sequence: 1,
+          preferredScheduleBlockId: 'phase-3c-block',
+          createdAt: '2026-07-01T12:00:01.000Z',
+          updatedAt: '2026-07-01T12:00:01.000Z',
+        },
+      ],
+      sessionOccurrences: [
+        {
+          id: 'phase-3c-bump-session-1',
+          lessonPlanId: 'phase-3c-bump-plan-1',
+          contextId: 'phase-3c-context',
+          scheduleBlockId: 'phase-3c-block',
+          date: '2026-07-17',
+          startMinute: 540,
+          endMinute: 600,
+          deliveryState: 'scheduled',
+        },
+        {
+          id: 'phase-3c-bump-session-2',
+          lessonPlanId: 'phase-3c-bump-plan-2',
+          contextId: 'phase-3c-context',
+          scheduleBlockId: 'phase-3c-block',
+          date: '2026-07-31',
+          startMinute: 540,
+          endMinute: 600,
+          deliveryState: 'scheduled',
+        },
+      ],
+      scheduleExceptions: [
+        {
+          id: 'phase-3c-bump-cancel-friday',
+          date: '2026-07-24',
+          scheduleBlockId: 'phase-3c-block',
+          action: 'cancel',
+        },
+        {
+          id: 'phase-3c-bump-add-saturday',
+          date: '2026-07-25',
+          scheduleBlockId: 'phase-3c-block',
+          action: 'add',
+          replacementStartMinute: 600,
+          replacementEndMinute: 660,
+        },
+      ],
+    };
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction(Object.keys(values), 'readwrite');
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error);
+        transaction.oncomplete = () => resolve();
+        for (const [storeName, storeValues] of Object.entries(values)) {
+          const store = transaction.objectStore(storeName);
+          for (const value of storeValues) store.put(value);
+        }
+      });
+    } finally {
+      database.close();
+    }
+  });
 }
 
 test('Planning item becomes one synchronized scheduled and completed session', async ({ page }) => {
@@ -309,6 +409,89 @@ test('Lesson series preserves one ordered plan sequence with undoable reordering
   ).toBeVisible();
   await expect(
     reorderedPlanning.getByLabel('Series lesson two, Draft').getByText('Lesson 2 of 2'),
+  ).toBeVisible();
+
+  const accessibilityResults = await new AxeBuilder({ page }).analyze();
+  expect(
+    accessibilityResults.violations,
+    accessibilityResults.violations
+      .map((violation) => `${violation.id}: ${violation.help}`)
+      .join('\n'),
+  ).toEqual([]);
+});
+
+test('Bump previews and shifts one lesson series across a Friday cancellation and Saturday addition', async ({
+  page,
+}) => {
+  await page.goto('./#/learners?date=2026-07-17');
+  await seed(page);
+  await seedBumpScenario(page);
+  await page.reload();
+
+  const planning = page.getByRole('region', {
+    name: 'Planning for Synthetic planning class',
+  });
+  const firstCard = planning.getByLabel('Bump lesson one, Scheduled');
+  await expect(firstCard.getByText('Friday, July 17, 2026')).toBeVisible();
+  await firstCard.getByRole('link', { name: 'Manage session' }).click();
+
+  await page.getByRole('button', { name: 'Preview bump' }).click();
+  const preview = page.getByRole('region', { name: 'Bump preview' });
+  await expect(preview.getByText('2 sessions affected')).toBeVisible();
+  await expect(preview.getByText(/Saturday, July 25, 2026/)).toBeVisible();
+  await expect(preview.getByText(/Friday, August 7, 2026/)).toBeVisible();
+  await expect(preview.getByText('Adjusted occurrence')).toBeVisible();
+  await preview.getByRole('button', { name: 'Confirm bump' }).click();
+
+  await expect(page).toHaveURL(/planning=upcoming&date=2026-07-25/);
+  const movedPlanning = page.getByRole('region', {
+    name: 'Planning for Synthetic planning class',
+  });
+  await expect(
+    movedPlanning.getByLabel('Bump lesson one, Scheduled').getByText('Saturday, July 25, 2026'),
+  ).toBeVisible();
+  await expect(
+    movedPlanning.getByLabel('Bump lesson two, Scheduled').getByText('Friday, August 7, 2026'),
+  ).toBeVisible();
+
+  await page.goto('./#/today?date=2026-07-25');
+  await expect(
+    page.locator('[data-today-item^="session-occurrence:"]').filter({ hasText: 'Bump lesson one' }),
+  ).toBeVisible();
+
+  await page.goto('./#/week?date=2026-07-25&view=everything');
+  const weekends = page.getByRole('checkbox', { name: 'Weekends' });
+  await weekends.check();
+  await expect(weekends).toBeChecked();
+  await expect(
+    page.locator('[data-week-item^="session-occurrence:"]').filter({ hasText: 'Bump lesson one' }),
+  ).toBeVisible();
+
+  await page.goto('./#/calendar?date=2026-07-25');
+  await expect(
+    page
+      .locator('[data-calendar-item^="session-occurrence:"]')
+      .filter({ hasText: 'Bump lesson one' }),
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.goto('./#/learners?date=2026-07-17');
+  const restoredPlanning = page.getByRole('region', {
+    name: 'Planning for Synthetic planning class',
+  });
+  await expect(
+    restoredPlanning.getByLabel('Bump lesson one, Scheduled').getByText('Friday, July 17, 2026'),
+  ).toBeVisible();
+  await expect(
+    restoredPlanning.getByLabel('Bump lesson two, Scheduled').getByText('Friday, July 31, 2026'),
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(
+    restoredPlanning.getByLabel('Bump lesson one, Scheduled').getByText('Saturday, July 25, 2026'),
+  ).toBeVisible();
+  await expect(
+    restoredPlanning.getByLabel('Bump lesson two, Scheduled').getByText('Friday, August 7, 2026'),
   ).toBeVisible();
 
   const accessibilityResults = await new AxeBuilder({ page }).analyze();
