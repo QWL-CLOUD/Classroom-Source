@@ -20,10 +20,19 @@ Move earlier and Move later normalize the order transactionally.
 Creating a series while saving a plan, changing a plan's series, deleting a plan, and reordering a
 series all write one compound Planning command. Global Undo/Redo therefore restores the series
 record and every affected sequence together. The existing `lessonSeries` table and indexed
-`LessonPlan.seriesId` field are sufficient, so Phase 3C-3A does not change the Dexie version.
+`LessonPlan.seriesId` field are sufficient, so Lesson Series work does not change the Dexie version.
 
-Bump scheduling is intentionally deferred to the next slice. Series order is now stable metadata
-that a future dry-run Bump service can use without inferring order from dates or titles.
+## Lesson Series lifecycle
+
+A Series has an `active` or `archived` lifecycle state. Existing records without this field parse as
+active. Archived Series remain attached to their existing Plans and Sessions, but they are excluded
+from new Plan assignment choices until restored.
+
+Deleting a Series deletes only the container record. Every linked Plan is preserved and becomes
+ungrouped by clearing `seriesId` and `sequence`. Session occurrences, completed teaching history,
+and future Session-linked Reflection or Memory records are not touched. The Series deletion and all
+Plan detachments commit as one compound Planning command, so one Undo restores the Series and every
+original sequence.
 
 ## Lesson content and inheritance
 

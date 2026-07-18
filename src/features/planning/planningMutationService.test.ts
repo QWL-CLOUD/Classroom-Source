@@ -301,6 +301,90 @@ describe('planning mutation service', () => {
     expect(await database.lessonPlans.count()).toBe(1);
   });
 
+  it('renames, archives, restores, and deletes a series without deleting teaching history', async () => {
+    const first = await service.createPlan('context', {
+      ...createLessonPlanEditorValues('block'),
+      title: 'Lifecycle lesson one',
+      seriesMode: 'new',
+      newSeriesTitle: 'Lifecycle unit',
+    });
+    const series = (await database.lessonSeries.toArray())[0]!;
+    const second = await service.createPlan('context', {
+      ...createLessonPlanEditorValues('block'),
+      title: 'Lifecycle lesson two',
+      seriesMode: 'existing',
+      seriesId: series.id,
+    });
+    const session = await service.schedulePlan(
+      first.id,
+      createSessionEditorValues('2026-07-17', 'block'),
+    );
+    await service.completeSession(session.id);
+
+    await service.renameLessonSeries(series.id, 'Renamed lifecycle unit');
+    expect(await database.lessonSeries.get(series.id)).toMatchObject({
+      title: 'Renamed lifecycle unit',
+      lifecycleState: 'active',
+    });
+
+    await service.archiveLessonSeries(series.id);
+    expect(await database.lessonSeries.get(series.id)).toMatchObject({
+      lifecycleState: 'archived',
+    });
+    await expect(
+      service.createPlan('context', {
+        ...createLessonPlanEditorValues(),
+        title: 'Blocked archived assignment',
+        seriesMode: 'existing',
+        seriesId: series.id,
+      }),
+    ).rejects.toThrow('Restore this lesson series');
+
+    await service.restoreLessonSeries(series.id);
+    expect(await database.lessonSeries.get(series.id)).toMatchObject({
+      lifecycleState: 'active',
+      archivedAt: undefined,
+    });
+
+    await service.deleteLessonSeries(series.id);
+    expect(await database.lessonSeries.get(series.id)).toBeUndefined();
+    expect(await database.lessonPlans.get(first.id)).toMatchObject({
+      seriesId: undefined,
+      sequence: undefined,
+    });
+    expect(await database.lessonPlans.get(second.id)).toMatchObject({
+      seriesId: undefined,
+      sequence: undefined,
+    });
+    expect(await database.sessionOccurrences.get(session.id)).toMatchObject({
+      lessonPlanId: first.id,
+      deliveryState: 'completed',
+    });
+
+    await history.undo();
+    expect(await database.lessonSeries.get(series.id)).toMatchObject({
+      title: 'Renamed lifecycle unit',
+      lifecycleState: 'active',
+    });
+    expect(await database.lessonPlans.get(first.id)).toMatchObject({
+      seriesId: series.id,
+      sequence: 0,
+    });
+    expect(await database.lessonPlans.get(second.id)).toMatchObject({
+      seriesId: series.id,
+      sequence: 1,
+    });
+    expect(await database.sessionOccurrences.get(session.id)).toMatchObject({
+      deliveryState: 'completed',
+    });
+
+    await history.redo();
+    expect(await database.lessonSeries.get(series.id)).toBeUndefined();
+    expect(await database.sessionOccurrences.get(session.id)).toMatchObject({
+      deliveryState: 'completed',
+    });
+  });
+
   it('does not overwrite an existing plan when a generated ID collides', async () => {
     const collisionService = new PlanningMutationService(database, {
       createId: () => 'fixed-plan-id',

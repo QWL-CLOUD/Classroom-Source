@@ -14,6 +14,8 @@ This repository is the React + TypeScript source rebuild of Classroom. The legac
 - Phase 1B–1E: private legacy migration, rollback, and acceptance complete
 - Phase 2A–2F: repository-backed views and controlled Calendar editing complete
 - Phase 2 completion audit: automated closure complete; private real-data acceptance remains a local browser check
+- Phase 3C-1–3C-5: Planning/Session lifecycle, Lesson Flow, Lesson Series ordering and Bump,
+  cross-surface planning entry, safe Plan deletion, and Lesson Series lifecycle complete
 
 ## Phase 2 capabilities
 
@@ -25,6 +27,8 @@ This repository is the React + TypeScript source rebuild of Classroom. The legac
 - Validated create, edit, and delete flows for dated Calendar events
 - Transactional change log with global Undo and Redo
 - Hash Router URLs compatible with the GitHub Pages `/Classroom-Source/` base path
+- Lesson Series management with rename, archive/restore, container-only deletion, and compound
+  Undo/Redo that preserves Plans, Sessions, and completed teaching history
 
 ## Main routes
 

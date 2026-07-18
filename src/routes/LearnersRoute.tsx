@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  Archive,
   BookOpen,
   CalendarDays,
   CalendarPlus,
@@ -7,16 +8,22 @@ import {
   Clock3,
   Layers3,
   Pencil,
+  RotateCcw,
+  Save,
   Trash2,
   UserRound,
   Users,
+  X,
 } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import type { LearnerContext } from '@/domain/models/entities';
 import type { LearnerPlanningView } from '@/domain/readModels/learnerReadModels';
-import type { LearnerPlanningItem } from '@/features/learners/learnerReadModel';
+import type {
+  LearnerLessonSeriesItem,
+  LearnerPlanningItem,
+} from '@/features/learners/learnerReadModel';
 import { formatLessonSeriesPositionLabel } from '@/features/planning/lessonSeriesPresentation';
 import { planningMutationService } from '@/features/planning/planningMutationService';
 import {
@@ -32,10 +39,13 @@ const planningViewLabels: Record<LearnerPlanningView, string> = {
   upcoming: 'Upcoming',
   unscheduled: 'Unscheduled',
   completed: 'Completed',
+  series: 'Series',
 };
 
 function isPlanningView(value: string | null): value is LearnerPlanningView {
-  return value === 'upcoming' || value === 'unscheduled' || value === 'completed';
+  return (
+    value === 'upcoming' || value === 'unscheduled' || value === 'completed' || value === 'series'
+  );
 }
 
 function contextKindIcon(kind: LearnerContext['kind']): ReactNode {
@@ -173,9 +183,186 @@ function PlanningItemCard({ item }: { item: LearnerPlanningItem }) {
   );
 }
 
+function LessonSeriesCard({ item }: { item: LearnerLessonSeriesItem }) {
+  const [renaming, setRenaming] = useState(false);
+  const [title, setTitle] = useState(item.title);
+  const [deleteArmed, setDeleteArmed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function rename(): Promise<void> {
+    if (saving) return;
+    if (!renaming) {
+      setRenaming(true);
+      setDeleteArmed(false);
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await planningMutationService.renameLessonSeries(item.id, title);
+      setRenaming(false);
+      setSaving(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'The lesson series could not be renamed.');
+      setSaving(false);
+    }
+  }
+
+  async function toggleArchive(): Promise<void> {
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    setDeleteArmed(false);
+    try {
+      if (item.lifecycleState === 'archived') {
+        await planningMutationService.restoreLessonSeries(item.id);
+      } else {
+        await planningMutationService.archiveLessonSeries(item.id);
+      }
+      setSaving(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'The lesson series could not be updated.');
+      setSaving(false);
+    }
+  }
+
+  async function remove(): Promise<void> {
+    if (saving) return;
+    if (!deleteArmed) {
+      setDeleteArmed(true);
+      setRenaming(false);
+      setError(null);
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await planningMutationService.deleteLessonSeries(item.id);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'The lesson series could not be deleted.');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <li>
+      <article
+        className={styles.seriesItem}
+        aria-label={`${item.title}, ${item.lifecycleState === 'archived' ? 'Archived' : 'Active'} lesson series`}
+      >
+        <div className={styles.itemHeading}>
+          <div>
+            <span className={styles.stateBadge}>
+              {item.lifecycleState === 'archived' ? 'Archived' : 'Active'}
+            </span>
+            {renaming ? (
+              <label className={styles.renameField}>
+                <span>Series title</span>
+                <input
+                  value={title}
+                  autoFocus
+                  onChange={(event) => {
+                    setTitle(event.target.value);
+                    setError(null);
+                  }}
+                />
+              </label>
+            ) : (
+              <h3>{item.title}</h3>
+            )}
+          </div>
+          <div className={styles.itemActions}>
+            <button
+              className="button"
+              type="button"
+              disabled={saving}
+              onClick={() => void rename()}
+            >
+              {renaming ? (
+                <Save aria-hidden="true" size={16} />
+              ) : (
+                <Pencil aria-hidden="true" size={16} />
+              )}
+              {renaming ? 'Save name' : 'Rename'}
+            </button>
+            {renaming ? (
+              <button
+                className="button"
+                type="button"
+                disabled={saving}
+                onClick={() => {
+                  setRenaming(false);
+                  setTitle(item.title);
+                  setError(null);
+                }}
+              >
+                <X aria-hidden="true" size={16} /> Cancel
+              </button>
+            ) : null}
+            <button
+              className="button"
+              type="button"
+              disabled={saving}
+              onClick={() => void toggleArchive()}
+            >
+              {item.lifecycleState === 'archived' ? (
+                <RotateCcw aria-hidden="true" size={16} />
+              ) : (
+                <Archive aria-hidden="true" size={16} />
+              )}
+              {item.lifecycleState === 'archived' ? 'Restore' : 'Archive'}
+            </button>
+            <button
+              className={deleteArmed ? styles.deleteConfirmButton : 'button'}
+              type="button"
+              disabled={saving}
+              onClick={() => void remove()}
+            >
+              <Trash2 aria-hidden="true" size={16} />
+              {deleteArmed ? 'Confirm delete series' : 'Delete series'}
+            </button>
+          </div>
+        </div>
+
+        {item.subject ? <p className={styles.subject}>{item.subject}</p> : null}
+        <div className={styles.seriesMetrics} aria-label="Lesson series linked record counts">
+          <span>{item.linkedPlanCount} Plans</span>
+          <span>{item.unscheduledPlanCount} Unscheduled</span>
+          <span>{item.scheduledSessionCount} Scheduled</span>
+          <span>{item.completedSessionCount} Completed</span>
+        </div>
+
+        {deleteArmed ? (
+          <div className={styles.deleteNotice} role="alert">
+            <strong>Delete Series “{item.title}”?</strong>
+            <span>
+              {item.linkedPlanCount} linked Plan{item.linkedPlanCount === 1 ? '' : 's'} will become
+              ungrouped. {item.scheduledSessionCount} scheduled and {item.completedSessionCount}{' '}
+              completed Session
+              {item.scheduledSessionCount + item.completedSessionCount === 1 ? '' : 's'} remain
+              unchanged. Teaching history is preserved, and the whole action can be undone.
+            </span>
+            <button className="button" type="button" onClick={() => setDeleteArmed(false)}>
+              Keep series
+            </button>
+          </div>
+        ) : null}
+
+        {error ? (
+          <p className={styles.deleteError} role="alert">
+            {error}
+          </p>
+        ) : null}
+      </article>
+    </li>
+  );
+}
+
 function emptyPlanningMessage(view: LearnerPlanningView): string {
   if (view === 'upcoming') return 'No upcoming sessions from this date.';
   if (view === 'completed') return 'No completed sessions have been recorded.';
+  if (view === 'series') return 'No lesson series have been created for this learner context.';
   return 'No unscheduled lesson plans for this learner context.';
 }
 
@@ -205,7 +392,9 @@ export function LearnersRoute() {
       ? model.upcomingItems
       : planningView === 'unscheduled'
         ? model.unscheduledItems
-        : model.completedItems
+        : planningView === 'completed'
+          ? model.completedItems
+          : []
     : [];
 
   return (
@@ -372,7 +561,9 @@ export function LearnersRoute() {
                         ? model.upcomingItems.length
                         : view === 'unscheduled'
                           ? model.unscheduledItems.length
-                          : model.completedItems.length;
+                          : view === 'completed'
+                            ? model.completedItems.length
+                            : model.seriesItems.length;
                     return (
                       <button
                         key={view}
@@ -396,7 +587,16 @@ export function LearnersRoute() {
                   role="tabpanel"
                   aria-labelledby={`learner-planning-tab-${planningView}`}
                 >
-                  {planningItems.length > 0 ? (
+                  {planningView === 'series' && model.seriesItems.length > 0 ? (
+                    <ul
+                      className={styles.planningList}
+                      aria-label={`Lesson series for ${model.selectedContext.name}`}
+                    >
+                      {model.seriesItems.map((item) => (
+                        <LessonSeriesCard key={item.id} item={item} />
+                      ))}
+                    </ul>
+                  ) : planningItems.length > 0 ? (
                     <ul
                       className={styles.planningList}
                       aria-label={`${planningViewLabels[planningView]} planning for ${model.selectedContext.name}`}
@@ -409,6 +609,8 @@ export function LearnersRoute() {
                     <div className={styles.emptyPlanning} role="status">
                       {planningView === 'completed' ? (
                         <CheckCircle2 aria-hidden="true" size={28} />
+                      ) : planningView === 'series' ? (
+                        <Layers3 aria-hidden="true" size={28} />
                       ) : planningView === 'upcoming' ? (
                         <CalendarDays aria-hidden="true" size={28} />
                       ) : (

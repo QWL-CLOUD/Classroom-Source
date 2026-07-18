@@ -31,4 +31,4 @@ export interface LearnersReadSnapshot {
   sessions: SessionOccurrence[];
 }
 
-export type LearnerPlanningView = 'upcoming' | 'unscheduled' | 'completed';
+export type LearnerPlanningView = 'upcoming' | 'unscheduled' | 'completed' | 'series';

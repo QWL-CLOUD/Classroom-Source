@@ -136,6 +136,7 @@ describe('buildLearnersPageReadModel', () => {
       contextId: 'class-context',
       title: 'Boundary Unit',
       subject: 'Synthetic subject',
+      lifecycleState: 'active' as const,
     };
     const first = {
       ...lessonPlan('plan-before', 'Before From lesson', 'ready', '2026-07-10T12:00:00.000Z'),
@@ -212,6 +213,7 @@ describe('buildLearnersPageReadModel', () => {
       contextId: 'class-context',
       title: 'Fractions Unit',
       subject: 'Math',
+      lifecycleState: 'active' as const,
     };
     const first = {
       ...lessonPlan('plan-first', 'Equivalent fractions', 'ready', '2026-07-12T12:00:00.000Z'),
@@ -242,6 +244,74 @@ describe('buildLearnersPageReadModel', () => {
       seriesTitle: 'Fractions Unit',
       seriesPositionLabel: 'Lesson 2 of 2',
     });
+  });
+
+  it('summarizes active and archived series with linked plan and session counts', () => {
+    const activeSeries = {
+      id: 'series-active',
+      contextId: 'class-context',
+      title: 'Active Unit',
+      subject: 'Math',
+      lifecycleState: 'active' as const,
+    };
+    const archivedSeries = {
+      id: 'series-archived',
+      contextId: 'class-context',
+      title: 'Archived Unit',
+      subject: 'Language',
+      lifecycleState: 'archived' as const,
+      archivedAt: '2026-07-20T12:00:00.000Z',
+    };
+    const activeFirst = {
+      ...lessonPlan('active-first', 'Active first', 'ready', '2026-07-10T12:00:00.000Z'),
+      seriesId: activeSeries.id,
+      sequence: 0,
+    };
+    const activeSecond = {
+      ...lessonPlan('active-second', 'Active second', 'ready', '2026-07-11T12:00:00.000Z'),
+      seriesId: activeSeries.id,
+      sequence: 1,
+    };
+    const archivedPlan = {
+      ...lessonPlan('archived-plan', 'Archived lesson', 'ready', '2026-07-12T12:00:00.000Z'),
+      seriesId: archivedSeries.id,
+      sequence: 0,
+    };
+
+    const model = buildLearnersPageReadModel(
+      snapshot(
+        [activeFirst, activeSecond, archivedPlan],
+        [
+          session('active-session', activeFirst.id, '2026-07-20', 'scheduled'),
+          session('archived-session', archivedPlan.id, '2026-07-10', 'completed'),
+        ],
+        [archivedSeries, activeSeries],
+      ),
+      '2026-07-15',
+    );
+
+    expect(model.seriesItems).toEqual([
+      {
+        id: activeSeries.id,
+        title: 'Active Unit',
+        subject: 'Math',
+        lifecycleState: 'active',
+        linkedPlanCount: 2,
+        unscheduledPlanCount: 1,
+        scheduledSessionCount: 1,
+        completedSessionCount: 0,
+      },
+      {
+        id: archivedSeries.id,
+        title: 'Archived Unit',
+        subject: 'Language',
+        lifecycleState: 'archived',
+        linkedPlanCount: 1,
+        unscheduledPlanCount: 0,
+        scheduledSessionCount: 0,
+        completedSessionCount: 1,
+      },
+    ]);
   });
 
   it('keeps plans unscheduled until they have a scheduled or completed occurrence', () => {

@@ -170,6 +170,7 @@ export class PlanningMutationService {
           existing.contextId,
           parsed.series,
           parsed.fields.subject,
+          existing.seriesId,
         );
         const targetSeriesId = assignment.seriesId;
         const beforePeers: LessonPlan[] = [];
@@ -429,6 +430,136 @@ export class PlanningMutationService {
     return result.value;
   }
 
+  async renameLessonSeries(id: string, title: string): Promise<LessonSeries> {
+    const normalizedTitle = title.trim();
+    if (!normalizedTitle) throw new Error('Lesson series title is required.');
+
+    const result = await this.db.transaction(
+      'rw',
+      this.db.lessonSeries,
+      this.db.changeLog,
+      async (): Promise<CommitResult<LessonSeries> | { value: LessonSeries; log: null }> => {
+        const existing = await this.requireSeries(id);
+        if (existing.title === normalizedTitle) return { value: existing, log: null };
+        const updated = lessonSeriesSchema.parse({
+          ...existing,
+          title: normalizedTitle,
+          updatedAt: this.now(),
+        });
+        const commands: PlanningCommandPair = {
+          forward: createPlanningCommand([putLessonSeriesOperation(updated)]),
+          inverse: createPlanningCommand([putLessonSeriesOperation(existing)]),
+        };
+        const log = this.createChangeLog(
+          'planning.series.rename',
+          `Rename lesson series “${existing.title}” to “${updated.title}”`,
+          commands,
+        );
+
+        await clearSupportedRedoBranch(this.db);
+        await this.applyOperations(commands.forward.operations);
+        await this.db.changeLog.put(log);
+        return { value: updated, log };
+      },
+    );
+
+    if (result.log) this.notifyNewChange(result.log);
+    return result.value;
+  }
+
+  async archiveLessonSeries(id: string): Promise<LessonSeries> {
+    return this.setLessonSeriesLifecycleState(id, 'archived');
+  }
+
+  async restoreLessonSeries(id: string): Promise<LessonSeries> {
+    return this.setLessonSeriesLifecycleState(id, 'active');
+  }
+
+  async deleteLessonSeries(id: string): Promise<void> {
+    const log = await this.db.transaction(
+      'rw',
+      this.db.lessonSeries,
+      this.db.lessonPlans,
+      this.db.sessionOccurrences,
+      this.db.changeLog,
+      async () => {
+        const existing = await this.requireSeries(id);
+        const linkedPlans = await this.listSeriesPlans(existing.id, existing.contextId);
+        const timestamp = this.now();
+        const detachedPlans = linkedPlans.map((plan) =>
+          lessonPlanSchema.parse({
+            ...plan,
+            seriesId: undefined,
+            sequence: undefined,
+            updatedAt: timestamp,
+          }),
+        );
+        const commands: PlanningCommandPair = {
+          forward: createPlanningCommand([
+            ...detachedPlans.map(putLessonPlanOperation),
+            deleteLessonSeriesOperation(existing.id),
+          ]),
+          inverse: createPlanningCommand([
+            putLessonSeriesOperation(existing),
+            ...linkedPlans.map(putLessonPlanOperation),
+          ]),
+        };
+        const log = this.createChangeLog(
+          'planning.series.delete',
+          `Delete lesson series “${existing.title}” and detach ${linkedPlans.length} plan${linkedPlans.length === 1 ? '' : 's'}`,
+          commands,
+        );
+
+        await clearSupportedRedoBranch(this.db);
+        await this.applyOperations(commands.forward.operations);
+        await this.db.changeLog.put(log);
+        return log;
+      },
+    );
+
+    this.notifyNewChange(log);
+  }
+
+  private async setLessonSeriesLifecycleState(
+    id: string,
+    lifecycleState: LessonSeries['lifecycleState'],
+  ): Promise<LessonSeries> {
+    const result = await this.db.transaction(
+      'rw',
+      this.db.lessonSeries,
+      this.db.changeLog,
+      async (): Promise<CommitResult<LessonSeries> | { value: LessonSeries; log: null }> => {
+        const existing = await this.requireSeries(id);
+        if (existing.lifecycleState === lifecycleState) return { value: existing, log: null };
+        const timestamp = this.now();
+        const updated = lessonSeriesSchema.parse({
+          ...existing,
+          lifecycleState,
+          archivedAt: lifecycleState === 'archived' ? timestamp : undefined,
+          updatedAt: timestamp,
+        });
+        const verb = lifecycleState === 'archived' ? 'Archive' : 'Restore';
+        const commands: PlanningCommandPair = {
+          forward: createPlanningCommand([putLessonSeriesOperation(updated)]),
+          inverse: createPlanningCommand([putLessonSeriesOperation(existing)]),
+        };
+        const log = this.createChangeLog(
+          `planning.series.${lifecycleState}`,
+          `${verb} lesson series “${existing.title}”`,
+          commands,
+        );
+
+        await clearSupportedRedoBranch(this.db);
+        await this.applyOperations(commands.forward.operations);
+        await this.db.changeLog.put(log);
+        return { value: updated, log };
+      },
+    );
+
+    if (result.log) this.notifyNewChange(result.log);
+    return result.value;
+  }
+
   private async listActivePlanSessions(planId: string): Promise<SessionOccurrence[]> {
     return (await this.db.sessionOccurrences.where('lessonPlanId').equals(planId).toArray())
       .map((value) => sessionOccurrenceSchema.parse(value))
@@ -439,12 +570,16 @@ export class PlanningMutationService {
     contextId: string,
     assignment: LessonSeriesAssignment,
     subject: string,
+    allowArchivedSeriesId?: string,
   ): Promise<{ seriesId?: string; createdSeries?: LessonSeries }> {
     if (assignment.kind === 'none') return {};
     if (assignment.kind === 'existing') {
       const series = await this.requireSeries(assignment.seriesId);
       if (series.contextId !== contextId) {
         throw new Error('The selected lesson series belongs to another learner context.');
+      }
+      if (series.lifecycleState === 'archived' && series.id !== allowArchivedSeriesId) {
+        throw new Error('Restore this lesson series before assigning new plans to it.');
       }
       return { seriesId: series.id };
     }
@@ -456,6 +591,8 @@ export class PlanningMutationService {
       contextId,
       title: assignment.title,
       subject,
+      lifecycleState: 'active',
+      updatedAt: this.now(),
     });
     return { seriesId: createdSeries.id, createdSeries };
   }
