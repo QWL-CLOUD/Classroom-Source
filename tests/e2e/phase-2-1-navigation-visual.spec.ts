@@ -127,6 +127,27 @@ test('Phase 2.1 preserves Week view and focus while keeping time labels readable
   await expect(page.getByLabel('View')).toHaveValue('everything');
   await expect(focusedSession).toHaveAttribute('aria-current', 'true');
 
+  const weekGrid = page.getByRole('region', { name: /Week of/ });
+  const requestedScrollLeft = await weekGrid.evaluate((element) => {
+    const target = Math.min(180, element.scrollWidth - element.clientWidth);
+    element.scrollLeft = target;
+    return target;
+  });
+  await expect
+    .poll(async () =>
+      Math.abs((await weekGrid.evaluate((element) => element.scrollLeft)) - requestedScrollLeft),
+    )
+    .toBeLessThanOrEqual(5);
+
+  const manualScrollLeft = await weekGrid.evaluate((element) => {
+    element.scrollLeft = element.scrollWidth - element.clientWidth;
+    return element.scrollLeft;
+  });
+  await page.getByRole('checkbox', { name: 'Weekends' }).click();
+  await expect
+    .poll(() => weekGrid.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(manualScrollLeft - 10);
+
   await page.getByLabel('View').selectOption('teaching');
   await expect(page).toHaveURL(/view=schedule$/);
   await expect(page.getByText('Synthetic arrival')).toBeVisible();

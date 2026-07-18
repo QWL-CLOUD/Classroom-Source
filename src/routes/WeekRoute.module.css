@@ -154,7 +154,7 @@
   overflow-x: auto;
   padding: 4px 2px 20px;
   scroll-padding-inline: 2px;
-  scroll-snap-type: x proximity;
+  overscroll-behavior-inline: contain;
 }
 
 .weekGrid:focus-visible {
@@ -166,7 +166,6 @@
   min-width: 255px;
   min-height: 500px;
   padding: 0;
-  scroll-snap-align: start;
 }
 
 .today {
