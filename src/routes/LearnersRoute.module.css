@@ -599,3 +599,222 @@
     grid-row: auto;
   }
 }
+
+.lifecycleTabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 16px;
+  padding: 5px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: #f5f7f5;
+}
+
+.lifecycleTabs button {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: #4f5955;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.lifecycleTabs button:hover {
+  background: #fff;
+}
+
+.lifecycleTabs button:focus-visible {
+  outline: 3px solid #355f54;
+  outline-offset: 2px;
+}
+
+.lifecycleTabs button span {
+  min-width: 22px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #355f54;
+  background: #e4eee8;
+  font-size: 11px;
+  text-align: center;
+}
+
+.lifecycleTabs .activeLifecycleTab {
+  border-color: #9cb8aa;
+  color: #23483f;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(34 61 52 / 8%);
+}
+
+.contextSummaryHeader {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.contextTitleRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.contextTitleRow .page-eyebrow {
+  margin: 0;
+}
+
+.contextStatusBadge {
+  display: inline-flex;
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: #355f54;
+  background: #e4eee8;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.archivedBadge {
+  color: #675338;
+  background: #f2eadb;
+}
+
+.contextActions,
+.contextEditActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.contextEditForm {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.contextEditForm label {
+  display: grid;
+  gap: 7px;
+  color: #4f5955;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.contextEditForm input,
+.contextEditForm textarea {
+  width: 100%;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  background: #fff;
+  font: inherit;
+}
+
+.contextEditForm textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.contextEditForm input:focus,
+.contextEditForm textarea:focus {
+  outline: 3px solid rgb(53 95 84 / 25%);
+  border-color: var(--accent-strong);
+}
+
+.contextNotesField,
+.contextEditActions {
+  grid-column: 1 / -1;
+}
+
+.archivedNotice,
+.deleteBlockedNotice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 14px;
+  padding: 11px 12px;
+  border: 1px solid #d8c8a7;
+  border-radius: 10px;
+  color: #675338;
+  background: #faf5e9;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.deleteBlockedNotice {
+  display: grid;
+  border-color: #d39a91;
+  color: #6e302b;
+  background: #fff0ed;
+}
+
+.linkedRecordCounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 3px;
+}
+
+.linkedRecordCounts span {
+  padding: 4px 7px;
+  border: 1px solid rgb(110 48 43 / 18%);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 55%);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.archivedPlanRestriction {
+  padding: 8px 10px;
+  border: 1px solid #d8c8a7;
+  border-radius: 10px;
+  color: #675338;
+  background: #faf5e9;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+@media (max-width: 900px) {
+  .contextSummaryHeader {
+    flex-direction: column;
+  }
+
+  .contextActions,
+  .contextEditActions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 620px) {
+  .contextEditForm {
+    grid-template-columns: 1fr;
+  }
+
+  .contextNotesField,
+  .contextEditActions {
+    grid-column: 1;
+  }
+
+  .contextActions,
+  .contextActions > *,
+  .contextEditActions,
+  .contextEditActions > * {
+    width: 100%;
+  }
+}

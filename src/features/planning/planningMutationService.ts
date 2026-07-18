@@ -1,6 +1,7 @@
 import { classroomDb, type ClassroomDatabase } from '@/data/db/ClassroomDatabase';
 import {
   changeLogSchema,
+  learnerContextSchema,
   lessonPlanSchema,
   lessonSeriesSchema,
   scheduleBlockSchema,
@@ -91,8 +92,12 @@ export class PlanningMutationService {
       this.db.sessionOccurrences,
       this.db.changeLog,
       async (): Promise<CommitResult<LessonPlan>> => {
-        const context = await this.db.learnerContexts.get(contextId);
-        if (!context) throw new Error('Learner context no longer exists.');
+        const contextValue = await this.db.learnerContexts.get(contextId);
+        if (!contextValue) throw new Error('Learner context no longer exists.');
+        const context = learnerContextSchema.parse(contextValue);
+        if (context.status !== 'active') {
+          throw new Error('Restore this learner context before creating a new plan.');
+        }
 
         const timestamp = this.now();
         const planId = this.createId();
@@ -601,13 +606,22 @@ export class PlanningMutationService {
     const fields = parseSessionEditorValues(values);
     const result = await this.db.transaction(
       'rw',
-      this.db.lessonPlans,
-      this.db.sessionOccurrences,
-      this.db.scheduleBlocks,
-      this.db.scheduleExceptions,
-      this.db.changeLog,
+      [
+        this.db.learnerContexts,
+        this.db.lessonPlans,
+        this.db.sessionOccurrences,
+        this.db.scheduleBlocks,
+        this.db.scheduleExceptions,
+        this.db.changeLog,
+      ],
       async (): Promise<CommitResult<SessionOccurrence>> => {
         const plan = await this.requirePlan(planId);
+        const contextValue = await this.db.learnerContexts.get(plan.contextId);
+        if (!contextValue) throw new Error('Learner context no longer exists.');
+        const context = learnerContextSchema.parse(contextValue);
+        if (context.status !== 'active') {
+          throw new Error('Restore this learner context before scheduling a new session.');
+        }
         const existingSessions = (
           await this.db.sessionOccurrences.where('lessonPlanId').equals(planId).toArray()
         ).map((value) => sessionOccurrenceSchema.parse(value));

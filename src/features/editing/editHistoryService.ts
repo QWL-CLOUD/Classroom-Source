@@ -40,6 +40,8 @@ export class EditHistoryService {
       'rw',
       [
         this.db.calendarEvents,
+        this.db.learnerContexts,
+        this.db.contextMemberships,
         this.db.scheduleBlocks,
         this.db.scheduleExceptions,
         this.db.lessonSeries,
@@ -73,6 +75,8 @@ export class EditHistoryService {
       'rw',
       [
         this.db.calendarEvents,
+        this.db.learnerContexts,
+        this.db.contextMemberships,
         this.db.scheduleBlocks,
         this.db.scheduleExceptions,
         this.db.lessonSeries,

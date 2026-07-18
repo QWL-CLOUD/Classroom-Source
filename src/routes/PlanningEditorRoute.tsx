@@ -632,6 +632,21 @@ export function PlanningEditorRoute() {
     );
   }
 
+  if (!planId && snapshot.context?.status === 'archived') {
+    return (
+      <div className={`card ${styles.errorPanel}`} role="alert">
+        <h1>Restore this learner context</h1>
+        <p>Archived Classes, Groups, and Individuals cannot receive a new lesson plan.</p>
+        <a
+          className="button"
+          href={`#/learners?context=${encodeURIComponent(snapshot.context.id)}&status=archived`}
+        >
+          Manage archived context
+        </a>
+      </div>
+    );
+  }
+
   function selectContext(contextId: string): void {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set('context', contextId);
