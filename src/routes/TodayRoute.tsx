@@ -155,6 +155,13 @@ export function TodayRoute() {
         : new Map<string, ScheduleBlockHierarchyMetadata>(),
     [state],
   );
+  const learnerContextNames = useMemo<ReadonlyMap<string, string>>(
+    () =>
+      state.status === 'ready'
+        ? new Map(state.data.learnerContexts.map((context) => [context.id, context.name] as const))
+        : new Map<string, string>(),
+    [state],
+  );
   const today = useMemo(
     () =>
       state.status === 'ready' && planningState.status === 'ready'
@@ -458,14 +465,62 @@ export function TodayRoute() {
                           {item.category ? (
                             <p className={styles.itemCategory}>{item.category}</p>
                           ) : null}
-                          {item.sourceType === 'schedule-block' ? (
-                            <a
-                              className={styles.occurrenceEdit}
-                              href={`#/schedule/occurrence/edit?block=${encodeURIComponent(item.sourceRecordId)}&date=${date}&return=today`}
-                              aria-label={`Edit ${item.title} on ${date}`}
+                          {item.attachedSessions.length > 0 ? (
+                            <div
+                              className={styles.attachedSessions}
+                              aria-label={`Teaching plans attached to ${item.title}`}
                             >
-                              Edit occurrence
-                            </a>
+                              <span className={styles.attachedSessionsLabel}>Teaching plan</span>
+                              {item.attachedSessions.map((session) => (
+                                <div
+                                  key={session.sessionId}
+                                  className={styles.attachedSession}
+                                  data-today-item={`session-occurrence:${session.sessionId}`}
+                                  data-session-id={session.sessionId}
+                                >
+                                  <div>
+                                    <span className={styles.attachedSessionType}>Session</span>
+                                    <strong>{session.title}</strong>
+                                    <span>
+                                      {learnerContextNames.get(session.contextId) ??
+                                        'Learner context'}{' '}
+                                      · {session.deliveryState}
+                                    </span>
+                                  </div>
+                                  <a
+                                    className={styles.occurrenceEdit}
+                                    href={`#/planning/session?session=${encodeURIComponent(session.sessionId)}&date=${date}&return=today`}
+                                    aria-label={`Manage ${session.title} session`}
+                                  >
+                                    Manage session
+                                  </a>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                          {item.sourceType === 'schedule-block' ? (
+                            <div className={styles.occurrenceActions}>
+                              {item.kind === 'teachable' && item.planningEnabled ? (
+                                <a
+                                  className={styles.occurrenceEdit}
+                                  href={buildPlanningEntryHref({
+                                    date,
+                                    returnTo: 'today',
+                                    scheduleBlockId: item.sourceRecordId,
+                                  })}
+                                  aria-label={`Plan ${item.title} on ${date}`}
+                                >
+                                  <CalendarPlus aria-hidden="true" size={14} /> Plan this block
+                                </a>
+                              ) : null}
+                              <a
+                                className={styles.occurrenceEdit}
+                                href={`#/schedule/occurrence/edit?block=${encodeURIComponent(item.sourceRecordId)}&date=${date}&return=today`}
+                                aria-label={`Edit ${item.title} on ${date}`}
+                              >
+                                Edit occurrence
+                              </a>
+                            </div>
                           ) : null}
                           {item.sourceType === 'session-occurrence' ? (
                             <a

@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useEffect, useMemo, useRef, type ChangeEvent, type CSSProperties } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -102,6 +102,13 @@ export function WeekRoute() {
         : new Map<string, ScheduleBlockHierarchyMetadata>(),
     [state],
   );
+  const learnerContextNames = useMemo<ReadonlyMap<string, string>>(
+    () =>
+      state.status === 'ready'
+        ? new Map(state.data.learnerContexts.map((context) => [context.id, context.name] as const))
+        : new Map<string, string>(),
+    [state],
+  );
   const visibleDays = week ? (showWeekends ? week.days : week.days.slice(0, 5)) : [];
   const errorMessage =
     state.status === 'error'
@@ -120,7 +127,13 @@ export function WeekRoute() {
   useEffect(() => {
     if (!focusId || !week || showWeekends) return;
     const focusedDayIndex = week.days.findIndex((day) =>
-      day.items.some((item) => item.occurrenceId === focusId),
+      day.items.some(
+        (item) =>
+          item.occurrenceId === focusId ||
+          item.attachedSessions.some(
+            (session) => `session-occurrence:${session.sessionId}` === focusId,
+          ),
+      ),
     );
     if (focusedDayIndex >= 5) setShowWeekends(true);
   }, [focusId, setShowWeekends, showWeekends, week]);
@@ -308,7 +321,11 @@ export function WeekRoute() {
                 {day.items.length > 0 ? (
                   <ul className={styles.itemList} aria-label={`Items for ${day.label}`}>
                     {day.items.map((item) => {
-                      const focused = item.occurrenceId === focusId;
+                      const focused =
+                        item.occurrenceId === focusId ||
+                        item.attachedSessions.some(
+                          (session) => `session-occurrence:${session.sessionId}` === focusId,
+                        );
                       const hierarchy =
                         item.sourceType === 'schedule-block'
                           ? scheduleHierarchy.get(item.sourceRecordId)
@@ -317,8 +334,16 @@ export function WeekRoute() {
                         <li
                           key={item.occurrenceId}
                           ref={(node: HTMLLIElement | null) => {
-                            if (node) itemRefs.current.set(item.occurrenceId, node);
-                            else itemRefs.current.delete(item.occurrenceId);
+                            const focusKeys = [
+                              item.occurrenceId,
+                              ...item.attachedSessions.map(
+                                (session) => `session-occurrence:${session.sessionId}`,
+                              ),
+                            ];
+                            for (const key of focusKeys) {
+                              if (node) itemRefs.current.set(key, node);
+                              else itemRefs.current.delete(key);
+                            }
                           }}
                           className={`${getItemClassName(item, focused)} ${
                             hierarchy?.visualDepth ? styles.hierarchyChild : ''
@@ -359,14 +384,67 @@ export function WeekRoute() {
                           {item.category ? (
                             <p className={styles.itemCategory}>{item.category}</p>
                           ) : null}
-                          {item.sourceType === 'schedule-block' ? (
-                            <a
-                              className={styles.occurrenceEdit}
-                              href={`#/schedule/occurrence/edit?block=${encodeURIComponent(item.sourceRecordId)}&date=${day.date}&return=week`}
-                              aria-label={`Edit ${item.title} on ${day.date}`}
+                          {item.attachedSessions.length > 0 ? (
+                            <div
+                              className={styles.attachedSessions}
+                              aria-label={`Teaching plans attached to ${item.title}`}
                             >
-                              Edit occurrence
-                            </a>
+                              <span className={styles.attachedSessionsLabel}>Teaching plan</span>
+                              {item.attachedSessions.map((session) => (
+                                <div
+                                  key={session.sessionId}
+                                  className={styles.attachedSession}
+                                  data-week-item={`session-occurrence:${session.sessionId}`}
+                                  data-session-id={session.sessionId}
+                                  aria-current={
+                                    focusId === `session-occurrence:${session.sessionId}`
+                                      ? 'true'
+                                      : undefined
+                                  }
+                                >
+                                  <div>
+                                    <span className={styles.attachedSessionType}>Session</span>
+                                    <strong>{session.title}</strong>
+                                    <span>
+                                      {learnerContextNames.get(session.contextId) ??
+                                        'Learner context'}{' '}
+                                      · {session.deliveryState}
+                                    </span>
+                                  </div>
+                                  <a
+                                    className={styles.occurrenceEdit}
+                                    href={`#/planning/session?session=${encodeURIComponent(session.sessionId)}&date=${day.date}&return=week`}
+                                    aria-label={`Manage ${session.title} session`}
+                                  >
+                                    Manage session
+                                  </a>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                          {item.sourceType === 'schedule-block' ? (
+                            <div className={styles.occurrenceActions}>
+                              {item.kind === 'teachable' && item.planningEnabled ? (
+                                <a
+                                  className={styles.occurrenceEdit}
+                                  href={buildPlanningEntryHref({
+                                    date: day.date,
+                                    returnTo: 'week',
+                                    scheduleBlockId: item.sourceRecordId,
+                                  })}
+                                  aria-label={`Plan ${item.title} on ${day.date}`}
+                                >
+                                  <CalendarPlus aria-hidden="true" size={14} /> Plan this block
+                                </a>
+                              ) : null}
+                              <a
+                                className={styles.occurrenceEdit}
+                                href={`#/schedule/occurrence/edit?block=${encodeURIComponent(item.sourceRecordId)}&date=${day.date}&return=week`}
+                                aria-label={`Edit ${item.title} on ${day.date}`}
+                              >
+                                Edit occurrence
+                              </a>
+                            </div>
                           ) : null}
                           {item.sourceType === 'session-occurrence' ? (
                             <a

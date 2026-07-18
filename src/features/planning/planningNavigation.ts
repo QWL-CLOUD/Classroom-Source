@@ -14,9 +14,11 @@ export function buildPlanningEntryHref(options: {
   date: string;
   returnTo: Exclude<PlanningReturnTarget, 'learners'>;
   contextId?: string;
+  scheduleBlockId?: string;
 }): string {
   const params = new URLSearchParams({ date: options.date, return: options.returnTo });
   if (options.contextId) params.set('context', options.contextId);
+  if (options.scheduleBlockId) params.set('block', options.scheduleBlockId);
   return `#/planning/edit?${params.toString()}`;
 }
 
@@ -37,6 +39,7 @@ export function buildPlanningSurfaceHref(options: {
   contextId: string;
   learnerView?: 'upcoming' | 'unscheduled' | 'completed';
   focusSessionId?: string;
+  focusOccurrenceId?: string;
 }): string {
   if (options.returnTo === 'today') return `#/today?date=${options.date}`;
   if (options.returnTo === 'calendar') return `#/calendar?date=${options.date}`;
@@ -44,7 +47,9 @@ export function buildPlanningSurfaceHref(options: {
     return buildWeekHref({
       date: options.date,
       view: 'everything',
-      focus: options.focusSessionId ? `session-occurrence:${options.focusSessionId}` : undefined,
+      focus:
+        options.focusOccurrenceId ??
+        (options.focusSessionId ? `session-occurrence:${options.focusSessionId}` : undefined),
     });
   }
 

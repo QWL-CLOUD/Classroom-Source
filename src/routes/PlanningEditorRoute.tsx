@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   ArrowUp,
   CalendarPlus,
+  Clock3,
   ListOrdered,
   Save,
   Trash2,
@@ -19,14 +20,17 @@ import {
   lessonPlanSchema,
   lessonSeriesSchema,
   scheduleBlockSchema,
+  scheduleExceptionSchema,
   schoolYearSchema,
   sessionOccurrenceSchema,
   type LearnerContext,
   type LessonPlan,
   type LessonSeries,
   type ScheduleBlock,
+  type ScheduleException,
   type SessionOccurrence,
 } from '@/domain/models/entities';
+import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
 import { LessonFlowEditor } from '@/features/planning/LessonFlowEditor';
 import { formatLessonSeriesPositionLabel } from '@/features/planning/lessonSeriesPresentation';
 import {
@@ -41,6 +45,7 @@ import {
   type LessonContentEditorValues,
   type LessonPlanEditorValues,
 } from '@/features/planning/planningEditorModel';
+import { resolveScheduleOccurrence } from '@/features/scheduleExceptions/scheduleOccurrenceResolver';
 import {
   planningMutationService,
   type PlanningMutationService,
@@ -49,6 +54,12 @@ import {
 import { formatLongDate, parseLocalDate, todayLocalDate } from '@/shared/dates/localDate';
 
 import styles from './PlanningEditorRoute.module.css';
+
+interface PlanningScheduleOccurrence {
+  block: ScheduleBlock;
+  date: string;
+  adjusted: boolean;
+}
 
 interface PlanningEditorSnapshot {
   contexts: LearnerContext[];
@@ -59,6 +70,8 @@ interface PlanningEditorSnapshot {
   scheduleBlocks: ScheduleBlock[];
   lessonSeries: LessonSeries[];
   seriesPlans: LessonPlan[];
+  planningOccurrence: PlanningScheduleOccurrence | null;
+  planningOccurrenceError: string | null;
 }
 
 function getErrorMessage(cause: unknown): string {
@@ -83,19 +96,31 @@ function PlanningEditorForm({
   initialDate,
   returnTo,
   service = planningMutationService,
+  onChangeContext,
 }: {
   snapshot: PlanningEditorSnapshot;
   initialDate: string;
   returnTo: PlanningReturnTarget;
   service?: PlanningMutationService;
+  onChangeContext?: () => void;
 }) {
-  const { context, plan, sessions, contextSessions, scheduleBlocks, lessonSeries, seriesPlans } =
-    snapshot;
+  const {
+    context,
+    plan,
+    sessions,
+    contextSessions,
+    scheduleBlocks,
+    lessonSeries,
+    seriesPlans,
+    planningOccurrence,
+  } = snapshot;
   const [values, setValues] = useState<LessonPlanEditorValues>(() =>
     plan
       ? toLessonPlanEditorValues(plan)
       : createLessonPlanEditorValues(
-          scheduleBlocks.find((block) => block.planningEnabled)?.id ?? '',
+          planningOccurrence?.block.id ??
+            scheduleBlocks.find((block) => block.planningEnabled)?.id ??
+            '',
         ),
   );
   const [saving, setSaving] = useState(false);
@@ -115,7 +140,10 @@ function PlanningEditorForm({
   const learnerReturnDate = learnerView === 'upcoming' ? returnDate : undefined;
   if (!context) return null;
   const selectedContext = context;
-  const surfaceDate = activeSession?.date ?? initialDate;
+  const surfaceDate = activeSession?.date ?? planningOccurrence?.date ?? initialDate;
+  const occurrenceFocusId = planningOccurrence
+    ? `schedule-block:${planningOccurrence.block.id}:${planningOccurrence.date}`
+    : undefined;
   const backHref =
     returnTo === 'learners'
       ? learnerHref(selectedContext.id, learnerView, learnerReturnDate)
@@ -124,6 +152,7 @@ function PlanningEditorForm({
           date: surfaceDate,
           contextId: selectedContext.id,
           focusSessionId: activeSession?.id,
+          focusOccurrenceId: occurrenceFocusId,
         });
 
   const seriesChoice =
@@ -214,6 +243,32 @@ function PlanningEditorForm({
     setSaving(true);
     setError(null);
     try {
+      if (planningOccurrence && !plan) {
+        const result = await service.createPlanForScheduleOccurrence(selectedContext.id, values, {
+          scheduleBlockId: planningOccurrence.block.id,
+          date: planningOccurrence.date,
+        });
+        if (!result.created) {
+          const params = new URLSearchParams({
+            plan: result.plan.id,
+            date: planningOccurrence.date,
+            return: returnTo,
+            block: planningOccurrence.block.id,
+          });
+          window.location.hash = `#/planning/edit?${params.toString()}`;
+          return;
+        }
+        window.location.hash = buildPlanningSurfaceHref({
+          returnTo,
+          date: result.session.date,
+          contextId: selectedContext.id,
+          learnerView: 'upcoming',
+          focusOccurrenceId: occurrenceFocusId,
+          focusSessionId: result.session.id,
+        });
+        return;
+      }
+
       const saved = plan
         ? await service.updatePlan(plan.id, values)
         : await service.createPlan(selectedContext.id, values);
@@ -223,8 +278,16 @@ function PlanningEditorForm({
           date: initialDate,
           returnTo,
         });
-      } else {
+      } else if (returnTo === 'learners') {
         window.location.hash = learnerHref(selectedContext.id, learnerView, learnerReturnDate);
+      } else {
+        window.location.hash = buildPlanningSurfaceHref({
+          returnTo,
+          date: surfaceDate,
+          contextId: selectedContext.id,
+          focusSessionId: activeSession?.id,
+          focusOccurrenceId: occurrenceFocusId,
+        });
       }
     } catch (cause) {
       setError(getErrorMessage(cause));
@@ -249,6 +312,7 @@ function PlanningEditorForm({
               returnTo,
               date: surfaceDate,
               contextId: selectedContext.id,
+              focusOccurrenceId: occurrenceFocusId,
             });
     } catch (cause) {
       setError(getErrorMessage(cause));
@@ -271,6 +335,33 @@ function PlanningEditorForm({
             : `Back to ${returnTo === 'today' ? 'Today' : returnTo === 'week' ? 'Week' : 'Calendar'}`}
         </a>
       </div>
+
+      {planningOccurrence ? (
+        <section
+          className={styles.occurrenceSummary}
+          aria-label={`Planning ${planningOccurrence.block.title} on ${planningOccurrence.date}`}
+        >
+          <Clock3 aria-hidden="true" size={20} />
+          <div>
+            <strong>{planningOccurrence.block.title}</strong>
+            <span>
+              {formatLongDate(planningOccurrence.date)} ·{' '}
+              {formatCalendarMinute(planningOccurrence.block.startMinute)}–
+              {formatCalendarMinute(planningOccurrence.block.endMinute)}
+              {planningOccurrence.adjusted ? ' · Adjusted occurrence' : ''}
+            </span>
+            <p>
+              This Schedule Block supplies the occurrence date and time. The selected learner
+              context owns the Plan and Session.
+            </p>
+          </div>
+          {onChangeContext ? (
+            <button className="button" type="button" disabled={saving} onClick={onChangeContext}>
+              Change context
+            </button>
+          ) : null}
+        </section>
+      ) : null}
 
       <div className={styles.formGrid}>
         <label className={styles.fullWidth}>
@@ -332,6 +423,7 @@ function PlanningEditorForm({
           <span>Preferred schedule block</span>
           <select
             value={values.preferredScheduleBlockId}
+            disabled={Boolean(planningOccurrence)}
             onChange={(event) => update('preferredScheduleBlockId', event.target.value)}
           >
             <option value="">Choose when scheduling</option>
@@ -437,9 +529,10 @@ function PlanningEditorForm({
           disabled={saving}
           onClick={() => void save(false)}
         >
-          <Save aria-hidden="true" size={17} /> {saving ? 'Saving…' : 'Save plan'}
+          <Save aria-hidden="true" size={17} />{' '}
+          {saving ? 'Saving…' : planningOccurrence && !plan ? 'Save plan to block' : 'Save plan'}
         </button>
-        {!activeSession ? (
+        {!planningOccurrence && !activeSession ? (
           <button
             className="button"
             type="button"
@@ -448,14 +541,14 @@ function PlanningEditorForm({
           >
             <CalendarPlus aria-hidden="true" size={17} /> Save and schedule
           </button>
-        ) : (
+        ) : activeSession ? (
           <a
             className="button"
             href={`#/planning/session?session=${encodeURIComponent(activeSession.id)}&date=${surfaceDate}${returnTo === 'learners' ? '' : `&return=${returnTo}`}`}
           >
             <CalendarPlus aria-hidden="true" size={17} /> Manage session
           </a>
-        )}
+        ) : null}
         {plan ? (
           <button
             className={deleteArmed ? styles.dangerButton : 'button'}
@@ -481,13 +574,34 @@ function PlanningContextPicker({
   date,
   onSelect,
   returnTo,
+  planningOccurrence,
+  suggestedContextId,
 }: {
   contexts: LearnerContext[];
   date: string;
-  onSelect: (contextId: string) => void;
+  onSelect: (contextId: string) => Promise<void> | void;
   returnTo: PlanningReturnTarget;
+  planningOccurrence?: PlanningScheduleOccurrence | null;
+  suggestedContextId?: string;
 }) {
-  const [contextId, setContextId] = useState(contexts[0]?.id ?? '');
+  const initialContextId = contexts.some((context) => context.id === suggestedContextId)
+    ? suggestedContextId!
+    : (contexts[0]?.id ?? '');
+  const [contextId, setContextId] = useState(initialContextId);
+  const [selecting, setSelecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function continueToPlan(): Promise<void> {
+    if (!contextId || selecting) return;
+    setSelecting(true);
+    setError(null);
+    try {
+      await onSelect(contextId);
+    } catch (cause) {
+      setError(getErrorMessage(cause));
+      setSelecting(false);
+    }
+  }
 
   return (
     <section className={`card ${styles.contextPicker}`} aria-labelledby="planning-context-heading">
@@ -497,15 +611,39 @@ function PlanningContextPicker({
           <p className="page-eyebrow">Planning destination</p>
           <h2 id="planning-context-heading">Choose who this lesson is for</h2>
           <p>
-            {returnTo === 'learners'
-              ? 'Select a Class, Group, or Individual before creating the planning item.'
-              : `The session date will start on ${formatLongDate(date)} if you choose Save and schedule.`}
+            {planningOccurrence
+              ? 'The Schedule Block suggests a context when available, but you may choose any active Class, Group, or Individual.'
+              : returnTo === 'learners'
+                ? 'Select a Class, Group, or Individual before creating the planning item.'
+                : `The session date will start on ${formatLongDate(date)} if you choose Save and schedule.`}
           </p>
         </div>
       </div>
+
+      {planningOccurrence ? (
+        <div className={styles.contextOccurrence} aria-label="Selected schedule occurrence">
+          <Clock3 aria-hidden="true" size={18} />
+          <div>
+            <strong>{planningOccurrence.block.title}</strong>
+            <span>
+              {formatLongDate(planningOccurrence.date)} ·{' '}
+              {formatCalendarMinute(planningOccurrence.block.startMinute)}–
+              {formatCalendarMinute(planningOccurrence.block.endMinute)}
+            </span>
+          </div>
+        </div>
+      ) : null}
+
       <label>
         <span>Learner context</span>
-        <select value={contextId} onChange={(event) => setContextId(event.target.value)}>
+        <select
+          value={contextId}
+          disabled={selecting}
+          onChange={(event) => {
+            setContextId(event.target.value);
+            setError(null);
+          }}
+        >
           {contexts.map((context) => (
             <option key={context.id} value={context.id}>
               {context.name} ·{' '}
@@ -514,17 +652,23 @@ function PlanningContextPicker({
                 : context.kind === 'group'
                   ? 'Group'
                   : 'Individual'}
+              {context.id === suggestedContextId ? ' · Suggested' : ''}
             </option>
           ))}
         </select>
       </label>
+      {error ? (
+        <p className={styles.errorMessage} role="alert">
+          {error}
+        </p>
+      ) : null}
       <button
         className="button button-primary"
         type="button"
-        disabled={!contextId}
-        onClick={() => onSelect(contextId)}
+        disabled={!contextId || selecting}
+        onClick={() => void continueToPlan()}
       >
-        Continue to plan
+        {selecting ? 'Opening plan…' : 'Continue to plan'}
       </button>
     </section>
   );
@@ -534,6 +678,7 @@ export function PlanningEditorRoute() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedContextId = searchParams.get('context');
   const planId = searchParams.get('plan');
+  const requestedBlockId = searchParams.get('block');
   const requestedDate = searchParams.get('date');
   const initialDate = parseLocalDate(requestedDate) ? requestedDate! : todayLocalDate();
   const returnTo = parsePlanningReturnTarget(searchParams.get('return'));
@@ -558,6 +703,45 @@ export function PlanningEditorRoute() {
           first.name.localeCompare(second.name) ||
           first.id.localeCompare(second.id),
       );
+    const allScheduleBlocks = (await classroomDb.scheduleBlocks.toArray()).map((value) =>
+      scheduleBlockSchema.parse(value),
+    );
+    let planningOccurrence: PlanningScheduleOccurrence | null = null;
+    let planningOccurrenceError: string | null = null;
+    if (requestedBlockId) {
+      const sourceBlock = allScheduleBlocks.find((block) => block.id === requestedBlockId);
+      if (!sourceBlock) {
+        planningOccurrenceError = 'The selected Schedule Block no longer exists.';
+      } else if (
+        sourceBlock.archivedAt ||
+        sourceBlock.kind !== 'teachable' ||
+        !sourceBlock.planningEnabled
+      ) {
+        planningOccurrenceError = 'This Schedule Block is not eligible for lesson planning.';
+      } else {
+        const exceptionValues = await classroomDb.scheduleExceptions
+          .where('date')
+          .equals(initialDate)
+          .toArray();
+        const exceptions: ScheduleException[] = exceptionValues.map((value) =>
+          scheduleExceptionSchema.parse(value),
+        );
+        try {
+          const resolved = resolveScheduleOccurrence(sourceBlock, initialDate, exceptions);
+          if (!resolved) {
+            planningOccurrenceError = 'This Schedule Block does not occur on the selected date.';
+          } else {
+            planningOccurrence = {
+              block: resolved.block,
+              date: initialDate,
+              adjusted: resolved.adjusted,
+            };
+          }
+        } catch (cause) {
+          planningOccurrenceError = getErrorMessage(cause);
+        }
+      }
+    }
     const planValue = planId ? await classroomDb.lessonPlans.get(planId) : undefined;
     const plan = planValue ? lessonPlanSchema.parse(planValue) : null;
     const contextId = plan?.contextId ?? requestedContextId;
@@ -568,14 +752,18 @@ export function PlanningEditorRoute() {
           (value) => sessionOccurrenceSchema.parse(value),
         )
       : [];
-    const scheduleBlocks = (await classroomDb.scheduleBlocks.toArray())
-      .map((value) => scheduleBlockSchema.parse(value))
+    const scheduleBlocks = allScheduleBlocks
       .filter(
         (block) =>
           !block.archivedAt &&
           block.kind === 'teachable' &&
-          (block.planningEnabled || block.id === plan?.preferredScheduleBlockId) &&
-          (!context || !block.contextId || block.contextId === context.id),
+          (block.planningEnabled ||
+            block.id === plan?.preferredScheduleBlockId ||
+            block.id === planningOccurrence?.block.id) &&
+          (!context ||
+            !block.contextId ||
+            block.contextId === context.id ||
+            block.id === planningOccurrence?.block.id),
       )
       .sort(
         (first, second) =>
@@ -609,8 +797,10 @@ export function PlanningEditorRoute() {
       scheduleBlocks,
       lessonSeries,
       seriesPlans,
+      planningOccurrence,
+      planningOccurrenceError,
     };
-  }, [planId, requestedContextId]);
+  }, [initialDate, planId, requestedBlockId, requestedContextId]);
 
   if (snapshot === undefined) {
     return (
@@ -620,6 +810,8 @@ export function PlanningEditorRoute() {
     );
   }
 
+  const readySnapshot = snapshot;
+
   if ((planId && !snapshot.plan) || (requestedContextId && !snapshot.context)) {
     return (
       <div className={`card ${styles.errorPanel}`} role="alert">
@@ -627,6 +819,24 @@ export function PlanningEditorRoute() {
         <p>The requested learner context or lesson plan could not be found.</p>
         <a className="button" href="#/learners">
           Back to Learners
+        </a>
+      </div>
+    );
+  }
+
+  if (requestedBlockId && snapshot.planningOccurrenceError) {
+    const backHref = buildPlanningSurfaceHref({
+      returnTo,
+      date: initialDate,
+      contextId: snapshot.context?.id ?? '',
+      focusOccurrenceId: `schedule-block:${requestedBlockId}:${initialDate}`,
+    });
+    return (
+      <div className={`card ${styles.errorPanel}`} role="alert">
+        <h1>Schedule occurrence unavailable</h1>
+        <p>{snapshot.planningOccurrenceError}</p>
+        <a className="button" href={backHref}>
+          Back to {returnTo === 'today' ? 'Today' : returnTo === 'week' ? 'Week' : 'Calendar'}
         </a>
       </div>
     );
@@ -647,9 +857,41 @@ export function PlanningEditorRoute() {
     );
   }
 
-  function selectContext(contextId: string): void {
+  async function selectContext(contextId: string): Promise<void> {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set('context', contextId);
+    nextParams.delete('plan');
+
+    const planningOccurrence = readySnapshot.planningOccurrence;
+    if (planningOccurrence) {
+      const matchingSessions = (
+        await classroomDb.sessionOccurrences.where('contextId').equals(contextId).toArray()
+      )
+        .map((value) => sessionOccurrenceSchema.parse(value))
+        .filter(
+          (session) =>
+            session.scheduleBlockId === planningOccurrence.block.id &&
+            session.date === planningOccurrence.date &&
+            session.deliveryState !== 'cancelled',
+        )
+        .sort((first, second) => first.id.localeCompare(second.id));
+      if (matchingSessions.length > 1) {
+        throw new Error(
+          'Multiple sessions already use this schedule occurrence and learner context.',
+        );
+      }
+      if (matchingSessions[0]) {
+        nextParams.set('plan', matchingSessions[0].lessonPlanId);
+      }
+    }
+
+    setSearchParams(nextParams);
+  }
+
+  function changeContext(): void {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('context');
+    nextParams.delete('plan');
     setSearchParams(nextParams);
   }
 
@@ -657,11 +899,12 @@ export function PlanningEditorRoute() {
     <section className="page">
       <header className="page-header">
         <div>
-          <p className="page-eyebrow">Phase 3C-4</p>
+          <p className="page-eyebrow">Phase 3C-6B</p>
           <h1>Planning</h1>
           <p>
-            Create reusable teaching content, then keep it unscheduled or place it on{' '}
-            {formatLongDate(initialDate)}.
+            {snapshot.planningOccurrence
+              ? `Plan the ${snapshot.planningOccurrence.block.title} occurrence on ${formatLongDate(initialDate)} without hard-binding its suggested learner context.`
+              : `Create reusable teaching content, then keep it unscheduled or place it on ${formatLongDate(initialDate)}.`}
           </p>
         </div>
       </header>
@@ -672,6 +915,8 @@ export function PlanningEditorRoute() {
             contexts={snapshot.contexts}
             date={initialDate}
             returnTo={returnTo}
+            planningOccurrence={snapshot.planningOccurrence}
+            suggestedContextId={snapshot.planningOccurrence?.block.contextId}
             onSelect={selectContext}
           />
         ) : (
@@ -685,10 +930,14 @@ export function PlanningEditorRoute() {
         )
       ) : (
         <PlanningEditorForm
-          key={snapshot.plan?.id ?? `new-${snapshot.context.id}-${initialDate}`}
+          key={
+            snapshot.plan?.id ??
+            `new-${snapshot.context.id}-${initialDate}-${snapshot.planningOccurrence?.block.id ?? 'free'}`
+          }
           snapshot={snapshot}
           initialDate={initialDate}
           returnTo={returnTo}
+          onChangeContext={snapshot.planningOccurrence ? changeContext : undefined}
         />
       )}
     </section>

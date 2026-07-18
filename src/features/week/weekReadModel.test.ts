@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CalendarEvent, ScheduleBlock } from '@/domain/models/entities';
+import type {
+  CalendarEvent,
+  LessonPlan,
+  ScheduleBlock,
+  SessionOccurrence,
+} from '@/domain/models/entities';
 
 import { buildWeekReadModel, getWeekRange, shiftWeek, type WeekViewFilter } from './weekReadModel';
 
@@ -117,6 +122,56 @@ describe('week read model', () => {
     expect(teachingDay?.items).toHaveLength(1);
     expect(teachingDay?.items[0]?.sourceType).toBe('schedule-block');
     expect(teaching.hiddenDuplicateCount).toBe(0);
+  });
+
+  it('attaches a scheduled Session to its Schedule occurrence instead of rendering a second item', () => {
+    const plan: LessonPlan = {
+      id: 'attached-plan',
+      contextId: 'context',
+      title: 'Attached lesson',
+      subject: 'Language',
+      workflowState: 'ready',
+      preferredScheduleBlockId: 'schedule-block',
+      createdAt: '2026-07-01T12:00:00.000Z',
+      updatedAt: '2026-07-01T12:00:00.000Z',
+    };
+    const session: SessionOccurrence = {
+      id: 'attached-session',
+      lessonPlanId: plan.id,
+      contextId: 'context',
+      scheduleBlockId: 'schedule-block',
+      date: '2026-07-15',
+      startMinute: 540,
+      endMinute: 600,
+      deliveryState: 'scheduled',
+    };
+
+    const model = buildWeekReadModel(
+      '2026-07-15',
+      [scheduleBlock()],
+      [],
+      'everything',
+      '2026-07-15',
+      [plan],
+      [session],
+    );
+    const selectedDay = model.days.find((day) => day.date === '2026-07-15');
+
+    expect(selectedDay?.items).toHaveLength(1);
+    expect(selectedDay?.items[0]).toMatchObject({
+      sourceType: 'schedule-block',
+      planningEnabled: true,
+      attachedSessions: [
+        {
+          sessionId: 'attached-session',
+          lessonPlanId: 'attached-plan',
+          title: 'Attached lesson',
+          contextId: 'context',
+          deliveryState: 'scheduled',
+        },
+      ],
+    });
+    expect(model.sourceSessionOccurrenceCount).toBe(1);
   });
 
   it('separates calendar and personal agenda filters', () => {

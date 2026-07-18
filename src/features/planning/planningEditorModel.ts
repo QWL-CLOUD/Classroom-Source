@@ -65,6 +65,17 @@ export interface SessionEditorValues extends LessonContentEditorValues {
   contentMode: 'inherit' | 'custom';
 }
 
+export const scheduleOccurrencePlanningTargetSchema = z.object({
+  scheduleBlockId: z.string().min(1, 'Choose a schedule block occurrence.'),
+  date: z
+    .string()
+    .refine((value) => Boolean(parseLocalDate(value)), 'Choose a valid schedule occurrence date.'),
+});
+
+export type ScheduleOccurrencePlanningTarget = z.infer<
+  typeof scheduleOccurrencePlanningTargetSchema
+>;
+
 export type LessonPlanEditableFields = Pick<
   LessonPlan,
   | 'title'
