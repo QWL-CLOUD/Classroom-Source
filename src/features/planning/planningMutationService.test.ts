@@ -385,6 +385,121 @@ describe('planning mutation service', () => {
     });
   });
 
+  it('creates one Plan and Session for a Schedule occurrence as one undoable command', async () => {
+    await database.scheduleExceptions.put({
+      id: 'occurrence-adjustment',
+      date: '2026-07-17',
+      scheduleBlockId: 'block',
+      action: 'modify',
+      replacementStartMinute: 600,
+      replacementEndMinute: 675,
+    });
+
+    const result = await service.createPlanForScheduleOccurrence(
+      'context',
+      {
+        ...createLessonPlanEditorValues(),
+        title: 'Occurrence-first lesson',
+        subject: 'Language',
+        workflowState: 'ready',
+      },
+      { scheduleBlockId: 'block', date: '2026-07-17' },
+    );
+
+    expect(result.created).toBe(true);
+    expect(result.plan).toMatchObject({
+      contextId: 'context',
+      preferredScheduleBlockId: 'block',
+      title: 'Occurrence-first lesson',
+    });
+    expect(result.session).toMatchObject({
+      lessonPlanId: result.plan.id,
+      contextId: 'context',
+      scheduleBlockId: 'block',
+      date: '2026-07-17',
+      startMinute: 600,
+      endMinute: 675,
+      deliveryState: 'scheduled',
+    });
+    expect(await database.lessonPlans.count()).toBe(1);
+    expect(await database.sessionOccurrences.count()).toBe(1);
+    expect(await database.changeLog.count()).toBe(1);
+
+    await history.undo();
+    expect(await database.lessonPlans.count()).toBe(0);
+    expect(await database.sessionOccurrences.count()).toBe(0);
+
+    await history.redo();
+    expect(await database.lessonPlans.get(result.plan.id)).toMatchObject({
+      title: 'Occurrence-first lesson',
+    });
+    expect(await database.sessionOccurrences.get(result.session.id)).toMatchObject({
+      date: '2026-07-17',
+      startMinute: 600,
+      endMinute: 675,
+    });
+  });
+
+  it('opens the existing Plan instead of duplicating the same occurrence and context', async () => {
+    const first = await service.createPlanForScheduleOccurrence(
+      'context',
+      {
+        ...createLessonPlanEditorValues(),
+        title: 'Original occurrence plan',
+      },
+      { scheduleBlockId: 'block', date: '2026-07-17' },
+    );
+    const repeated = await service.createPlanForScheduleOccurrence(
+      'context',
+      {
+        ...createLessonPlanEditorValues(),
+        title: 'Duplicate attempt',
+      },
+      { scheduleBlockId: 'block', date: '2026-07-17' },
+    );
+
+    expect(repeated).toMatchObject({
+      created: false,
+      plan: { id: first.plan.id, title: 'Original occurrence plan' },
+      session: { id: first.session.id },
+    });
+    expect(await database.lessonPlans.count()).toBe(1);
+    expect(await database.sessionOccurrences.count()).toBe(1);
+    expect(await database.changeLog.count()).toBe(1);
+  });
+
+  it('allows a different active context to use the same Schedule occurrence', async () => {
+    await database.learnerContexts.put({
+      id: 'group-context',
+      kind: 'group',
+      name: 'Synthetic group',
+      schoolYearId: 'year',
+      status: 'active',
+    });
+
+    const classResult = await service.createPlanForScheduleOccurrence(
+      'context',
+      { ...createLessonPlanEditorValues(), title: 'Class occurrence plan' },
+      { scheduleBlockId: 'block', date: '2026-07-17' },
+    );
+    const groupResult = await service.createPlanForScheduleOccurrence(
+      'group-context',
+      { ...createLessonPlanEditorValues(), title: 'Group occurrence plan' },
+      { scheduleBlockId: 'block', date: '2026-07-17' },
+    );
+
+    expect(classResult.created).toBe(true);
+    expect(groupResult.created).toBe(true);
+    expect(groupResult.plan.contextId).toBe('group-context');
+    expect(groupResult.session).toMatchObject({
+      contextId: 'group-context',
+      scheduleBlockId: 'block',
+      date: '2026-07-17',
+    });
+    expect(await database.lessonPlans.count()).toBe(2);
+    expect(await database.sessionOccurrences.count()).toBe(2);
+  });
+
   it('does not overwrite an existing plan when a generated ID collides', async () => {
     const collisionService = new PlanningMutationService(database, {
       createId: () => 'fixed-plan-id',

@@ -226,3 +226,76 @@
 .deleteImpact p {
   margin: 4px 0 0;
 }
+
+.occurrenceSummary {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: -4px 0 20px;
+  padding: 14px;
+  border: 1px solid #a9bba9;
+  border-radius: 12px;
+  color: #355145;
+  background: #f0f6f1;
+}
+
+.occurrenceSummary > div {
+  display: grid;
+  flex: 1;
+  gap: 3px;
+  min-width: 0;
+}
+
+.occurrenceSummary strong {
+  color: var(--heading);
+  font-size: 15px;
+}
+
+.occurrenceSummary span {
+  color: #4f5955;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.occurrenceSummary p {
+  margin: 3px 0 0;
+  color: #4f5955;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.contextOccurrence {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #a9bba9;
+  border-radius: 11px;
+  color: #355145;
+  background: #f0f6f1;
+}
+
+.contextOccurrence > div {
+  display: grid;
+  gap: 2px;
+}
+
+.contextOccurrence strong {
+  color: var(--heading);
+}
+
+.contextOccurrence span {
+  color: #4f5955;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (max-width: 680px) {
+  .occurrenceSummary {
+    flex-wrap: wrap;
+  }
+
+  .occurrenceSummary .button {
+    width: 100%;
+  }
+}

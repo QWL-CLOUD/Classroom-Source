@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CalendarEvent, ScheduleBlock } from '@/domain/models/entities';
+import type {
+  CalendarEvent,
+  LessonPlan,
+  ScheduleBlock,
+  SessionOccurrence,
+} from '@/domain/models/entities';
 
 import { buildTodayReadModel } from './todayReadModel';
 
@@ -238,5 +243,53 @@ describe('Today read model', () => {
     expect(
       buildTodayReadModel('2026-07-15', [], [event], '2026-07-15', 300).timelineItems,
     ).toHaveLength(1);
+  });
+
+  it('shows Session content inside the matching Schedule occurrence card', () => {
+    const plan: LessonPlan = {
+      id: 'today-attached-plan',
+      contextId: 'context',
+      title: 'Today attached lesson',
+      subject: 'Language',
+      workflowState: 'ready',
+      preferredScheduleBlockId: 'schedule-block',
+      createdAt: '2026-07-01T12:00:00.000Z',
+      updatedAt: '2026-07-01T12:00:00.000Z',
+    };
+    const session: SessionOccurrence = {
+      id: 'today-attached-session',
+      lessonPlanId: plan.id,
+      contextId: 'context',
+      scheduleBlockId: 'schedule-block',
+      date: '2026-07-15',
+      startMinute: 540,
+      endMinute: 600,
+      deliveryState: 'scheduled',
+    };
+
+    const model = buildTodayReadModel(
+      '2026-07-15',
+      [scheduleBlock()],
+      [],
+      '2026-07-15',
+      500,
+      [],
+      [plan],
+      [session],
+    );
+
+    expect(model.timelineItems).toHaveLength(1);
+    expect(model.timelineItems[0]).toMatchObject({
+      sourceType: 'schedule-block',
+      planningEnabled: true,
+      attachedSessions: [
+        {
+          sessionId: 'today-attached-session',
+          title: 'Today attached lesson',
+          contextId: 'context',
+        },
+      ],
+    });
+    expect(model.sourceSessionOccurrenceCount).toBe(1);
   });
 });

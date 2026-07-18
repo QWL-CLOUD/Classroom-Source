@@ -19,6 +19,13 @@ describe('planning navigation', () => {
         contextId: 'context',
       }),
     ).toBe('#/planning/edit?date=2026-07-18&return=week&context=context');
+    expect(
+      buildPlanningEntryHref({
+        date: '2026-07-17',
+        returnTo: 'today',
+        scheduleBlockId: 'block',
+      }),
+    ).toBe('#/planning/edit?date=2026-07-17&return=today&block=block');
   });
 
   it('preserves the selected date when scheduling and returning to a source surface', () => {
@@ -45,6 +52,15 @@ describe('planning navigation', () => {
         focusSessionId: 'session',
       }),
     ).toContain('focus=session-occurrence%3Asession');
+    expect(
+      buildPlanningSurfaceHref({
+        returnTo: 'week',
+        date: '2026-07-17',
+        contextId: 'context',
+        focusSessionId: 'session',
+        focusOccurrenceId: 'schedule-block:block:2026-07-17',
+      }),
+    ).toContain('focus=schedule-block%3Ablock%3A2026-07-17');
   });
 
   it('rejects unknown return targets by falling back to Learners', () => {

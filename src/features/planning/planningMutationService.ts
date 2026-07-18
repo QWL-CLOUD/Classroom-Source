@@ -32,8 +32,10 @@ import {
 import {
   parseLessonPlanEditorValues,
   parseSessionEditorValues,
+  scheduleOccurrencePlanningTargetSchema,
   type LessonPlanEditorValues,
   type LessonSeriesAssignment,
+  type ScheduleOccurrencePlanningTarget,
   type SessionEditorValues,
 } from './planningEditorModel';
 import {
@@ -56,6 +58,12 @@ export type LessonSeriesMoveDirection = 'earlier' | 'later';
 
 export interface DeleteLessonPlanOptions {
   includeSessions?: boolean;
+}
+
+export interface CreatePlanForScheduleOccurrenceResult {
+  plan: LessonPlan;
+  session: SessionOccurrence;
+  created: boolean;
 }
 
 function compareSeriesPlans(first: LessonPlan, second: LessonPlan): number {
@@ -157,6 +165,158 @@ export class PlanningMutationService {
       },
     );
     this.notifyNewChange(result.log);
+    return result.value;
+  }
+
+  async createPlanForScheduleOccurrence(
+    contextId: string,
+    values: LessonPlanEditorValues,
+    input: ScheduleOccurrencePlanningTarget,
+  ): Promise<CreatePlanForScheduleOccurrenceResult> {
+    const parsed = parseLessonPlanEditorValues(values);
+    const target = scheduleOccurrencePlanningTargetSchema.parse(input);
+    const result = await this.db.transaction(
+      'rw',
+      [
+        this.db.learnerContexts,
+        this.db.lessonSeries,
+        this.db.lessonPlans,
+        this.db.sessionOccurrences,
+        this.db.scheduleBlocks,
+        this.db.scheduleExceptions,
+        this.db.changeLog,
+      ],
+      async (): Promise<
+        | CommitResult<CreatePlanForScheduleOccurrenceResult>
+        | { value: CreatePlanForScheduleOccurrenceResult; log: null }
+      > => {
+        const contextValue = await this.db.learnerContexts.get(contextId);
+        if (!contextValue) throw new Error('Learner context no longer exists.');
+        const context = learnerContextSchema.parse(contextValue);
+        if (context.status !== 'active') {
+          throw new Error('Restore this learner context before planning a schedule occurrence.');
+        }
+
+        const blockValue = await this.db.scheduleBlocks.get(target.scheduleBlockId);
+        if (!blockValue) throw new Error('The selected schedule block no longer exists.');
+        const scheduleBlock = scheduleBlockSchema.parse(blockValue);
+        if (
+          scheduleBlock.archivedAt ||
+          scheduleBlock.kind !== 'teachable' ||
+          !scheduleBlock.planningEnabled
+        ) {
+          throw new Error('This schedule block is not eligible for lesson planning.');
+        }
+
+        const exceptions = (
+          await this.db.scheduleExceptions.where('date').equals(target.date).toArray()
+        ).map((value) => scheduleExceptionSchema.parse(value));
+        const occurrence = resolveScheduleOccurrence(scheduleBlock, target.date, exceptions);
+        if (!occurrence) {
+          throw new Error('The selected schedule block does not occur on this date.');
+        }
+
+        const matchingSessions = (
+          await this.db.sessionOccurrences.where('contextId').equals(contextId).toArray()
+        )
+          .map((value) => sessionOccurrenceSchema.parse(value))
+          .filter(
+            (session) =>
+              session.scheduleBlockId === target.scheduleBlockId &&
+              session.date === target.date &&
+              session.deliveryState !== 'cancelled',
+          )
+          .sort((first, second) => first.id.localeCompare(second.id));
+        if (matchingSessions.length > 1) {
+          throw new Error(
+            'Multiple sessions already use this schedule occurrence and learner context.',
+          );
+        }
+        const existingSession = matchingSessions[0];
+        if (existingSession) {
+          const existingPlan = await this.requirePlan(existingSession.lessonPlanId);
+          return {
+            value: { plan: existingPlan, session: existingSession, created: false },
+            log: null,
+          };
+        }
+
+        const timestamp = this.now();
+        const planId = this.createId();
+        if (await this.db.lessonPlans.get(planId)) {
+          throw new Error('Lesson plan ID already exists.');
+        }
+        const sessionId = this.createId();
+        if (await this.db.sessionOccurrences.get(sessionId)) {
+          throw new Error('Session ID already exists.');
+        }
+        const assignment = await this.resolveSeriesAssignment(
+          contextId,
+          parsed.series,
+          parsed.fields.subject,
+        );
+        const existingSeriesPlans = assignment.seriesId
+          ? await this.listSeriesPlans(assignment.seriesId, contextId)
+          : [];
+        const normalizedSeriesPlans = existingSeriesPlans.map((plan, index) =>
+          lessonPlanSchema.parse({
+            ...plan,
+            sequence: index,
+            updatedAt: plan.sequence === index ? plan.updatedAt : timestamp,
+          }),
+        );
+        const plan = lessonPlanSchema.parse({
+          id: planId,
+          contextId,
+          ...parsed.fields,
+          preferredScheduleBlockId: scheduleBlock.id,
+          seriesId: assignment.seriesId,
+          sequence: assignment.seriesId ? normalizedSeriesPlans.length : undefined,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        });
+        const session = sessionOccurrenceSchema.parse({
+          id: sessionId,
+          lessonPlanId: plan.id,
+          contextId,
+          scheduleBlockId: scheduleBlock.id,
+          date: target.date,
+          startMinute: occurrence.block.startMinute,
+          endMinute: occurrence.block.endMinute,
+          deliveryState: 'scheduled',
+        });
+        const commands: PlanningCommandPair = {
+          forward: createPlanningCommand([
+            ...(assignment.createdSeries
+              ? [putLessonSeriesOperation(assignment.createdSeries)]
+              : []),
+            ...normalizedSeriesPlans.map(putLessonPlanOperation),
+            putLessonPlanOperation(plan),
+            putSessionOperation(session),
+          ]),
+          inverse: createPlanningCommand([
+            deleteSessionOperation(session.id),
+            deleteLessonPlanOperation(plan.id),
+            ...existingSeriesPlans.map(putLessonPlanOperation),
+            ...(assignment.createdSeries
+              ? [deleteLessonSeriesOperation(assignment.createdSeries.id)]
+              : []),
+          ]),
+        };
+        const log = this.createChangeLog(
+          'planning.schedule-occurrence.create',
+          `Plan “${plan.title}” in “${occurrence.block.title}”`,
+          commands,
+        );
+
+        await clearSupportedRedoBranch(this.db);
+        await this.applyOperations(commands.forward.operations);
+        await this.db.changeLog.put(log);
+        return { value: { plan, session, created: true }, log };
+      },
+    );
+
+    if (result.log) this.notifyNewChange(result.log);
     return result.value;
   }
 

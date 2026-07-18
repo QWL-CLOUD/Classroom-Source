@@ -31,6 +31,14 @@ export interface WeekRange {
   dates: string[];
 }
 
+export interface WeekAttachedSession {
+  sessionId: string;
+  lessonPlanId: string;
+  title: string;
+  contextId: string;
+  deliveryState: SessionOccurrence['deliveryState'];
+}
+
 export interface WeekDayItem {
   occurrenceId: string;
   sourceRecordId: string;
@@ -44,7 +52,9 @@ export interface WeekDayItem {
   startMinute?: number;
   endMinute?: number;
   kind?: ScheduleBlock['kind'];
+  planningEnabled?: boolean;
   deliveryState?: SessionOccurrence['deliveryState'];
+  attachedSessions: WeekAttachedSession[];
   parentTitle?: string;
   spanPosition: WeekSpanPosition;
   sortOrder: number;
@@ -144,6 +154,8 @@ function toScheduleItem(
     startMinute: block.startMinute,
     endMinute: block.endMinute,
     kind: block.kind,
+    planningEnabled: block.planningEnabled,
+    attachedSessions: [],
     parentTitle: parent?.title,
     spanPosition: 'single',
     sortOrder: block.sortOrder,
@@ -168,6 +180,7 @@ function toCalendarEventItem(event: CalendarEvent, date: string): WeekDayItem {
     endMinute: event.endMinute,
     spanPosition,
     sortOrder: 0,
+    attachedSessions: [],
   };
 }
 
@@ -192,6 +205,58 @@ function toSessionItem(
     deliveryState: session.deliveryState,
     spanPosition: 'single',
     sortOrder: 0,
+    attachedSessions: [],
+  };
+}
+
+function attachSessionsToScheduleItems(
+  scheduleItems: readonly WeekDayItem[],
+  sessions: readonly SessionOccurrence[],
+  lessonPlanById: ReadonlyMap<string, LessonPlan>,
+): { scheduleItems: WeekDayItem[]; standaloneSessionItems: WeekDayItem[] } {
+  const scheduleByBlockId = new Map<string, WeekDayItem>(
+    scheduleItems
+      .filter((item) => item.sourceType === 'schedule-block')
+      .map(
+        (item) =>
+          [item.sourceRecordId, { ...item, attachedSessions: [...item.attachedSessions] }] as [
+            string,
+            WeekDayItem,
+          ],
+      ),
+  );
+  const standaloneSessionItems: WeekDayItem[] = [];
+
+  for (const session of sessions) {
+    const scheduleItem = session.scheduleBlockId
+      ? scheduleByBlockId.get(session.scheduleBlockId)
+      : undefined;
+    const plan = lessonPlanById.get(session.lessonPlanId);
+    if (!scheduleItem) {
+      standaloneSessionItems.push(toSessionItem(session, lessonPlanById));
+      continue;
+    }
+    scheduleItem.attachedSessions.push({
+      sessionId: session.id,
+      lessonPlanId: session.lessonPlanId,
+      title: plan?.title ?? 'Planned session',
+      contextId: session.contextId,
+      deliveryState: session.deliveryState,
+    });
+  }
+
+  for (const item of scheduleByBlockId.values()) {
+    item.attachedSessions.sort(
+      (first, second) =>
+        first.contextId.localeCompare(second.contextId) ||
+        first.title.localeCompare(second.title) ||
+        first.sessionId.localeCompare(second.sessionId),
+    );
+  }
+
+  return {
+    scheduleItems: scheduleItems.map((item) => scheduleByBlockId.get(item.sourceRecordId) ?? item),
+    standaloneSessionItems,
   };
 }
 
@@ -234,7 +299,12 @@ function removeExactDatedDuplicates(items: readonly WeekDayItem[]): {
 
   let hiddenDuplicateCount = 0;
   const deduplicated = items.filter((item) => {
-    if (item.sourceType !== 'schedule-block' || item.kind === 'container') return true;
+    if (
+      item.sourceType !== 'schedule-block' ||
+      item.kind === 'container' ||
+      item.attachedSessions.length > 0
+    )
+      return true;
     const signature = duplicateSignature(item);
     if (!signature || !datedEventSignatures.has(signature)) return true;
     hiddenDuplicateCount += 1;
@@ -330,16 +400,17 @@ export function buildWeekReadModel(
         return toCalendarEventItem(event, date);
       });
 
-    const sessionItems = sessionOccurrences
-      .filter((session) => session.date === date && session.deliveryState !== 'cancelled')
-      .map((session) => {
-        visibleSessionOccurrenceIds.add(session.id);
-        return toSessionItem(session, lessonPlanById);
-      });
-
-    const filteredItems = [...scheduleItems, ...eventItems, ...sessionItems].filter((item) =>
-      itemMatchesView(item, viewFilter),
+    const visibleSessions = sessionOccurrences.filter(
+      (session) => session.date === date && session.deliveryState !== 'cancelled',
     );
+    visibleSessions.forEach((session) => visibleSessionOccurrenceIds.add(session.id));
+    const attached = attachSessionsToScheduleItems(scheduleItems, visibleSessions, lessonPlanById);
+
+    const filteredItems = [
+      ...attached.scheduleItems,
+      ...eventItems,
+      ...attached.standaloneSessionItems,
+    ].filter((item) => itemMatchesView(item, viewFilter));
     const deduplicated = removeExactDatedDuplicates(filteredItems);
     hiddenDuplicateCount += deduplicated.hiddenDuplicateCount;
 
