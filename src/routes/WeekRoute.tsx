@@ -64,6 +64,7 @@ export function WeekRoute() {
   const weekView = queryWeekView ?? storedWeekView;
   const focusId = searchParams.get('focus');
   const itemRefs = useRef(new Map<string, HTMLLIElement>());
+  const handledFocusKeyRef = useRef<string | null>(null);
 
   const range = useMemo(() => getWeekRange(date), [date]);
   const previousRange = useMemo(() => getWeekRange(shiftWeek(date, -1)), [date]);
@@ -124,7 +125,15 @@ export function WeekRoute() {
   }, [focusId, setShowWeekends, showWeekends, week]);
 
   useEffect(() => {
-    if (!focusId || !week) return;
+    if (!focusId) {
+      handledFocusKeyRef.current = null;
+      return;
+    }
+    if (!week) return;
+
+    const focusKey = `${date}:${focusId}`;
+    if (handledFocusKeyRef.current === focusKey) return;
+
     const frame = window.requestAnimationFrame(() => {
       const target = itemRefs.current.get(focusId);
       if (!target) return;
@@ -134,9 +143,10 @@ export function WeekRoute() {
         inline: 'center',
       });
       target.focus({ preventScroll: true });
+      handledFocusKeyRef.current = focusKey;
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [focusId, showWeekends, week]);
+  }, [date, focusId, showWeekends, week]);
 
   function navigateToDate(nextDate: string): void {
     const nextParams = new URLSearchParams(searchParams);

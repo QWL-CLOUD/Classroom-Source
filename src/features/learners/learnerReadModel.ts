@@ -245,8 +245,21 @@ export function buildLearnersPageReadModel(
       )
       .map((session) => session.lessonPlanId),
   );
-  const upcomingItems = snapshot.sessions
-    .filter((session) => session.deliveryState === 'scheduled' && session.date >= anchorDate)
+  const scheduledSessions = snapshot.sessions.filter(
+    (session) => session.deliveryState === 'scheduled',
+  );
+  const visibleSeriesIds = new Set(
+    scheduledSessions
+      .filter((session) => session.date >= anchorDate)
+      .map((session) => lessonPlanById.get(session.lessonPlanId)?.seriesId)
+      .filter((seriesId): seriesId is string => Boolean(seriesId)),
+  );
+  const upcomingItems = scheduledSessions
+    .filter((session) => {
+      if (session.date >= anchorDate) return true;
+      const seriesId = lessonPlanById.get(session.lessonPlanId)?.seriesId;
+      return Boolean(seriesId && visibleSeriesIds.has(seriesId));
+    })
     .sort(compareUpcomingSessions)
     .map((session) => sessionToPlanningItem(session, lessonPlanById, seriesMetadataByPlanId));
   const completedItems = snapshot.sessions
