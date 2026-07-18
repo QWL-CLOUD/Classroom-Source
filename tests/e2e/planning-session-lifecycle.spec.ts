@@ -522,7 +522,7 @@ test('Lesson series preserves one ordered plan sequence with undoable reordering
 test('Scheduled lesson reordering swaps occupied session slots and remains undoable', async ({
   page,
 }) => {
-  await page.goto('./#/learners?date=2026-07-17');
+  await page.goto('./#/learners?date=2026-07-18');
   await seed(page);
   await seedScheduledReorderScenario(page);
   await page.reload();
@@ -530,6 +530,7 @@ test('Scheduled lesson reordering swaps occupied session slots and remains undoa
   const planning = page.getByRole('region', {
     name: 'Planning for Synthetic planning class',
   });
+  await expect(page.getByLabel('From')).toHaveValue('2026-07-18');
   const lessonA = planning.getByLabel('Reorder lesson A, Scheduled');
   const lessonB = planning.getByLabel('Reorder lesson B, Scheduled');
   await expect(lessonA.getByText('Friday, July 17, 2026')).toBeVisible();

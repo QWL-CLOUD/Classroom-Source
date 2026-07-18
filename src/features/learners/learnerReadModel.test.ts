@@ -130,6 +130,42 @@ describe('buildLearnersPageReadModel', () => {
     });
   });
 
+  it('keeps a visible scheduled lesson series intact across the From boundary', () => {
+    const series = {
+      id: 'series-boundary',
+      contextId: 'class-context',
+      title: 'Boundary Unit',
+      subject: 'Synthetic subject',
+    };
+    const first = {
+      ...lessonPlan('plan-before', 'Before From lesson', 'ready', '2026-07-10T12:00:00.000Z'),
+      seriesId: series.id,
+      sequence: 0,
+    };
+    const second = {
+      ...lessonPlan('plan-after', 'After From lesson', 'ready', '2026-07-10T12:00:00.000Z'),
+      seriesId: series.id,
+      sequence: 1,
+    };
+
+    const model = buildLearnersPageReadModel(
+      snapshot(
+        [first, second],
+        [
+          session('session-before', first.id, '2026-07-17', 'scheduled'),
+          session('session-after', second.id, '2026-07-24', 'scheduled'),
+        ],
+        [series],
+      ),
+      '2026-07-18',
+    );
+
+    expect(model.upcomingItems.map((item) => item.title)).toEqual([
+      'Before From lesson',
+      'After From lesson',
+    ]);
+  });
+
   it('summarizes inherited and customized lesson flow on planning cards', () => {
     const plan = {
       ...lessonPlan('plan-flow', 'Flow lesson', 'ready', '2026-07-10T12:00:00.000Z'),
