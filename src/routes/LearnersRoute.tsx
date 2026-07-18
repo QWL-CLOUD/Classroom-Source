@@ -16,6 +16,7 @@ import { useSearchParams } from 'react-router-dom';
 import type { LearnerContext } from '@/domain/models/entities';
 import type { LearnerPlanningView } from '@/domain/readModels/learnerReadModels';
 import type { LearnerPlanningItem } from '@/features/learners/learnerReadModel';
+import { formatLessonSeriesPositionLabel } from '@/features/planning/lessonSeriesPresentation';
 import {
   buildLearnersPageReadModel,
   getLearnerKindLabel,
@@ -83,8 +84,9 @@ function PlanningItemCard({ item }: { item: LearnerPlanningItem }) {
         {item.seriesTitle && item.seriesPositionLabel ? (
           <p className={styles.seriesSummary}>
             <Layers3 aria-hidden="true" size={15} />
-            <strong>{item.seriesTitle}</strong>
-            <span>{item.seriesPositionLabel}</span>
+            <span>
+              {formatLessonSeriesPositionLabel(item.seriesPositionLabel, item.seriesTitle)}
+            </span>
           </p>
         ) : null}
         {item.contentSummary ? (
