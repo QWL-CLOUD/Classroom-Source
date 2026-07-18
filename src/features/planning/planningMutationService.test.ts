@@ -294,4 +294,89 @@ describe('planning mutation service', () => {
       deliveryState: 'scheduled',
     });
   });
+
+  it('previews and commits one atomic series bump across schedule exceptions', async () => {
+    await database.scheduleBlocks.update('block', {
+      bumpEnabled: true,
+      effectiveFrom: '2026-07-01',
+      effectiveTo: '2026-08-31',
+    });
+    await database.scheduleExceptions.bulkPut([
+      {
+        id: 'cancel-friday',
+        date: '2026-07-24',
+        scheduleBlockId: 'block',
+        action: 'cancel',
+      },
+      {
+        id: 'add-saturday',
+        date: '2026-07-25',
+        scheduleBlockId: 'block',
+        action: 'add',
+        replacementStartMinute: 600,
+        replacementEndMinute: 660,
+      },
+    ]);
+
+    const firstPlan = await service.createPlan('context', {
+      ...createLessonPlanEditorValues('block'),
+      title: 'Bump lesson one',
+      workflowState: 'ready',
+      seriesMode: 'new',
+      newSeriesTitle: 'Bump unit',
+    });
+    const series = (await database.lessonSeries.toArray())[0]!;
+    const secondPlan = await service.createPlan('context', {
+      ...createLessonPlanEditorValues('block'),
+      title: 'Bump lesson two',
+      workflowState: 'ready',
+      seriesMode: 'existing',
+      seriesId: series.id,
+    });
+    const firstSession = await service.schedulePlan(
+      firstPlan.id,
+      createSessionEditorValues('2026-07-17', 'block'),
+    );
+    const secondSession = await service.schedulePlan(
+      secondPlan.id,
+      createSessionEditorValues('2026-07-31', 'block'),
+    );
+
+    const preview = await service.previewSeriesBump(firstSession.id);
+    expect(preview.canCommit).toBe(true);
+    expect(preview.items).toMatchObject([
+      { sessionId: firstSession.id, fromDate: '2026-07-17', toDate: '2026-07-25' },
+      { sessionId: secondSession.id, fromDate: '2026-07-31', toDate: '2026-08-07' },
+    ]);
+
+    await service.bumpSeries(firstSession.id, preview.previewToken);
+    expect(await database.sessionOccurrences.get(firstSession.id)).toMatchObject({
+      date: '2026-07-25',
+      startMinute: 600,
+      endMinute: 660,
+    });
+    expect(await database.sessionOccurrences.get(secondSession.id)).toMatchObject({
+      date: '2026-08-07',
+      startMinute: 540,
+      endMinute: 600,
+    });
+
+    await history.undo();
+    expect(await database.sessionOccurrences.get(firstSession.id)).toMatchObject({
+      date: '2026-07-17',
+      startMinute: 540,
+      endMinute: 600,
+    });
+    expect(await database.sessionOccurrences.get(secondSession.id)).toMatchObject({
+      date: '2026-07-31',
+    });
+
+    await history.redo();
+    expect(await database.sessionOccurrences.get(firstSession.id)).toMatchObject({
+      date: '2026-07-25',
+    });
+    expect(await database.sessionOccurrences.get(secondSession.id)).toMatchObject({
+      date: '2026-08-07',
+    });
+  });
 });

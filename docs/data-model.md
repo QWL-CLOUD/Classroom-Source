@@ -44,3 +44,16 @@ Dexie schema-version change because no new index is needed.
 
 A Friday block is not a special rendering branch. It is a normal schedule block with `weekdays: [5]`.
 All local dates use `YYYY-MM-DD`; clock values are integer minutes after midnight.
+
+## Lesson Series Bump foundation
+
+Phase 3C-3B keeps Bump metadata out of the database schema. A Bump is computed from existing
+Lesson Series order, scheduled Session occurrences, one bump-enabled Schedule Block, and its dated
+Schedule Exceptions. The dry-run preview shifts each scheduled Session from the selected lesson
+onward to that Session's next valid occurrence. Cancelled dates are skipped; added and modified
+occurrences supply their effective date and time.
+
+The commit revalidates the preview inside one Dexie transaction, refuses stale previews or occupied
+target Schedule Block dates, and stores all Session replacements in one Planning change-log command.
+Global Undo/Redo therefore restores or reapplies the entire shift atomically. Cross-context,
+cross-block, parent-subtree, and automatic collision cascading remain out of scope.
