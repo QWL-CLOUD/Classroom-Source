@@ -495,3 +495,64 @@
   background: #eee8f7;
   font-size: 10px;
 }
+
+.deleteNotice {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 5px 12px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 11px 12px;
+  border: 1px solid #d39a91;
+  border-radius: 10px;
+  color: #6e302b;
+  background: #fff0ed;
+}
+
+.deleteNotice strong,
+.deleteNotice span {
+  grid-column: 1;
+}
+
+.deleteNotice button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.deleteConfirmButton {
+  min-height: 40px;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border: 1px solid #a94d45;
+  border-radius: 10px;
+  color: #fff;
+  background: #8f3f38;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.deleteError {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px solid #d39a91;
+  border-radius: 10px;
+  color: #6e302b;
+  background: #fff0ed;
+}
+
+@media (max-width: 620px) {
+  .deleteNotice {
+    grid-template-columns: 1fr;
+  }
+
+  .deleteNotice button,
+  .deleteNotice strong,
+  .deleteNotice span {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}

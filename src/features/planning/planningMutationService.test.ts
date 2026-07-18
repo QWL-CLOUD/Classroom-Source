@@ -461,4 +461,47 @@ describe('planning mutation service', () => {
       date: '2026-08-07',
     });
   });
+
+  it('deletes a plan with linked sessions as one reversible compound change', async () => {
+    const first = await service.createPlan('context', {
+      ...createLessonPlanEditorValues('block'),
+      title: 'Delete lesson one',
+      seriesMode: 'new',
+      newSeriesTitle: 'Delete unit',
+    });
+    const series = (await database.lessonSeries.toArray())[0]!;
+    const second = await service.createPlan('context', {
+      ...createLessonPlanEditorValues('block'),
+      title: 'Delete lesson two',
+      seriesMode: 'existing',
+      seriesId: series.id,
+    });
+    const session = await service.schedulePlan(
+      first.id,
+      createSessionEditorValues('2026-07-17', 'block'),
+    );
+
+    await expect(service.deletePlan(first.id)).rejects.toThrow(
+      'Remove the scheduled session before deleting this plan',
+    );
+
+    await service.deletePlan(first.id, { includeSessions: true });
+    expect(await database.lessonPlans.get(first.id)).toBeUndefined();
+    expect(await database.sessionOccurrences.get(session.id)).toBeUndefined();
+    expect(await database.lessonPlans.get(second.id)).toMatchObject({ sequence: 0 });
+
+    await history.undo();
+    expect(await database.lessonPlans.get(first.id)).toMatchObject({ sequence: 0 });
+    expect(await database.lessonPlans.get(second.id)).toMatchObject({ sequence: 1 });
+    expect(await database.sessionOccurrences.get(session.id)).toMatchObject({
+      lessonPlanId: first.id,
+      date: '2026-07-17',
+      deliveryState: 'scheduled',
+    });
+
+    await history.redo();
+    expect(await database.lessonPlans.get(first.id)).toBeUndefined();
+    expect(await database.sessionOccurrences.get(session.id)).toBeUndefined();
+    expect(await database.lessonPlans.get(second.id)).toMatchObject({ sequence: 0 });
+  });
 });

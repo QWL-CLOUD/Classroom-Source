@@ -488,3 +488,13 @@
   outline-offset: 3px;
   border-radius: 4px;
 }
+
+.addButton {
+  text-decoration: none;
+}
+
+.addButton:hover,
+.addButton:focus-visible {
+  color: var(--accent-strong);
+  background: #e4eee8;
+}

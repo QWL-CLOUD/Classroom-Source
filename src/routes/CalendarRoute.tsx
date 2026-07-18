@@ -1,5 +1,6 @@
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { useMemo } from 'react';
+import { buildPlanningEntryHref } from '@/features/planning/planningNavigation';
 import {
   buildScheduleBlockHierarchyMetadata,
   type ScheduleBlockHierarchyMetadata,
@@ -224,6 +225,13 @@ export function CalendarRoute() {
                         {day.dayNumber}
                       </time>
                       {day.isToday ? <span className={styles.todayLabel}>Today</span> : null}
+                      <a
+                        className={styles.dayAddButton}
+                        href={buildPlanningEntryHref({ date: day.date, returnTo: 'calendar' })}
+                        aria-label={`Add lesson plan to ${day.label}`}
+                      >
+                        <Plus aria-hidden="true" size={16} />
+                      </a>
                     </header>
 
                     {day.items.length > 0 ? (
@@ -292,7 +300,7 @@ export function CalendarRoute() {
                             {item.sourceType === 'session-occurrence' ? (
                               <a
                                 className={styles.occurrenceEdit}
-                                href={`#/planning/session?session=${encodeURIComponent(item.sourceRecordId)}`}
+                                href={`#/planning/session?session=${encodeURIComponent(item.sourceRecordId)}&date=${day.date}&return=calendar`}
                                 aria-label={`Manage ${item.title} session`}
                               >
                                 Manage session

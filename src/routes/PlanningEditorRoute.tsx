@@ -6,10 +6,11 @@ import {
   ListOrdered,
   Save,
   Trash2,
+  Users,
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { ZodError } from 'zod';
 
 import { classroomDb } from '@/data/db/ClassroomDatabase';
@@ -18,6 +19,7 @@ import {
   lessonPlanSchema,
   lessonSeriesSchema,
   scheduleBlockSchema,
+  schoolYearSchema,
   sessionOccurrenceSchema,
   type LearnerContext,
   type LessonPlan,
@@ -27,6 +29,12 @@ import {
 } from '@/domain/models/entities';
 import { LessonFlowEditor } from '@/features/planning/LessonFlowEditor';
 import { formatLessonSeriesPositionLabel } from '@/features/planning/lessonSeriesPresentation';
+import {
+  buildPlanningSurfaceHref,
+  buildSessionEditorHref,
+  parsePlanningReturnTarget,
+  type PlanningReturnTarget,
+} from '@/features/planning/planningNavigation';
 import {
   createLessonPlanEditorValues,
   toLessonPlanEditorValues,
@@ -38,9 +46,12 @@ import {
   type PlanningMutationService,
 } from '@/features/planning/planningMutationService';
 
+import { formatLongDate, parseLocalDate, todayLocalDate } from '@/shared/dates/localDate';
+
 import styles from './PlanningEditorRoute.module.css';
 
 interface PlanningEditorSnapshot {
+  contexts: LearnerContext[];
   context: LearnerContext | null;
   plan: LessonPlan | null;
   sessions: SessionOccurrence[];
@@ -69,12 +80,15 @@ function learnerHref(
 
 function PlanningEditorForm({
   snapshot,
+  initialDate,
+  returnTo,
   service = planningMutationService,
 }: {
   snapshot: PlanningEditorSnapshot;
+  initialDate: string;
+  returnTo: PlanningReturnTarget;
   service?: PlanningMutationService;
 }) {
-  const navigate = useNavigate();
   const { context, plan, sessions, contextSessions, scheduleBlocks, lessonSeries, seriesPlans } =
     snapshot;
   const [values, setValues] = useState<LessonPlanEditorValues>(() =>
@@ -99,9 +113,18 @@ function PlanningEditorForm({
   const learnerDate = learnerView === 'upcoming' ? activeSession?.date : undefined;
   const [returnDate, setReturnDate] = useState<string | undefined>(() => learnerDate);
   const learnerReturnDate = learnerView === 'upcoming' ? returnDate : undefined;
-
   if (!context) return null;
   const selectedContext = context;
+  const surfaceDate = activeSession?.date ?? initialDate;
+  const backHref =
+    returnTo === 'learners'
+      ? learnerHref(selectedContext.id, learnerView, learnerReturnDate)
+      : buildPlanningSurfaceHref({
+          returnTo,
+          date: surfaceDate,
+          contextId: selectedContext.id,
+          focusSessionId: activeSession?.id,
+        });
 
   const seriesChoice =
     values.seriesMode === 'new'
@@ -192,7 +215,11 @@ function PlanningEditorForm({
         ? await service.updatePlan(plan.id, values)
         : await service.createPlan(selectedContext.id, values);
       if (scheduleAfterSave) {
-        navigate(`/planning/session?plan=${encodeURIComponent(saved.id)}`);
+        window.location.hash = buildSessionEditorHref({
+          planId: saved.id,
+          date: initialDate,
+          returnTo,
+        });
       } else {
         window.location.hash = learnerHref(selectedContext.id, learnerView, learnerReturnDate);
       }
@@ -211,8 +238,15 @@ function PlanningEditorForm({
     setSaving(true);
     setError(null);
     try {
-      await service.deletePlan(plan.id);
-      window.location.hash = learnerHref(selectedContext.id, 'unscheduled');
+      await service.deletePlan(plan.id, { includeSessions: true });
+      window.location.hash =
+        returnTo === 'learners'
+          ? learnerHref(selectedContext.id, 'unscheduled')
+          : buildPlanningSurfaceHref({
+              returnTo,
+              date: surfaceDate,
+              contextId: selectedContext.id,
+            });
     } catch (cause) {
       setError(getErrorMessage(cause));
       setSaving(false);
@@ -227,11 +261,11 @@ function PlanningEditorForm({
           <h2>{plan ? 'Edit plan' : 'New plan'}</h2>
           <p>{selectedContext.name}</p>
         </div>
-        <a
-          className="button"
-          href={learnerHref(selectedContext.id, learnerView, learnerReturnDate)}
-        >
-          <ArrowLeft aria-hidden="true" size={17} /> Back to Learners
+        <a className="button" href={backHref}>
+          <ArrowLeft aria-hidden="true" size={17} />
+          {returnTo === 'learners'
+            ? 'Back to Learners'
+            : `Back to ${returnTo === 'today' ? 'Today' : returnTo === 'week' ? 'Week' : 'Calendar'}`}
         </a>
       </div>
 
@@ -371,6 +405,21 @@ function PlanningEditorForm({
         </p>
       ) : null}
 
+      {deleteArmed && plan ? (
+        <div className={styles.deleteImpact} role="alert">
+          <Trash2 aria-hidden="true" size={18} />
+          <div>
+            <strong>Delete “{plan.title}”?</strong>
+            <p>
+              {sessions.length > 0
+                ? `This also removes ${sessions.length} linked session${sessions.length === 1 ? '' : 's'} from Today, Week, Calendar, and Learners.`
+                : 'This removes the planning item from Learners.'}{' '}
+              The entire deletion can be undone.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       {error ? (
         <p className={styles.errorMessage} role="alert">
           {error}
@@ -398,7 +447,7 @@ function PlanningEditorForm({
         ) : (
           <a
             className="button"
-            href={`#/planning/session?session=${encodeURIComponent(activeSession.id)}`}
+            href={`#/planning/session?session=${encodeURIComponent(activeSession.id)}&date=${surfaceDate}${returnTo === 'learners' ? '' : `&return=${returnTo}`}`}
           >
             <CalendarPlus aria-hidden="true" size={17} /> Manage session
           </a>
@@ -407,14 +456,15 @@ function PlanningEditorForm({
           <button
             className={deleteArmed ? styles.dangerButton : 'button'}
             type="button"
-            disabled={saving || sessions.length > 0}
-            title={
-              sessions.length > 0 ? 'Unschedule the session before deleting this plan.' : undefined
-            }
+            disabled={saving}
             onClick={() => void remove()}
           >
             <Trash2 aria-hidden="true" size={17} />
-            {deleteArmed ? 'Confirm delete' : 'Delete plan'}
+            {deleteArmed
+              ? sessions.length > 0
+                ? 'Confirm delete plan and sessions'
+                : 'Confirm delete plan'
+              : 'Delete plan'}
           </button>
         ) : null}
       </div>
@@ -422,12 +472,88 @@ function PlanningEditorForm({
   );
 }
 
+function PlanningContextPicker({
+  contexts,
+  date,
+  onSelect,
+  returnTo,
+}: {
+  contexts: LearnerContext[];
+  date: string;
+  onSelect: (contextId: string) => void;
+  returnTo: PlanningReturnTarget;
+}) {
+  const [contextId, setContextId] = useState(contexts[0]?.id ?? '');
+
+  return (
+    <section className={`card ${styles.contextPicker}`} aria-labelledby="planning-context-heading">
+      <div>
+        <Users aria-hidden="true" size={22} />
+        <div>
+          <p className="page-eyebrow">Planning destination</p>
+          <h2 id="planning-context-heading">Choose who this lesson is for</h2>
+          <p>
+            {returnTo === 'learners'
+              ? 'Select a Class, Group, or Individual before creating the planning item.'
+              : `The session date will start on ${formatLongDate(date)} if you choose Save and schedule.`}
+          </p>
+        </div>
+      </div>
+      <label>
+        <span>Learner context</span>
+        <select value={contextId} onChange={(event) => setContextId(event.target.value)}>
+          {contexts.map((context) => (
+            <option key={context.id} value={context.id}>
+              {context.name} ·{' '}
+              {context.kind === 'class'
+                ? 'Class'
+                : context.kind === 'group'
+                  ? 'Group'
+                  : 'Individual'}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button
+        className="button button-primary"
+        type="button"
+        disabled={!contextId}
+        onClick={() => onSelect(contextId)}
+      >
+        Continue to plan
+      </button>
+    </section>
+  );
+}
+
 export function PlanningEditorRoute() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const requestedContextId = searchParams.get('context');
   const planId = searchParams.get('plan');
+  const requestedDate = searchParams.get('date');
+  const initialDate = parseLocalDate(requestedDate) ? requestedDate! : todayLocalDate();
+  const returnTo = parsePlanningReturnTarget(searchParams.get('return'));
 
   const snapshot = useLiveQuery(async (): Promise<PlanningEditorSnapshot> => {
+    const activeSchoolYearIds = new Set(
+      (await classroomDb.schoolYears.toArray())
+        .map((value) => schoolYearSchema.parse(value))
+        .filter((value) => value.active)
+        .map((value) => value.id),
+    );
+    const contexts = (await classroomDb.learnerContexts.toArray())
+      .map((value) => learnerContextSchema.parse(value))
+      .filter(
+        (value) =>
+          value.status === 'active' &&
+          (activeSchoolYearIds.size === 0 || activeSchoolYearIds.has(value.schoolYearId)),
+      )
+      .sort(
+        (first, second) =>
+          first.kind.localeCompare(second.kind) ||
+          first.name.localeCompare(second.name) ||
+          first.id.localeCompare(second.id),
+      );
     const planValue = planId ? await classroomDb.lessonPlans.get(planId) : undefined;
     const plan = planValue ? lessonPlanSchema.parse(planValue) : null;
     const contextId = plan?.contextId ?? requestedContextId;
@@ -471,6 +597,7 @@ export function PlanningEditorRoute() {
       : [];
 
     return {
+      contexts,
       context,
       plan,
       sessions,
@@ -489,7 +616,7 @@ export function PlanningEditorRoute() {
     );
   }
 
-  if (!snapshot.context || (planId && !snapshot.plan)) {
+  if ((planId && !snapshot.plan) || (requestedContextId && !snapshot.context)) {
     return (
       <div className={`card ${styles.errorPanel}`} role="alert">
         <h1>Planning item unavailable</h1>
@@ -501,19 +628,50 @@ export function PlanningEditorRoute() {
     );
   }
 
+  function selectContext(contextId: string): void {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('context', contextId);
+    setSearchParams(nextParams);
+  }
+
   return (
     <section className="page">
       <header className="page-header">
         <div>
-          <p className="page-eyebrow">Phase 3C-3</p>
+          <p className="page-eyebrow">Phase 3C-4</p>
           <h1>Planning</h1>
-          <p>Create reusable teaching content before assigning a date and time.</p>
+          <p>
+            Create reusable teaching content, then keep it unscheduled or place it on{' '}
+            {formatLongDate(initialDate)}.
+          </p>
         </div>
       </header>
-      <PlanningEditorForm
-        key={snapshot.plan?.id ?? `new-${snapshot.context.id}`}
-        snapshot={snapshot}
-      />
+
+      {!snapshot.context ? (
+        snapshot.contexts.length > 0 ? (
+          <PlanningContextPicker
+            contexts={snapshot.contexts}
+            date={initialDate}
+            returnTo={returnTo}
+            onSelect={selectContext}
+          />
+        ) : (
+          <div className={`card ${styles.errorPanel}`} role="alert">
+            <h2>No active learner contexts</h2>
+            <p>Create or import a Class, Group, or Individual before adding a lesson plan.</p>
+            <a className="button" href="#/learners">
+              Back to Learners
+            </a>
+          </div>
+        )
+      ) : (
+        <PlanningEditorForm
+          key={snapshot.plan?.id ?? `new-${snapshot.context.id}-${initialDate}`}
+          snapshot={snapshot}
+          initialDate={initialDate}
+          returnTo={returnTo}
+        />
+      )}
     </section>
   );
 }
