@@ -15,6 +15,7 @@ function createRepository(overrides: Partial<ClassroomRepository> = {}): Classro
     listScheduleBlocksForRange: vi.fn().mockResolvedValue([]),
     listCalendarEventsForRange: vi.fn().mockResolvedValue([]),
     listLearnerContexts: vi.fn().mockResolvedValue([]),
+    listLessonSeries: vi.fn().mockResolvedValue([]),
     listLessonPlans: vi.fn().mockResolvedValue([]),
     listSessionOccurrences: vi.fn().mockResolvedValue([]),
     countQuarantineRecords: vi.fn().mockResolvedValue(0),
@@ -73,11 +74,13 @@ describe('loadLearnersReadSnapshot', () => {
       },
     ];
     const listLearnerContexts = vi.fn().mockResolvedValue(contexts);
+    const listLessonSeries = vi.fn().mockResolvedValue([]);
     const listLessonPlans = vi.fn().mockResolvedValue([]);
     const listSessionOccurrences = vi.fn().mockResolvedValue([]);
     const repository = createRepository({
       getActiveSchoolYear: vi.fn().mockResolvedValue(schoolYear),
       listLearnerContexts,
+      listLessonSeries,
       listLessonPlans,
       listSessionOccurrences,
     });
@@ -88,6 +91,9 @@ describe('loadLearnersReadSnapshot', () => {
       schoolYearId: 'school-year-current',
     });
     expect(result.selectedContext?.id).toBe('group-context');
+    expect(listLessonSeries).toHaveBeenCalledWith({
+      contextId: 'group-context',
+    });
     expect(listLessonPlans).toHaveBeenCalledWith({
       contextId: 'group-context',
     });
@@ -115,6 +121,7 @@ describe('loadLearnersReadSnapshot', () => {
     expect(fallback.selectedContext?.id).toBe('first-context');
     expect(empty).toMatchObject({
       selectedContext: null,
+      lessonSeries: [],
       lessonPlans: [],
       sessions: [],
     });

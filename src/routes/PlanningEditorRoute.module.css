@@ -66,6 +66,44 @@
   grid-column: 1 / -1;
 }
 
+.seriesPosition {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18px;
+  padding: 13px 14px;
+  border: 1px solid #a9bba9;
+  border-radius: 12px;
+  color: #355145;
+  background: #f0f6f1;
+}
+
+.seriesPosition > div,
+.seriesActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  align-items: center;
+}
+
+.seriesPosition p {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+
+.seriesPosition span {
+  color: #4f5955;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.seriesActions {
+  justify-content: flex-end;
+}
+
 .notice,
 .errorMessage {
   margin: 16px 0 0;

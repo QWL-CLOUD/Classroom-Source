@@ -249,3 +249,72 @@ test('Lesson flow inherits into a session, supports an override, and can return 
       .join('\n'),
   ).toEqual([]);
 });
+
+test('Lesson series preserves one ordered plan sequence with undoable reordering', async ({
+  page,
+}) => {
+  await page.goto('./#/learners?date=2026-07-17');
+  await seed(page);
+  await page.reload();
+
+  const planning = page.getByRole('region', {
+    name: 'Planning for Synthetic planning class',
+  });
+  await planning.getByRole('link', { name: 'New plan' }).click();
+  await page.getByLabel('Title').fill('Series lesson one');
+  await page.getByLabel('Lesson series').selectOption('__new__');
+  await page.getByLabel('New series title').fill('Synthetic lesson series');
+  await page.getByRole('button', { name: 'Save plan' }).click();
+
+  const unscheduled = page.getByRole('region', {
+    name: 'Planning for Synthetic planning class',
+  });
+  await unscheduled.getByRole('tab', { name: /Unscheduled/ }).click();
+  await unscheduled.getByRole('link', { name: 'New plan' }).click();
+  await page.getByLabel('Title').fill('Series lesson two');
+  await page.getByLabel('Lesson series').selectOption({ label: 'Synthetic lesson series' });
+  await page.getByRole('button', { name: 'Save plan' }).click();
+
+  const seriesPlanning = page.getByRole('region', {
+    name: 'Planning for Synthetic planning class',
+  });
+  const firstCard = seriesPlanning.getByLabel('Series lesson one, Draft');
+  const secondCard = seriesPlanning.getByLabel('Series lesson two, Draft');
+  await expect(firstCard.getByText('Synthetic lesson series')).toBeVisible();
+  await expect(firstCard.getByText('Lesson 1 of 2')).toBeVisible();
+  await expect(secondCard.getByText('Lesson 2 of 2')).toBeVisible();
+
+  await secondCard.getByRole('link', { name: 'Edit plan' }).click();
+  const seriesPosition = page.getByRole('region', { name: 'Lesson series position' });
+  await expect(seriesPosition.getByText('Lesson 2 of 2')).toBeVisible();
+  await seriesPosition.getByRole('button', { name: 'Move earlier' }).click();
+  await expect(seriesPosition.getByText('Lesson 1 of 2')).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Learners' }).click();
+
+  const reorderedPlanning = page.getByRole('region', {
+    name: 'Planning for Synthetic planning class',
+  });
+  await reorderedPlanning.getByRole('tab', { name: /Unscheduled/ }).click();
+  await expect(
+    reorderedPlanning.getByLabel('Series lesson two, Draft').getByText('Lesson 1 of 2'),
+  ).toBeVisible();
+  await expect(
+    reorderedPlanning.getByLabel('Series lesson one, Draft').getByText('Lesson 2 of 2'),
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(
+    reorderedPlanning.getByLabel('Series lesson one, Draft').getByText('Lesson 1 of 2'),
+  ).toBeVisible();
+  await expect(
+    reorderedPlanning.getByLabel('Series lesson two, Draft').getByText('Lesson 2 of 2'),
+  ).toBeVisible();
+
+  const accessibilityResults = await new AxeBuilder({ page }).analyze();
+  expect(
+    accessibilityResults.violations,
+    accessibilityResults.violations
+      .map((violation) => `${violation.id}: ${violation.help}`)
+      .join('\n'),
+  ).toEqual([]);
+});

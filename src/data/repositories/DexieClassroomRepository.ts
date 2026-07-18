@@ -3,6 +3,7 @@ import {
   calendarEventSchema,
   learnerContextSchema,
   lessonPlanSchema,
+  lessonSeriesSchema,
   scheduleBlockSchema,
   scheduleExceptionSchema,
   schoolYearSchema,
@@ -11,6 +12,7 @@ import {
   type CalendarEvent,
   type LearnerContext,
   type LessonPlan,
+  type LessonSeries,
   type ScheduleBlock,
   type ScheduleException,
   type SchoolYear,
@@ -19,6 +21,7 @@ import {
 } from '@/domain/models/entities';
 import type {
   LessonPlanQuery,
+  LessonSeriesQuery,
   SessionOccurrenceQuery,
 } from '@/domain/readModels/learnerReadModels';
 import type {
@@ -217,6 +220,19 @@ export class DexieClassroomRepository implements ClassroomRepository {
           (!query.kind || context.kind === query.kind),
       )
       .sort(compareLearnerContexts);
+  }
+
+  async listLessonSeries(query: LessonSeriesQuery = {}): Promise<LessonSeries[]> {
+    const sourceRecords = query.contextId
+      ? await this.db.lessonSeries.where('contextId').equals(query.contextId).toArray()
+      : await this.db.lessonSeries.toArray();
+    return sourceRecords
+      .map((value) => lessonSeriesSchema.parse(value))
+      .filter((series) => !query.contextId || series.contextId === query.contextId)
+      .sort(
+        (first, second) =>
+          compareText(first.title, second.title) || first.id.localeCompare(second.id),
+      );
   }
 
   async listLessonPlans(query: LessonPlanQuery = {}): Promise<LessonPlan[]> {

@@ -35,6 +35,7 @@
 .dateControls label,
 .planningActions,
 .itemActions,
+.seriesSummary,
 .sessionTime,
 .unscheduledNote {
   display: flex;
@@ -456,6 +457,25 @@
   .itemActions > * {
     width: 100%;
   }
+}
+
+.seriesSummary {
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 11px 0 0;
+  color: #355145;
+  font-size: 12px;
+}
+
+.seriesSummary strong {
+  color: var(--heading);
+}
+
+.seriesSummary span {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #eef5f0;
+  font-weight: 800;
 }
 
 .contentSummary {

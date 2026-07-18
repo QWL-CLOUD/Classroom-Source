@@ -2,13 +2,27 @@ import { z } from 'zod';
 
 import {
   lessonPlanSchema,
+  lessonSeriesSchema,
   sessionOccurrenceSchema,
   type ChangeLog,
   type LessonPlan,
+  type LessonSeries,
   type SessionOccurrence,
 } from '@/domain/models/entities';
 
 export const PLANNING_COMMAND_PREFIX = 'planning.';
+
+const putLessonSeriesOperationSchema = z.object({
+  table: z.literal('lessonSeries'),
+  action: z.literal('put'),
+  record: lessonSeriesSchema,
+});
+
+const deleteLessonSeriesOperationSchema = z.object({
+  table: z.literal('lessonSeries'),
+  action: z.literal('delete'),
+  id: z.string().min(1),
+});
 
 const putLessonPlanOperationSchema = z.object({
   table: z.literal('lessonPlans'),
@@ -35,6 +49,8 @@ const deleteSessionOperationSchema = z.object({
 });
 
 export const planningOperationSchema = z.union([
+  putLessonSeriesOperationSchema,
+  deleteLessonSeriesOperationSchema,
   putLessonPlanOperationSchema,
   deleteLessonPlanOperationSchema,
   putSessionOperationSchema,
@@ -51,6 +67,22 @@ export type PlanningCommand = z.infer<typeof planningCommandSchema>;
 export interface PlanningCommandPair {
   forward: PlanningCommand;
   inverse: PlanningCommand;
+}
+
+export function putLessonSeriesOperation(record: LessonSeries): PlanningOperation {
+  return planningOperationSchema.parse({
+    table: 'lessonSeries',
+    action: 'put',
+    record,
+  });
+}
+
+export function deleteLessonSeriesOperation(id: string): PlanningOperation {
+  return planningOperationSchema.parse({
+    table: 'lessonSeries',
+    action: 'delete',
+    id,
+  });
 }
 
 export function putLessonPlanOperation(record: LessonPlan): PlanningOperation {

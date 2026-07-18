@@ -80,6 +80,13 @@ function PlanningItemCard({ item }: { item: LearnerPlanningItem }) {
         </div>
 
         {item.subject ? <p className={styles.subject}>{item.subject}</p> : null}
+        {item.seriesTitle && item.seriesPositionLabel ? (
+          <p className={styles.seriesSummary}>
+            <Layers3 aria-hidden="true" size={15} />
+            <strong>{item.seriesTitle}</strong>
+            <span>{item.seriesPositionLabel}</span>
+          </p>
+        ) : null}
         {item.contentSummary ? (
           <p className={styles.contentSummary}>
             <BookOpen aria-hidden="true" size={15} />

@@ -2,6 +2,7 @@ import type {
   CalendarEvent,
   LearnerContext,
   LessonPlan,
+  LessonSeries,
   ScheduleBlock,
   SchoolYear,
   SessionOccurrence,
@@ -9,6 +10,7 @@ import type {
 } from '@/domain/models/entities';
 import type {
   LessonPlanQuery,
+  LessonSeriesQuery,
   SessionOccurrenceQuery,
 } from '@/domain/readModels/learnerReadModels';
 import type {
@@ -27,6 +29,7 @@ export interface ClassroomRepository {
   listScheduleBlocksForRange(range: LocalDateRange): Promise<ScheduleBlock[]>;
   listCalendarEventsForRange(range: LocalDateRange): Promise<CalendarEvent[]>;
   listLearnerContexts(query?: LearnerContextQuery): Promise<LearnerContext[]>;
+  listLessonSeries(query?: LessonSeriesQuery): Promise<LessonSeries[]>;
   listLessonPlans(query?: LessonPlanQuery): Promise<LessonPlan[]>;
   listSessionOccurrences(query?: SessionOccurrenceQuery): Promise<SessionOccurrence[]>;
   countQuarantineRecords(): Promise<number>;
