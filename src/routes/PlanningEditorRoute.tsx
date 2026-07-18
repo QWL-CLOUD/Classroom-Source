@@ -44,6 +44,7 @@ interface PlanningEditorSnapshot {
   context: LearnerContext | null;
   plan: LessonPlan | null;
   sessions: SessionOccurrence[];
+  contextSessions: SessionOccurrence[];
   scheduleBlocks: ScheduleBlock[];
   lessonSeries: LessonSeries[];
   seriesPlans: LessonPlan[];
@@ -74,7 +75,8 @@ function PlanningEditorForm({
   service?: PlanningMutationService;
 }) {
   const navigate = useNavigate();
-  const { context, plan, sessions, scheduleBlocks, lessonSeries, seriesPlans } = snapshot;
+  const { context, plan, sessions, contextSessions, scheduleBlocks, lessonSeries, seriesPlans } =
+    snapshot;
   const [values, setValues] = useState<LessonPlanEditorValues>(() =>
     plan
       ? toLessonPlanEditorValues(plan)
@@ -85,10 +87,6 @@ function PlanningEditorForm({
   const [saving, setSaving] = useState(false);
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (!context) return null;
-  const selectedContext = context;
-
   const activeSession = sessions.find(
     (session) => session.deliveryState === 'scheduled' || session.deliveryState === 'completed',
   );
@@ -99,6 +97,11 @@ function PlanningEditorForm({
         ? 'upcoming'
         : 'unscheduled';
   const learnerDate = learnerView === 'upcoming' ? activeSession?.date : undefined;
+  const [returnDate, setReturnDate] = useState<string | undefined>(() => learnerDate);
+  const learnerReturnDate = learnerView === 'upcoming' ? returnDate : undefined;
+
+  if (!context) return null;
+  const selectedContext = context;
 
   const seriesChoice =
     values.seriesMode === 'new'
@@ -157,10 +160,22 @@ function PlanningEditorForm({
 
   async function moveWithinSeries(direction: 'earlier' | 'later'): Promise<void> {
     if (!plan || saving) return;
+    const targetIndex = direction === 'earlier' ? currentSeriesIndex - 1 : currentSeriesIndex + 1;
+    const targetPlan = currentSeriesPlans[targetIndex];
+    const targetSession = targetPlan
+      ? contextSessions.find(
+          (session) =>
+            session.lessonPlanId === targetPlan.id && session.deliveryState === 'scheduled',
+        )
+      : undefined;
+    const earliestAffectedDate = [activeSession?.date, targetSession?.date]
+      .filter((date): date is string => Boolean(date))
+      .sort()[0];
     setSaving(true);
     setError(null);
     try {
       await service.movePlanWithinSeries(plan.id, direction);
+      if (earliestAffectedDate) setReturnDate(earliestAffectedDate);
       setSaving(false);
     } catch (cause) {
       setError(getErrorMessage(cause));
@@ -179,7 +194,7 @@ function PlanningEditorForm({
       if (scheduleAfterSave) {
         navigate(`/planning/session?plan=${encodeURIComponent(saved.id)}`);
       } else {
-        window.location.hash = learnerHref(selectedContext.id, learnerView, learnerDate);
+        window.location.hash = learnerHref(selectedContext.id, learnerView, learnerReturnDate);
       }
     } catch (cause) {
       setError(getErrorMessage(cause));
@@ -212,7 +227,10 @@ function PlanningEditorForm({
           <h2>{plan ? 'Edit plan' : 'New plan'}</h2>
           <p>{selectedContext.name}</p>
         </div>
-        <a className="button" href={learnerHref(selectedContext.id, learnerView, learnerDate)}>
+        <a
+          className="button"
+          href={learnerHref(selectedContext.id, learnerView, learnerReturnDate)}
+        >
           <ArrowLeft aria-hidden="true" size={17} /> Back to Learners
         </a>
       </div>
@@ -446,8 +464,21 @@ export function PlanningEditorRoute() {
           (value) => lessonPlanSchema.parse(value),
         )
       : [];
+    const contextSessions = contextId
+      ? (await classroomDb.sessionOccurrences.where('contextId').equals(contextId).toArray()).map(
+          (value) => sessionOccurrenceSchema.parse(value),
+        )
+      : [];
 
-    return { context, plan, sessions, scheduleBlocks, lessonSeries, seriesPlans };
+    return {
+      context,
+      plan,
+      sessions,
+      contextSessions,
+      scheduleBlocks,
+      lessonSeries,
+      seriesPlans,
+    };
   }, [planId, requestedContextId]);
 
   if (snapshot === undefined) {
