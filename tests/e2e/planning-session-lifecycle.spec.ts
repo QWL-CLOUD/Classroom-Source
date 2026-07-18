@@ -167,6 +167,90 @@ async function seedBumpScenario(page: Page): Promise<void> {
   });
 }
 
+async function seedScheduledReorderScenario(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('classroom-v20');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+
+    const values = {
+      lessonSeries: [
+        {
+          id: 'phase-3c-reorder-series',
+          contextId: 'phase-3c-context',
+          title: 'Synthetic reorder unit',
+          subject: 'Language',
+        },
+      ],
+      lessonPlans: [
+        {
+          id: 'phase-3c-reorder-plan-a',
+          contextId: 'phase-3c-context',
+          title: 'Reorder lesson A',
+          subject: 'Language',
+          workflowState: 'ready',
+          seriesId: 'phase-3c-reorder-series',
+          sequence: 0,
+          preferredScheduleBlockId: 'phase-3c-block',
+          createdAt: '2026-07-01T12:00:00.000Z',
+          updatedAt: '2026-07-01T12:00:00.000Z',
+        },
+        {
+          id: 'phase-3c-reorder-plan-b',
+          contextId: 'phase-3c-context',
+          title: 'Reorder lesson B',
+          subject: 'Language',
+          workflowState: 'ready',
+          seriesId: 'phase-3c-reorder-series',
+          sequence: 1,
+          preferredScheduleBlockId: 'phase-3c-block',
+          createdAt: '2026-07-01T12:00:01.000Z',
+          updatedAt: '2026-07-01T12:00:01.000Z',
+        },
+      ],
+      sessionOccurrences: [
+        {
+          id: 'phase-3c-reorder-session-a',
+          lessonPlanId: 'phase-3c-reorder-plan-a',
+          contextId: 'phase-3c-context',
+          scheduleBlockId: 'phase-3c-block',
+          date: '2026-07-17',
+          startMinute: 540,
+          endMinute: 600,
+          deliveryState: 'scheduled',
+        },
+        {
+          id: 'phase-3c-reorder-session-b',
+          lessonPlanId: 'phase-3c-reorder-plan-b',
+          contextId: 'phase-3c-context',
+          scheduleBlockId: 'phase-3c-block',
+          date: '2026-07-24',
+          startMinute: 540,
+          endMinute: 600,
+          deliveryState: 'scheduled',
+        },
+      ],
+    };
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction(Object.keys(values), 'readwrite');
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error);
+        transaction.oncomplete = () => resolve();
+        for (const [storeName, storeValues] of Object.entries(values)) {
+          const store = transaction.objectStore(storeName);
+          for (const value of storeValues) store.put(value);
+        }
+      });
+    } finally {
+      database.close();
+    }
+  });
+}
+
 test('Planning item becomes one synchronized scheduled and completed session', async ({ page }) => {
   await page.goto('./#/learners?date=2026-07-10');
   await seed(page);
@@ -424,6 +508,106 @@ test('Lesson series preserves one ordered plan sequence with undoable reordering
     reorderedPlanning
       .getByLabel('Series lesson two, Draft')
       .getByText('Lesson 2 of 2 in “Synthetic lesson series”', { exact: true }),
+  ).toBeVisible();
+
+  const accessibilityResults = await new AxeBuilder({ page }).analyze();
+  expect(
+    accessibilityResults.violations,
+    accessibilityResults.violations
+      .map((violation) => `${violation.id}: ${violation.help}`)
+      .join('\n'),
+  ).toEqual([]);
+});
+
+test('Scheduled lesson reordering swaps occupied session slots and remains undoable', async ({
+  page,
+}) => {
+  await page.goto('./#/learners?date=2026-07-17');
+  await seed(page);
+  await seedScheduledReorderScenario(page);
+  await page.reload();
+
+  const planning = page.getByRole('region', {
+    name: 'Planning for Synthetic planning class',
+  });
+  const lessonA = planning.getByLabel('Reorder lesson A, Scheduled');
+  const lessonB = planning.getByLabel('Reorder lesson B, Scheduled');
+  await expect(lessonA.getByText('Friday, July 17, 2026')).toBeVisible();
+  await expect(
+    lessonA.getByText('Lesson 1 of 2 in “Synthetic reorder unit”', { exact: true }),
+  ).toBeVisible();
+  await expect(lessonB.getByText('Friday, July 24, 2026')).toBeVisible();
+
+  await lessonA.getByRole('link', { name: 'Edit plan' }).click();
+  const seriesPosition = page.getByRole('region', { name: 'Lesson series position' });
+  await seriesPosition.getByRole('button', { name: 'Move later' }).click();
+  await expect(
+    seriesPosition.getByText('Lesson 2 of 2 in “Synthetic reorder unit”', { exact: true }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Learners' }).click();
+
+  const reorderedPlanning = page.getByRole('region', {
+    name: 'Planning for Synthetic planning class',
+  });
+  await expect(
+    reorderedPlanning.getByLabel('Reorder lesson A, Scheduled').getByText('Friday, July 24, 2026'),
+  ).toBeVisible();
+  await expect(
+    reorderedPlanning
+      .getByLabel('Reorder lesson A, Scheduled')
+      .getByText('Lesson 2 of 2 in “Synthetic reorder unit”', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    reorderedPlanning.getByLabel('Reorder lesson B, Scheduled').getByText('Friday, July 17, 2026'),
+  ).toBeVisible();
+  await expect(
+    reorderedPlanning
+      .getByLabel('Reorder lesson B, Scheduled')
+      .getByText('Lesson 1 of 2 in “Synthetic reorder unit”', { exact: true }),
+  ).toBeVisible();
+
+  await page.goto('./#/today?date=2026-07-17');
+  await expect(
+    page
+      .locator('[data-today-item^="session-occurrence:"]')
+      .filter({ hasText: 'Reorder lesson B' }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator('[data-today-item^="session-occurrence:"]')
+      .filter({ hasText: 'Reorder lesson A' }),
+  ).toHaveCount(0);
+
+  await page.goto('./#/week?date=2026-07-24&view=everything');
+  await expect(
+    page.locator('[data-week-item^="session-occurrence:"]').filter({ hasText: 'Reorder lesson A' }),
+  ).toBeVisible();
+
+  await page.goto('./#/calendar?date=2026-07-17');
+  await expect(
+    page
+      .locator('[data-calendar-item^="session-occurrence:"]')
+      .filter({ hasText: 'Reorder lesson B' }),
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await page.goto('./#/learners?date=2026-07-17');
+  const restoredPlanning = page.getByRole('region', {
+    name: 'Planning for Synthetic planning class',
+  });
+  await expect(
+    restoredPlanning.getByLabel('Reorder lesson A, Scheduled').getByText('Friday, July 17, 2026'),
+  ).toBeVisible();
+  await expect(
+    restoredPlanning.getByLabel('Reorder lesson B, Scheduled').getByText('Friday, July 24, 2026'),
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(
+    restoredPlanning.getByLabel('Reorder lesson A, Scheduled').getByText('Friday, July 24, 2026'),
+  ).toBeVisible();
+  await expect(
+    restoredPlanning.getByLabel('Reorder lesson B, Scheduled').getByText('Friday, July 17, 2026'),
   ).toBeVisible();
 
   const accessibilityResults = await new AxeBuilder({ page }).analyze();

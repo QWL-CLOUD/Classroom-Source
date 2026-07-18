@@ -194,6 +194,88 @@ describe('planning mutation service', () => {
     ]);
   });
 
+  it('swaps scheduled session slots when reordering adjacent lessons and restores both through undo', async () => {
+    const first = await service.createPlan('context', {
+      ...createLessonPlanEditorValues('block'),
+      title: 'Scheduled lesson one',
+      seriesMode: 'new',
+      newSeriesTitle: 'Scheduled unit',
+    });
+    const series = (await database.lessonSeries.toArray())[0]!;
+    const second = await service.createPlan('context', {
+      ...createLessonPlanEditorValues('block'),
+      title: 'Scheduled lesson two',
+      seriesMode: 'existing',
+      seriesId: series.id,
+    });
+    const firstSession = await service.schedulePlan(
+      first.id,
+      createSessionEditorValues('2026-07-17', 'block'),
+    );
+    const secondSession = await service.schedulePlan(
+      second.id,
+      createSessionEditorValues('2026-07-24', 'block'),
+    );
+
+    await service.movePlanWithinSeries(first.id, 'later');
+
+    expect(await database.lessonPlans.get(first.id)).toMatchObject({ sequence: 1 });
+    expect(await database.lessonPlans.get(second.id)).toMatchObject({ sequence: 0 });
+    expect(await database.sessionOccurrences.get(firstSession.id)).toMatchObject({
+      date: '2026-07-24',
+      startMinute: 540,
+      endMinute: 600,
+      scheduleBlockId: 'block',
+    });
+    expect(await database.sessionOccurrences.get(secondSession.id)).toMatchObject({
+      date: '2026-07-17',
+      startMinute: 540,
+      endMinute: 600,
+      scheduleBlockId: 'block',
+    });
+
+    await history.undo();
+    expect(await database.lessonPlans.get(first.id)).toMatchObject({ sequence: 0 });
+    expect(await database.lessonPlans.get(second.id)).toMatchObject({ sequence: 1 });
+    expect(await database.sessionOccurrences.get(firstSession.id)).toMatchObject({
+      date: '2026-07-17',
+    });
+    expect(await database.sessionOccurrences.get(secondSession.id)).toMatchObject({
+      date: '2026-07-24',
+    });
+
+    await history.redo();
+    expect(await database.sessionOccurrences.get(firstSession.id)).toMatchObject({
+      date: '2026-07-24',
+    });
+    expect(await database.sessionOccurrences.get(secondSession.id)).toMatchObject({
+      date: '2026-07-17',
+    });
+  });
+
+  it('rejects reordering when only one adjacent lesson is scheduled', async () => {
+    const first = await service.createPlan('context', {
+      ...createLessonPlanEditorValues('block'),
+      title: 'Mixed lesson one',
+      seriesMode: 'new',
+      newSeriesTitle: 'Mixed unit',
+    });
+    const series = (await database.lessonSeries.toArray())[0]!;
+    const second = await service.createPlan('context', {
+      ...createLessonPlanEditorValues('block'),
+      title: 'Mixed lesson two',
+      seriesMode: 'existing',
+      seriesId: series.id,
+    });
+    await service.schedulePlan(first.id, createSessionEditorValues('2026-07-17', 'block'));
+
+    await expect(service.movePlanWithinSeries(first.id, 'later')).rejects.toThrow(
+      'Both adjacent lessons must either be scheduled or unscheduled',
+    );
+    expect(await database.lessonPlans.get(first.id)).toMatchObject({ sequence: 0 });
+    expect(await database.lessonPlans.get(second.id)).toMatchObject({ sequence: 1 });
+  });
+
   it('creates a new series atomically and removes it when the plan creation is undone', async () => {
     await service.createPlan('context', {
       ...createLessonPlanEditorValues(),

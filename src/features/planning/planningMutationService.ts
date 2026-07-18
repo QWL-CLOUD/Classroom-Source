@@ -320,6 +320,7 @@ export class PlanningMutationService {
       'rw',
       this.db.lessonSeries,
       this.db.lessonPlans,
+      this.db.sessionOccurrences,
       this.db.changeLog,
       async (): Promise<CommitResult<LessonPlan> | { value: LessonPlan; log: null }> => {
         const existing = await this.requirePlan(id);
@@ -340,6 +341,30 @@ export class PlanningMutationService {
           ordered[targetIndex]!,
           ordered[currentIndex]!,
         ];
+        const target = originals[targetIndex]!;
+        const existingSessions = await this.listActivePlanSessions(existing.id);
+        const targetSessions = await this.listActivePlanSessions(target.id);
+
+        if (
+          existingSessions.some((session) => session.deliveryState === 'completed') ||
+          targetSessions.some((session) => session.deliveryState === 'completed')
+        ) {
+          throw new Error('Completed lessons cannot be reordered. Reopen the session first.');
+        }
+
+        const existingSession = existingSessions.find(
+          (session) => session.deliveryState === 'scheduled',
+        );
+        const targetSession = targetSessions.find(
+          (session) => session.deliveryState === 'scheduled',
+        );
+
+        if (Boolean(existingSession) !== Boolean(targetSession)) {
+          throw new Error(
+            'Both adjacent lessons must either be scheduled or unscheduled before reordering.',
+          );
+        }
+
         const timestamp = this.now();
         const updatedPlans = ordered.map((plan, index) =>
           lessonPlanSchema.parse({
@@ -348,10 +373,37 @@ export class PlanningMutationService {
             updatedAt: plan.sequence === index ? plan.updatedAt : timestamp,
           }),
         );
+        const updatedSessions =
+          existingSession && targetSession
+            ? [
+                sessionOccurrenceSchema.parse({
+                  ...existingSession,
+                  scheduleBlockId: targetSession.scheduleBlockId,
+                  date: targetSession.date,
+                  startMinute: targetSession.startMinute,
+                  endMinute: targetSession.endMinute,
+                }),
+                sessionOccurrenceSchema.parse({
+                  ...targetSession,
+                  scheduleBlockId: existingSession.scheduleBlockId,
+                  date: existingSession.date,
+                  startMinute: existingSession.startMinute,
+                  endMinute: existingSession.endMinute,
+                }),
+              ]
+            : [];
         const moved = updatedPlans.find((plan) => plan.id === id)!;
         const commands: PlanningCommandPair = {
-          forward: createPlanningCommand(updatedPlans.map(putLessonPlanOperation)),
-          inverse: createPlanningCommand(originals.map(putLessonPlanOperation)),
+          forward: createPlanningCommand([
+            ...updatedPlans.map(putLessonPlanOperation),
+            ...updatedSessions.map(putSessionOperation),
+          ]),
+          inverse: createPlanningCommand([
+            ...originals.map(putLessonPlanOperation),
+            ...(existingSession && targetSession
+              ? [putSessionOperation(existingSession), putSessionOperation(targetSession)]
+              : []),
+          ]),
         };
         const log = this.createChangeLog(
           'planning.series.reorder',
@@ -368,6 +420,12 @@ export class PlanningMutationService {
 
     if (result.log) this.notifyNewChange(result.log);
     return result.value;
+  }
+
+  private async listActivePlanSessions(planId: string): Promise<SessionOccurrence[]> {
+    return (await this.db.sessionOccurrences.where('lessonPlanId').equals(planId).toArray())
+      .map((value) => sessionOccurrenceSchema.parse(value))
+      .filter((session) => session.deliveryState !== 'cancelled');
   }
 
   private async resolveSeriesAssignment(
