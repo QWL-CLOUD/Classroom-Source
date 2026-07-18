@@ -2,11 +2,13 @@ import { classroomDb, type ClassroomDatabase } from '@/data/db/ClassroomDatabase
 import {
   changeLogSchema,
   lessonPlanSchema,
+  lessonSeriesSchema,
   scheduleBlockSchema,
   scheduleExceptionSchema,
   sessionOccurrenceSchema,
   type ChangeLog,
   type LessonPlan,
+  type LessonSeries,
   type ScheduleException,
   type SessionOccurrence,
 } from '@/domain/models/entities';
@@ -17,8 +19,10 @@ import { resolveScheduleOccurrence } from '@/features/scheduleExceptions/schedul
 import {
   createPlanningCommand,
   deleteLessonPlanOperation,
+  deleteLessonSeriesOperation,
   deleteSessionOperation,
   putLessonPlanOperation,
+  putLessonSeriesOperation,
   putSessionOperation,
   serializePlanningCommand,
   type PlanningCommandPair,
@@ -28,6 +32,7 @@ import {
   parseLessonPlanEditorValues,
   parseSessionEditorValues,
   type LessonPlanEditorValues,
+  type LessonSeriesAssignment,
   type SessionEditorValues,
 } from './planningEditorModel';
 
@@ -39,6 +44,20 @@ export interface PlanningMutationDependencies {
 interface CommitResult<T> {
   value: T;
   log: ChangeLog;
+}
+
+export type LessonSeriesMoveDirection = 'earlier' | 'later';
+
+function compareSeriesPlans(first: LessonPlan, second: LessonPlan): number {
+  return (
+    (first.sequence ?? Number.MAX_SAFE_INTEGER) - (second.sequence ?? Number.MAX_SAFE_INTEGER) ||
+    first.createdAt.localeCompare(second.createdAt) ||
+    first.id.localeCompare(second.id)
+  );
+}
+
+function uniquePlans(plans: readonly LessonPlan[]): LessonPlan[] {
+  return [...new Map(plans.map((plan) => [plan.id, plan] as const)).values()];
 }
 
 export class PlanningMutationService {
@@ -54,32 +73,62 @@ export class PlanningMutationService {
   }
 
   async createPlan(contextId: string, values: LessonPlanEditorValues): Promise<LessonPlan> {
-    const fields = parseLessonPlanEditorValues(values);
-    const timestamp = this.now();
-    const record = lessonPlanSchema.parse({
-      id: this.createId(),
-      contextId,
-      ...fields,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    });
-
+    const parsed = parseLessonPlanEditorValues(values);
     const result = await this.db.transaction(
       'rw',
       this.db.learnerContexts,
+      this.db.lessonSeries,
       this.db.lessonPlans,
       this.db.sessionOccurrences,
       this.db.changeLog,
       async (): Promise<CommitResult<LessonPlan>> => {
         const context = await this.db.learnerContexts.get(contextId);
         if (!context) throw new Error('Learner context no longer exists.');
-        if (await this.db.lessonPlans.get(record.id)) {
+
+        const timestamp = this.now();
+        const planId = this.createId();
+        if (await this.db.lessonPlans.get(planId)) {
           throw new Error('Lesson plan ID already exists.');
         }
-
+        const assignment = await this.resolveSeriesAssignment(
+          contextId,
+          parsed.series,
+          parsed.fields.subject,
+        );
+        const existingSeriesPlans = assignment.seriesId
+          ? await this.listSeriesPlans(assignment.seriesId, contextId)
+          : [];
+        const normalizedSeriesPlans = existingSeriesPlans.map((plan, index) =>
+          lessonPlanSchema.parse({
+            ...plan,
+            sequence: index,
+            updatedAt: plan.sequence === index ? plan.updatedAt : timestamp,
+          }),
+        );
+        const record = lessonPlanSchema.parse({
+          id: planId,
+          contextId,
+          ...parsed.fields,
+          seriesId: assignment.seriesId,
+          sequence: assignment.seriesId ? normalizedSeriesPlans.length : undefined,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        });
+        const forwardOperations: PlanningOperation[] = [
+          ...(assignment.createdSeries ? [putLessonSeriesOperation(assignment.createdSeries)] : []),
+          ...normalizedSeriesPlans.map(putLessonPlanOperation),
+          putLessonPlanOperation(record),
+        ];
+        const inverseOperations: PlanningOperation[] = [
+          deleteLessonPlanOperation(record.id),
+          ...existingSeriesPlans.map(putLessonPlanOperation),
+          ...(assignment.createdSeries
+            ? [deleteLessonSeriesOperation(assignment.createdSeries.id)]
+            : []),
+        ];
         const commands: PlanningCommandPair = {
-          forward: createPlanningCommand([putLessonPlanOperation(record)]),
-          inverse: createPlanningCommand([deleteLessonPlanOperation(record.id)]),
+          forward: createPlanningCommand(forwardOperations),
+          inverse: createPlanningCommand(inverseOperations),
         };
         const log = this.createChangeLog(
           'planning.plan.create',
@@ -88,7 +137,7 @@ export class PlanningMutationService {
         );
 
         await clearSupportedRedoBranch(this.db);
-        await this.db.lessonPlans.add(record);
+        await this.applyOperations(commands.forward.operations);
         await this.db.changeLog.put(log);
         return { value: record, log };
       },
@@ -98,23 +147,96 @@ export class PlanningMutationService {
   }
 
   async updatePlan(id: string, values: LessonPlanEditorValues): Promise<LessonPlan> {
-    const fields = parseLessonPlanEditorValues(values);
+    const parsed = parseLessonPlanEditorValues(values);
     const result = await this.db.transaction(
       'rw',
+      this.db.lessonSeries,
       this.db.lessonPlans,
       this.db.sessionOccurrences,
       this.db.changeLog,
       async (): Promise<CommitResult<LessonPlan>> => {
         const existing = await this.requirePlan(id);
+        const timestamp = this.now();
+        const assignment = await this.resolveSeriesAssignment(
+          existing.contextId,
+          parsed.series,
+          parsed.fields.subject,
+        );
+        const targetSeriesId = assignment.seriesId;
+        const beforePeers: LessonPlan[] = [];
+        const afterPeers: LessonPlan[] = [];
+        let sequence: number | undefined;
+
+        if (existing.seriesId === targetSeriesId) {
+          sequence = targetSeriesId ? existing.sequence : undefined;
+          if (targetSeriesId && sequence === undefined) {
+            const members = await this.listSeriesPlans(targetSeriesId, existing.contextId);
+            sequence = Math.max(
+              0,
+              members.findIndex((plan) => plan.id === existing.id),
+            );
+          }
+        } else {
+          if (existing.seriesId) {
+            const oldPeers = await this.listSeriesPlans(
+              existing.seriesId,
+              existing.contextId,
+              existing.id,
+            );
+            beforePeers.push(...oldPeers);
+            afterPeers.push(
+              ...oldPeers.map((plan, index) =>
+                lessonPlanSchema.parse({
+                  ...plan,
+                  sequence: index,
+                  updatedAt: plan.sequence === index ? plan.updatedAt : timestamp,
+                }),
+              ),
+            );
+          }
+          if (targetSeriesId) {
+            const targetPeers = await this.listSeriesPlans(
+              targetSeriesId,
+              existing.contextId,
+              existing.id,
+            );
+            beforePeers.push(...targetPeers);
+            afterPeers.push(
+              ...targetPeers.map((plan, index) =>
+                lessonPlanSchema.parse({
+                  ...plan,
+                  sequence: index,
+                  updatedAt: plan.sequence === index ? plan.updatedAt : timestamp,
+                }),
+              ),
+            );
+            sequence = targetPeers.length;
+          }
+        }
+
         const updated = lessonPlanSchema.parse({
           ...existing,
-          ...fields,
+          ...parsed.fields,
           id,
-          updatedAt: this.now(),
+          seriesId: targetSeriesId,
+          sequence,
+          updatedAt: timestamp,
         });
+        const forwardPlans = uniquePlans([...afterPeers, updated]);
+        const inversePlans = uniquePlans([...beforePeers, existing]);
         const commands: PlanningCommandPair = {
-          forward: createPlanningCommand([putLessonPlanOperation(updated)]),
-          inverse: createPlanningCommand([putLessonPlanOperation(existing)]),
+          forward: createPlanningCommand([
+            ...(assignment.createdSeries
+              ? [putLessonSeriesOperation(assignment.createdSeries)]
+              : []),
+            ...forwardPlans.map(putLessonPlanOperation),
+          ]),
+          inverse: createPlanningCommand([
+            ...inversePlans.map(putLessonPlanOperation),
+            ...(assignment.createdSeries
+              ? [deleteLessonSeriesOperation(assignment.createdSeries.id)]
+              : []),
+          ]),
         };
         const log = this.createChangeLog(
           'planning.plan.update',
@@ -123,7 +245,7 @@ export class PlanningMutationService {
         );
 
         await clearSupportedRedoBranch(this.db);
-        await this.db.lessonPlans.put(updated);
+        await this.applyOperations(commands.forward.operations);
         await this.db.changeLog.put(log);
         return { value: updated, log };
       },
@@ -148,9 +270,26 @@ export class PlanningMutationService {
         if (sessions.length > 0) {
           throw new Error('Remove the scheduled session before deleting this plan.');
         }
+        const timestamp = this.now();
+        const peers = existing.seriesId
+          ? await this.listSeriesPlans(existing.seriesId, existing.contextId, existing.id)
+          : [];
+        const normalizedPeers = peers.map((plan, index) =>
+          lessonPlanSchema.parse({
+            ...plan,
+            sequence: index,
+            updatedAt: plan.sequence === index ? plan.updatedAt : timestamp,
+          }),
+        );
         const commands: PlanningCommandPair = {
-          forward: createPlanningCommand([deleteLessonPlanOperation(id)]),
-          inverse: createPlanningCommand([putLessonPlanOperation(existing)]),
+          forward: createPlanningCommand([
+            deleteLessonPlanOperation(id),
+            ...normalizedPeers.map(putLessonPlanOperation),
+          ]),
+          inverse: createPlanningCommand([
+            putLessonPlanOperation(existing),
+            ...peers.map(putLessonPlanOperation),
+          ]),
         };
         const nextLog = this.createChangeLog(
           'planning.plan.delete',
@@ -159,13 +298,96 @@ export class PlanningMutationService {
         );
 
         await clearSupportedRedoBranch(this.db);
-        await this.db.lessonPlans.delete(id);
+        await this.applyOperations(commands.forward.operations);
         await this.db.changeLog.put(nextLog);
         return nextLog;
       },
     );
 
     this.notifyNewChange(log);
+  }
+
+  async movePlanWithinSeries(
+    id: string,
+    direction: LessonSeriesMoveDirection,
+  ): Promise<LessonPlan> {
+    const result = await this.db.transaction(
+      'rw',
+      this.db.lessonSeries,
+      this.db.lessonPlans,
+      this.db.changeLog,
+      async (): Promise<CommitResult<LessonPlan> | { value: LessonPlan; log: null }> => {
+        const existing = await this.requirePlan(id);
+        if (!existing.seriesId) throw new Error('This plan is not assigned to a lesson series.');
+        const series = await this.requireSeries(existing.seriesId);
+        if (series.contextId !== existing.contextId) {
+          throw new Error('The lesson series does not belong to this learner context.');
+        }
+        const originals = await this.listSeriesPlans(series.id, existing.contextId);
+        const currentIndex = originals.findIndex((plan) => plan.id === id);
+        const targetIndex = direction === 'earlier' ? currentIndex - 1 : currentIndex + 1;
+        if (currentIndex < 0 || targetIndex < 0 || targetIndex >= originals.length) {
+          return { value: existing, log: null };
+        }
+
+        const ordered = [...originals];
+        [ordered[currentIndex], ordered[targetIndex]] = [
+          ordered[targetIndex]!,
+          ordered[currentIndex]!,
+        ];
+        const timestamp = this.now();
+        const updatedPlans = ordered.map((plan, index) =>
+          lessonPlanSchema.parse({
+            ...plan,
+            sequence: index,
+            updatedAt: plan.sequence === index ? plan.updatedAt : timestamp,
+          }),
+        );
+        const moved = updatedPlans.find((plan) => plan.id === id)!;
+        const commands: PlanningCommandPair = {
+          forward: createPlanningCommand(updatedPlans.map(putLessonPlanOperation)),
+          inverse: createPlanningCommand(originals.map(putLessonPlanOperation)),
+        };
+        const log = this.createChangeLog(
+          'planning.series.reorder',
+          `Move “${existing.title}” ${direction}`,
+          commands,
+        );
+
+        await clearSupportedRedoBranch(this.db);
+        await this.applyOperations(commands.forward.operations);
+        await this.db.changeLog.put(log);
+        return { value: moved, log };
+      },
+    );
+
+    if (result.log) this.notifyNewChange(result.log);
+    return result.value;
+  }
+
+  private async resolveSeriesAssignment(
+    contextId: string,
+    assignment: LessonSeriesAssignment,
+    subject: string,
+  ): Promise<{ seriesId?: string; createdSeries?: LessonSeries }> {
+    if (assignment.kind === 'none') return {};
+    if (assignment.kind === 'existing') {
+      const series = await this.requireSeries(assignment.seriesId);
+      if (series.contextId !== contextId) {
+        throw new Error('The selected lesson series belongs to another learner context.');
+      }
+      return { seriesId: series.id };
+    }
+
+    const id = this.createId();
+    if (await this.db.lessonSeries.get(id)) throw new Error('Lesson series ID already exists.');
+    const createdSeries = lessonSeriesSchema.parse({
+      id,
+      contextId,
+      title: assignment.title,
+      subject,
+    });
+    return { seriesId: createdSeries.id, createdSeries };
   }
 
   async schedulePlan(planId: string, values: SessionEditorValues): Promise<SessionOccurrence> {
@@ -392,6 +614,23 @@ export class PlanningMutationService {
     };
   }
 
+  private async requireSeries(id: string): Promise<LessonSeries> {
+    const value = await this.db.lessonSeries.get(id);
+    if (!value) throw new Error('Lesson series no longer exists.');
+    return lessonSeriesSchema.parse(value);
+  }
+
+  private async listSeriesPlans(
+    seriesId: string,
+    contextId: string,
+    excludeId?: string,
+  ): Promise<LessonPlan[]> {
+    return (await this.db.lessonPlans.where('seriesId').equals(seriesId).toArray())
+      .map((value) => lessonPlanSchema.parse(value))
+      .filter((plan) => plan.contextId === contextId && plan.id !== excludeId)
+      .sort(compareSeriesPlans);
+  }
+
   private async requirePlan(id: string): Promise<LessonPlan> {
     const value = await this.db.lessonPlans.get(id);
     if (!value) throw new Error('Lesson plan no longer exists.');
@@ -406,7 +645,10 @@ export class PlanningMutationService {
 
   private async applyOperations(operations: readonly PlanningOperation[]): Promise<void> {
     for (const operation of operations) {
-      if (operation.table === 'lessonPlans') {
+      if (operation.table === 'lessonSeries') {
+        if (operation.action === 'put') await this.db.lessonSeries.put(operation.record);
+        else await this.db.lessonSeries.delete(operation.id);
+      } else if (operation.table === 'lessonPlans') {
         if (operation.action === 'put') await this.db.lessonPlans.put(operation.record);
         else await this.db.lessonPlans.delete(operation.id);
       } else if (operation.action === 'put') {

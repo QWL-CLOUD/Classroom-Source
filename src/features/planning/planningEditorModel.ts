@@ -44,12 +44,17 @@ export interface LessonContentEditorValues {
   lessonFlow: LessonFlowStepEditorValues[];
 }
 
+export type LessonSeriesMode = 'none' | 'existing' | 'new';
+
 export interface LessonPlanEditorValues extends LessonContentEditorValues {
   title: string;
   subject: string;
   workflowState: LessonPlan['workflowState'];
   preferredScheduleBlockId: string;
   durationMinutes: string;
+  seriesMode: LessonSeriesMode;
+  seriesId: string;
+  newSeriesTitle: string;
 }
 
 export interface SessionEditorValues extends LessonContentEditorValues {
@@ -71,6 +76,14 @@ export type LessonPlanEditableFields = Pick<
   | 'notes'
   | 'lessonFlow'
 >;
+
+export type LessonSeriesAssignment =
+  { kind: 'none' } | { kind: 'existing'; seriesId: string } | { kind: 'new'; title: string };
+
+export interface ParsedLessonPlanEditorValues {
+  fields: LessonPlanEditableFields;
+  series: LessonSeriesAssignment;
+}
 
 export type SessionEditableFields = Pick<
   SessionOccurrence,
@@ -98,13 +111,33 @@ export const lessonContentEditorValuesSchema = z.object({
   lessonFlow: z.array(lessonFlowStepEditorValuesSchema),
 });
 
-export const lessonPlanEditorValuesSchema = lessonContentEditorValuesSchema.extend({
-  title: z.string().trim().min(1, 'Enter a planning title.'),
-  subject: z.string().trim(),
-  workflowState: z.enum(['draft', 'ready']),
-  preferredScheduleBlockId: z.string(),
-  durationMinutes: optionalDurationSchema,
-});
+export const lessonPlanEditorValuesSchema = lessonContentEditorValuesSchema
+  .extend({
+    title: z.string().trim().min(1, 'Enter a planning title.'),
+    subject: z.string().trim(),
+    workflowState: z.enum(['draft', 'ready']),
+    preferredScheduleBlockId: z.string(),
+    durationMinutes: optionalDurationSchema,
+    seriesMode: z.enum(['none', 'existing', 'new']),
+    seriesId: z.string(),
+    newSeriesTitle: z.string(),
+  })
+  .superRefine((values, context) => {
+    if (values.seriesMode === 'existing' && !values.seriesId.trim()) {
+      context.addIssue({
+        code: 'custom',
+        path: ['seriesId'],
+        message: 'Choose an existing lesson series.',
+      });
+    }
+    if (values.seriesMode === 'new' && !values.newSeriesTitle.trim()) {
+      context.addIssue({
+        code: 'custom',
+        path: ['newSeriesTitle'],
+        message: 'Enter a title for the new lesson series.',
+      });
+    }
+  });
 
 export const sessionEditorValuesSchema = lessonContentEditorValuesSchema
   .extend({
@@ -167,16 +200,25 @@ export function parseLessonContentEditorValues(input: LessonContentEditorValues)
 
 export function parseLessonPlanEditorValues(
   input: LessonPlanEditorValues,
-): LessonPlanEditableFields {
+): ParsedLessonPlanEditorValues {
   const values = lessonPlanEditorValuesSchema.parse(input);
   const content = parseLessonContentEditorValues(values);
+  const series: LessonSeriesAssignment =
+    values.seriesMode === 'existing'
+      ? { kind: 'existing', seriesId: values.seriesId }
+      : values.seriesMode === 'new'
+        ? { kind: 'new', title: values.newSeriesTitle.trim() }
+        : { kind: 'none' };
   return {
-    title: values.title,
-    subject: values.subject,
-    workflowState: values.workflowState,
-    preferredScheduleBlockId: values.preferredScheduleBlockId || undefined,
-    durationMinutes: values.durationMinutes ? Number(values.durationMinutes) : undefined,
-    ...content,
+    fields: {
+      title: values.title,
+      subject: values.subject,
+      workflowState: values.workflowState,
+      preferredScheduleBlockId: values.preferredScheduleBlockId || undefined,
+      durationMinutes: values.durationMinutes ? Number(values.durationMinutes) : undefined,
+      ...content,
+    },
+    series,
   };
 }
 
@@ -268,6 +310,9 @@ export function createLessonPlanEditorValues(
     workflowState: 'draft',
     preferredScheduleBlockId,
     durationMinutes: '',
+    seriesMode: 'none',
+    seriesId: '',
+    newSeriesTitle: '',
     ...createLessonContentEditorValues(),
   };
 }
@@ -280,6 +325,9 @@ export function toLessonPlanEditorValues(plan: LessonPlan): LessonPlanEditorValu
     workflowState: parsed.workflowState === 'archived' ? 'draft' : parsed.workflowState,
     preferredScheduleBlockId: parsed.preferredScheduleBlockId ?? '',
     durationMinutes: parsed.durationMinutes?.toString() ?? '',
+    seriesMode: parsed.seriesId ? 'existing' : 'none',
+    seriesId: parsed.seriesId ?? '',
+    newSeriesTitle: '',
     ...createLessonContentEditorValues({
       learningTarget: parsed.learningTarget,
       notes: parsed.notes,

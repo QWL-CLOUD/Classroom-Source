@@ -83,7 +83,10 @@ export async function applySupportedEditCommand(
 
   if (parsed.entity === 'planning') {
     for (const operation of parsed.command.operations) {
-      if (operation.table === 'lessonPlans') {
+      if (operation.table === 'lessonSeries') {
+        if (operation.action === 'put') await db.lessonSeries.put(operation.record);
+        else await db.lessonSeries.delete(operation.id);
+      } else if (operation.table === 'lessonPlans') {
         if (operation.action === 'put') await db.lessonPlans.put(operation.record);
         else await db.lessonPlans.delete(operation.id);
       } else if (operation.action === 'put') {

@@ -40,6 +40,7 @@ describe('planning sessions across workspace read models', () => {
         activeSchoolYear: null,
         contexts: [context],
         selectedContext: context,
+        lessonSeries: [],
         lessonPlans: [plan],
         sessions: [session],
       },

@@ -17,12 +17,14 @@ export async function loadLearnersReadSnapshot(
       activeSchoolYear,
       contexts,
       selectedContext: null,
+      lessonSeries: [],
       lessonPlans: [],
       sessions: [],
     };
   }
 
-  const [lessonPlans, sessions] = await Promise.all([
+  const [lessonSeries, lessonPlans, sessions] = await Promise.all([
+    repository.listLessonSeries({ contextId: selectedContext.id }),
     repository.listLessonPlans({ contextId: selectedContext.id }),
     repository.listSessionOccurrences({ contextId: selectedContext.id }),
   ]);
@@ -31,6 +33,7 @@ export async function loadLearnersReadSnapshot(
     activeSchoolYear,
     contexts,
     selectedContext,
+    lessonSeries,
     lessonPlans,
     sessions,
   };

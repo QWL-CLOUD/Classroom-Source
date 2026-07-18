@@ -76,11 +76,16 @@ function session(
   };
 }
 
-function snapshot(lessonPlans: LessonPlan[], sessions: SessionOccurrence[]): LearnersReadSnapshot {
+function snapshot(
+  lessonPlans: LessonPlan[],
+  sessions: SessionOccurrence[],
+  lessonSeries: LearnersReadSnapshot['lessonSeries'] = [],
+): LearnersReadSnapshot {
   return {
     activeSchoolYear: schoolYear,
     contexts,
     selectedContext: contexts[0]!,
+    lessonSeries,
     lessonPlans,
     sessions,
   };
@@ -162,6 +167,44 @@ describe('buildLearnersPageReadModel', () => {
     expect(model.upcomingItems[0]).toMatchObject({
       contentSummary: '1 step · 12 min',
       contentSourceLabel: 'Customized session',
+    });
+  });
+
+  it('shows lesson-series names and stable positions across planning states', () => {
+    const series = {
+      id: 'series-one',
+      contextId: 'class-context',
+      title: 'Fractions Unit',
+      subject: 'Math',
+    };
+    const first = {
+      ...lessonPlan('plan-first', 'Equivalent fractions', 'ready', '2026-07-12T12:00:00.000Z'),
+      seriesId: series.id,
+      sequence: 0,
+    };
+    const second = {
+      ...lessonPlan('plan-second', 'Compare fractions', 'ready', '2026-07-13T12:00:00.000Z'),
+      seriesId: series.id,
+      sequence: 1,
+    };
+
+    const model = buildLearnersPageReadModel(
+      snapshot(
+        [second, first],
+        [session('session-first', first.id, '2026-07-20', 'scheduled')],
+        [series],
+      ),
+      '2026-07-15',
+    );
+
+    expect(model.upcomingItems[0]).toMatchObject({
+      seriesTitle: 'Fractions Unit',
+      seriesPositionLabel: 'Lesson 1 of 2',
+    });
+    expect(model.unscheduledItems[0]).toMatchObject({
+      title: 'Compare fractions',
+      seriesTitle: 'Fractions Unit',
+      seriesPositionLabel: 'Lesson 2 of 2',
     });
   });
 

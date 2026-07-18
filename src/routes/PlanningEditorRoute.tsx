@@ -1,4 +1,12 @@
-import { ArrowLeft, CalendarPlus, Save, Trash2 } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowLeft,
+  ArrowUp,
+  CalendarPlus,
+  ListOrdered,
+  Save,
+  Trash2,
+} from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -8,10 +16,12 @@ import { classroomDb } from '@/data/db/ClassroomDatabase';
 import {
   learnerContextSchema,
   lessonPlanSchema,
+  lessonSeriesSchema,
   scheduleBlockSchema,
   sessionOccurrenceSchema,
   type LearnerContext,
   type LessonPlan,
+  type LessonSeries,
   type ScheduleBlock,
   type SessionOccurrence,
 } from '@/domain/models/entities';
@@ -34,6 +44,8 @@ interface PlanningEditorSnapshot {
   plan: LessonPlan | null;
   sessions: SessionOccurrence[];
   scheduleBlocks: ScheduleBlock[];
+  lessonSeries: LessonSeries[];
+  seriesPlans: LessonPlan[];
 }
 
 function getErrorMessage(cause: unknown): string {
@@ -43,8 +55,14 @@ function getErrorMessage(cause: unknown): string {
   return cause instanceof Error ? cause.message : 'The planning item could not be saved.';
 }
 
-function learnerHref(contextId: string, view: 'upcoming' | 'unscheduled' | 'completed'): string {
-  return `#/learners?context=${encodeURIComponent(contextId)}&planning=${view}`;
+function learnerHref(
+  contextId: string,
+  view: 'upcoming' | 'unscheduled' | 'completed',
+  date?: string,
+): string {
+  const params = new URLSearchParams({ context: contextId, planning: view });
+  if (date) params.set('date', date);
+  return `#/learners?${params.toString()}`;
 }
 
 function PlanningEditorForm({
@@ -55,7 +73,7 @@ function PlanningEditorForm({
   service?: PlanningMutationService;
 }) {
   const navigate = useNavigate();
-  const { context, plan, sessions, scheduleBlocks } = snapshot;
+  const { context, plan, sessions, scheduleBlocks, lessonSeries, seriesPlans } = snapshot;
   const [values, setValues] = useState<LessonPlanEditorValues>(() =>
     plan
       ? toLessonPlanEditorValues(plan)
@@ -79,6 +97,31 @@ function PlanningEditorForm({
       : activeSession
         ? 'upcoming'
         : 'unscheduled';
+  const learnerDate = learnerView === 'upcoming' ? activeSession?.date : undefined;
+
+  const seriesChoice =
+    values.seriesMode === 'new'
+      ? '__new__'
+      : values.seriesMode === 'existing'
+        ? values.seriesId
+        : '';
+  const currentSeries = plan?.seriesId
+    ? (lessonSeries.find((series) => series.id === plan.seriesId) ?? null)
+    : null;
+  const currentSeriesPlans = currentSeries
+    ? seriesPlans
+        .filter((candidate) => candidate.seriesId === currentSeries.id)
+        .sort(
+          (first, second) =>
+            (first.sequence ?? Number.MAX_SAFE_INTEGER) -
+              (second.sequence ?? Number.MAX_SAFE_INTEGER) ||
+            first.createdAt.localeCompare(second.createdAt) ||
+            first.id.localeCompare(second.id),
+        )
+    : [];
+  const currentSeriesIndex = plan
+    ? currentSeriesPlans.findIndex((candidate) => candidate.id === plan.id)
+    : -1;
 
   function update<K extends keyof LessonPlanEditorValues>(
     key: K,
@@ -87,6 +130,41 @@ function PlanningEditorForm({
     setValues((current) => ({ ...current, [key]: value }));
     setError(null);
     setDeleteArmed(false);
+  }
+
+  function updateSeriesChoice(value: string): void {
+    if (value === '__new__') {
+      setValues((current) => ({ ...current, seriesMode: 'new', seriesId: '' }));
+    } else if (value) {
+      setValues((current) => ({
+        ...current,
+        seriesMode: 'existing',
+        seriesId: value,
+        newSeriesTitle: '',
+      }));
+    } else {
+      setValues((current) => ({
+        ...current,
+        seriesMode: 'none',
+        seriesId: '',
+        newSeriesTitle: '',
+      }));
+    }
+    setError(null);
+    setDeleteArmed(false);
+  }
+
+  async function moveWithinSeries(direction: 'earlier' | 'later'): Promise<void> {
+    if (!plan || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await service.movePlanWithinSeries(plan.id, direction);
+      setSaving(false);
+    } catch (cause) {
+      setError(getErrorMessage(cause));
+      setSaving(false);
+    }
   }
 
   async function save(scheduleAfterSave: boolean): Promise<void> {
@@ -100,7 +178,7 @@ function PlanningEditorForm({
       if (scheduleAfterSave) {
         navigate(`/planning/session?plan=${encodeURIComponent(saved.id)}`);
       } else {
-        window.location.hash = learnerHref(selectedContext.id, learnerView);
+        window.location.hash = learnerHref(selectedContext.id, learnerView, learnerDate);
       }
     } catch (cause) {
       setError(getErrorMessage(cause));
@@ -133,7 +211,7 @@ function PlanningEditorForm({
           <h2>{plan ? 'Edit plan' : 'New plan'}</h2>
           <p>{selectedContext.name}</p>
         </div>
-        <a className="button" href={learnerHref(selectedContext.id, learnerView)}>
+        <a className="button" href={learnerHref(selectedContext.id, learnerView, learnerDate)}>
           <ArrowLeft aria-hidden="true" size={17} /> Back to Learners
         </a>
       </div>
@@ -168,6 +246,30 @@ function PlanningEditorForm({
             <option value="ready">Ready</option>
           </select>
         </label>
+
+        <label className={styles.fullWidth}>
+          <span>Lesson series</span>
+          <select value={seriesChoice} onChange={(event) => updateSeriesChoice(event.target.value)}>
+            <option value="">No series</option>
+            {lessonSeries.map((series) => (
+              <option key={series.id} value={series.id}>
+                {series.title}
+              </option>
+            ))}
+            <option value="__new__">Create a new series…</option>
+          </select>
+        </label>
+
+        {values.seriesMode === 'new' ? (
+          <label className={styles.fullWidth}>
+            <span>New series title</span>
+            <input
+              value={values.newSeriesTitle}
+              onChange={(event) => update('newSeriesTitle', event.target.value)}
+              placeholder="For example, Fractions Unit"
+            />
+          </label>
+        ) : null}
 
         <label>
           <span>Preferred schedule block</span>
@@ -208,6 +310,38 @@ function PlanningEditorForm({
           setDeleteArmed(false);
         }}
       />
+
+      {currentSeries && currentSeriesIndex >= 0 ? (
+        <section className={styles.seriesPosition} aria-label="Lesson series position">
+          <div>
+            <ListOrdered aria-hidden="true" size={18} />
+            <p>
+              <strong>{currentSeries.title}</strong>
+              <span>
+                Lesson {currentSeriesIndex + 1} of {currentSeriesPlans.length}
+              </span>
+            </p>
+          </div>
+          <div className={styles.seriesActions}>
+            <button
+              className="button"
+              type="button"
+              disabled={saving || currentSeriesIndex === 0}
+              onClick={() => void moveWithinSeries('earlier')}
+            >
+              <ArrowUp aria-hidden="true" size={16} /> Move earlier
+            </button>
+            <button
+              className="button"
+              type="button"
+              disabled={saving || currentSeriesIndex === currentSeriesPlans.length - 1}
+              onClick={() => void moveWithinSeries('later')}
+            >
+              <ArrowDown aria-hidden="true" size={16} /> Move later
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       {activeSession ? (
         <p className={styles.notice} role="status">
@@ -296,8 +430,21 @@ export function PlanningEditorRoute() {
         (first, second) =>
           first.startMinute - second.startMinute || first.title.localeCompare(second.title),
       );
+    const lessonSeries = contextId
+      ? (await classroomDb.lessonSeries.where('contextId').equals(contextId).toArray())
+          .map((value) => lessonSeriesSchema.parse(value))
+          .sort(
+            (first, second) =>
+              first.title.localeCompare(second.title) || first.id.localeCompare(second.id),
+          )
+      : [];
+    const seriesPlans = contextId
+      ? (await classroomDb.lessonPlans.where('contextId').equals(contextId).toArray()).map(
+          (value) => lessonPlanSchema.parse(value),
+        )
+      : [];
 
-    return { context, plan, sessions, scheduleBlocks };
+    return { context, plan, sessions, scheduleBlocks, lessonSeries, seriesPlans };
   }, [planId, requestedContextId]);
 
   if (snapshot === undefined) {
@@ -324,7 +471,7 @@ export function PlanningEditorRoute() {
     <section className="page">
       <header className="page-header">
         <div>
-          <p className="page-eyebrow">Phase 3C</p>
+          <p className="page-eyebrow">Phase 3C-3</p>
           <h1>Planning</h1>
           <p>Create reusable teaching content before assigning a date and time.</p>
         </div>

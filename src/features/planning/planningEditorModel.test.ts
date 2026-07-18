@@ -33,24 +33,47 @@ describe('planning editor models', () => {
         ],
       }),
     ).toEqual({
-      title: 'Fractions review',
-      subject: 'Math',
-      workflowState: 'ready',
-      preferredScheduleBlockId: undefined,
-      durationMinutes: 45,
-      learningTarget: 'Compare fractions.',
-      notes: undefined,
-      lessonFlow: [
-        {
-          id: 'step-1',
-          title: 'Sort fraction cards',
-          phase: 'guided-practice',
-          durationMinutes: 12,
-          details: 'Work with a partner.',
-          teacherNotes: undefined,
-        },
-      ],
+      fields: {
+        title: 'Fractions review',
+        subject: 'Math',
+        workflowState: 'ready',
+        preferredScheduleBlockId: undefined,
+        durationMinutes: 45,
+        learningTarget: 'Compare fractions.',
+        notes: undefined,
+        lessonFlow: [
+          {
+            id: 'step-1',
+            title: 'Sort fraction cards',
+            phase: 'guided-practice',
+            durationMinutes: 12,
+            details: 'Work with a partner.',
+            teacherNotes: undefined,
+          },
+        ],
+      },
+      series: { kind: 'none' },
     });
+  });
+
+  it('parses existing and new lesson-series choices', () => {
+    expect(
+      parseLessonPlanEditorValues({
+        ...createLessonPlanEditorValues(),
+        title: 'Series lesson',
+        seriesMode: 'existing',
+        seriesId: 'series-1',
+      }).series,
+    ).toEqual({ kind: 'existing', seriesId: 'series-1' });
+
+    expect(
+      parseLessonPlanEditorValues({
+        ...createLessonPlanEditorValues(),
+        title: 'New series lesson',
+        seriesMode: 'new',
+        newSeriesTitle: '  Fractions Unit  ',
+      }).series,
+    ).toEqual({ kind: 'new', title: 'Fractions Unit' });
   });
 
   it('keeps sessions live-linked until a content override is saved', () => {

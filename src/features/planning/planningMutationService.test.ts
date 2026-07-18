@@ -139,6 +139,86 @@ describe('planning mutation service', () => {
     });
   });
 
+  it('creates and reorders one lesson series with reversible compound history', async () => {
+    const first = await service.createPlan('context', {
+      ...createLessonPlanEditorValues(),
+      title: 'Lesson one',
+      seriesMode: 'new',
+      newSeriesTitle: 'Synthetic unit',
+    });
+    const series = (await database.lessonSeries.toArray())[0]!;
+    const second = await service.createPlan('context', {
+      ...createLessonPlanEditorValues(),
+      title: 'Lesson two',
+      seriesMode: 'existing',
+      seriesId: series.id,
+    });
+
+    expect(
+      (await database.lessonPlans.toArray()).sort(
+        (a, b) => (a.sequence ?? 999) - (b.sequence ?? 999),
+      ),
+    ).toMatchObject([
+      { id: first.id, seriesId: series.id, sequence: 0 },
+      { id: second.id, seriesId: series.id, sequence: 1 },
+    ]);
+
+    await service.movePlanWithinSeries(second.id, 'earlier');
+    expect(
+      (await database.lessonPlans.toArray()).sort(
+        (a, b) => (a.sequence ?? 999) - (b.sequence ?? 999),
+      ),
+    ).toMatchObject([
+      { id: second.id, sequence: 0 },
+      { id: first.id, sequence: 1 },
+    ]);
+
+    await history.undo();
+    expect(
+      (await database.lessonPlans.toArray()).sort(
+        (a, b) => (a.sequence ?? 999) - (b.sequence ?? 999),
+      ),
+    ).toMatchObject([
+      { id: first.id, sequence: 0 },
+      { id: second.id, sequence: 1 },
+    ]);
+
+    await history.redo();
+    expect(
+      (await database.lessonPlans.toArray()).sort(
+        (a, b) => (a.sequence ?? 999) - (b.sequence ?? 999),
+      ),
+    ).toMatchObject([
+      { id: second.id, sequence: 0 },
+      { id: first.id, sequence: 1 },
+    ]);
+  });
+
+  it('creates a new series atomically and removes it when the plan creation is undone', async () => {
+    await service.createPlan('context', {
+      ...createLessonPlanEditorValues(),
+      title: 'Atomic series lesson',
+      subject: 'Language',
+      seriesMode: 'new',
+      newSeriesTitle: 'Atomic unit',
+    });
+
+    expect(await database.lessonSeries.toArray()).toMatchObject([
+      { title: 'Atomic unit', subject: 'Language', contextId: 'context' },
+    ]);
+    expect(await database.lessonPlans.toArray()).toMatchObject([
+      { title: 'Atomic series lesson', sequence: 0 },
+    ]);
+
+    await history.undo();
+    expect(await database.lessonSeries.count()).toBe(0);
+    expect(await database.lessonPlans.count()).toBe(0);
+
+    await history.redo();
+    expect(await database.lessonSeries.count()).toBe(1);
+    expect(await database.lessonPlans.count()).toBe(1);
+  });
+
   it('does not overwrite an existing plan when a generated ID collides', async () => {
     const collisionService = new PlanningMutationService(database, {
       createId: () => 'fixed-plan-id',
