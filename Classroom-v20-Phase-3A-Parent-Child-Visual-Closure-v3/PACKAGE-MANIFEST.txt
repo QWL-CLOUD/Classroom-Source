@@ -1,0 +1,33 @@
+Classroom v20 — Phase 3A Parent–Child Visual Closure v3
+Base commit: 93305f3ad369cb9ed3ada005a61100e09e563dba
+Required branch: phase-3a-parent-child-visual-closure
+
+New source files:
+- src/features/editing/scheduleBlockHierarchy.ts
+- src/features/editing/scheduleBlockHierarchy.test.ts
+- tests/e2e/parent-child-visual-closure.spec.ts
+
+Replaced source files:
+- src/routes/ScheduleBlockEditorRoute.tsx
+- src/routes/ScheduleBlockEditorRoute.module.css
+
+Patched source files:
+- src/routes/WeekRoute.tsx
+- src/routes/WeekRoute.module.css
+- src/routes/TodayRoute.tsx
+- src/routes/TodayRoute.module.css
+- src/routes/CalendarRoute.tsx
+- src/routes/CalendarRoute.module.css
+
+Not modified:
+- Dexie schema/version
+- migration, rollback, quarantine
+- Schedule Exceptions / Phase 3B
+- legacy cos-* data
+- dist
+- private data
+
+Installer v3 fixes:
+- Week item hierarchy lookup tolerates the existing formatting blank line and still requires a unique match.
+- Today item hierarchy lookup derives the current indentation and tolerates a formatting blank line.
+- Remaining Today JSX anchors are independent of leading indentation.
