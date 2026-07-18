@@ -30,6 +30,11 @@ import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
 import { minuteToTime } from '@/features/editing/calendarEventEditorModel';
 import { LessonFlowEditor, LessonFlowPreview } from '@/features/planning/LessonFlowEditor';
 import {
+  buildPlanningSurfaceHref,
+  parsePlanningReturnTarget,
+  type PlanningReturnTarget,
+} from '@/features/planning/planningNavigation';
+import {
   createLessonContentEditorValues,
   createSessionEditorValues,
   resolveSessionLessonContent,
@@ -62,23 +67,15 @@ function getErrorMessage(cause: unknown): string {
   return cause instanceof Error ? cause.message : 'The session could not be saved.';
 }
 
-function learnerHref(
-  contextId: string,
-  view: 'upcoming' | 'unscheduled' | 'completed',
-  date?: string,
-): string {
-  const params = new URLSearchParams({ context: contextId, planning: view });
-  if (date) params.set('date', date);
-  return `#/learners?${params.toString()}`;
-}
-
 function SessionEditorForm({
   snapshot,
   initialDate,
+  returnTo,
   service = planningMutationService,
 }: {
   snapshot: SessionEditorSnapshot;
   initialDate: string;
+  returnTo: PlanningReturnTarget;
   service?: PlanningMutationService;
 }) {
   const { context, plan, session, scheduleBlocks } = snapshot;
@@ -148,6 +145,20 @@ function SessionEditorForm({
   const selectedPlan = plan;
   const inheritedContent = resolveSessionLessonContent(selectedPlan).content;
 
+  function returnHref(options: {
+    date: string;
+    sessionId?: string;
+    learnerView: 'upcoming' | 'unscheduled' | 'completed';
+  }): string {
+    return buildPlanningSurfaceHref({
+      returnTo,
+      date: options.date,
+      contextId: selectedContext.id,
+      learnerView: options.learnerView,
+      focusSessionId: options.sessionId,
+    });
+  }
+
   function update<K extends keyof SessionEditorValues>(
     key: K,
     value: SessionEditorValues[K],
@@ -191,7 +202,11 @@ function SessionEditorForm({
       const saved = session
         ? await service.updateSession(session.id, values)
         : await service.schedulePlan(selectedPlan.id, values);
-      window.location.hash = learnerHref(saved.contextId, 'upcoming', saved.date);
+      window.location.hash = returnHref({
+        date: saved.date,
+        sessionId: saved.id,
+        learnerView: 'upcoming',
+      });
     } catch (cause) {
       setError(getErrorMessage(cause));
       setSaving(false);
@@ -207,11 +222,11 @@ function SessionEditorForm({
         session.deliveryState === 'completed'
           ? await service.reopenSession(session.id)
           : await service.completeSession(session.id);
-      window.location.hash = learnerHref(
-        updated.contextId,
-        updated.deliveryState === 'completed' ? 'completed' : 'upcoming',
-        updated.date,
-      );
+      window.location.hash = returnHref({
+        date: updated.date,
+        sessionId: updated.id,
+        learnerView: updated.deliveryState === 'completed' ? 'completed' : 'upcoming',
+      });
     } catch (cause) {
       setError(getErrorMessage(cause));
       setSaving(false);
@@ -228,7 +243,10 @@ function SessionEditorForm({
     setError(null);
     try {
       await service.unscheduleSession(session.id);
-      window.location.hash = learnerHref(selectedContext.id, 'unscheduled', session.date);
+      window.location.hash = returnHref({
+        date: session.date,
+        learnerView: 'unscheduled',
+      });
     } catch (cause) {
       setError(getErrorMessage(cause));
       setSaving(false);
@@ -255,11 +273,11 @@ function SessionEditorForm({
     try {
       const committed = await service.bumpSeries(session.id, bumpPreview.previewToken);
       const selectedMove = committed.items.find((item) => item.sessionId === session.id);
-      window.location.hash = learnerHref(
-        selectedContext.id,
-        'upcoming',
-        selectedMove?.toDate ?? session.date,
-      );
+      window.location.hash = returnHref({
+        date: selectedMove?.toDate ?? session.date,
+        sessionId: session.id,
+        learnerView: 'upcoming',
+      });
     } catch (cause) {
       setError(getErrorMessage(cause));
       setSaving(false);
@@ -304,9 +322,16 @@ function SessionEditorForm({
         </div>
         <a
           className="button"
-          href={learnerHref(selectedContext.id, backView, session?.date ?? initialDate)}
+          href={returnHref({
+            date: session?.date ?? initialDate,
+            sessionId: session?.id,
+            learnerView: backView,
+          })}
         >
-          <ArrowLeft aria-hidden="true" size={17} /> Back to Learners
+          <ArrowLeft aria-hidden="true" size={17} />
+          {returnTo === 'learners'
+            ? 'Back to Learners'
+            : `Back to ${returnTo === 'today' ? 'Today' : returnTo === 'week' ? 'Week' : 'Calendar'}`}
         </a>
       </div>
 
@@ -600,6 +625,7 @@ export function SessionEditorRoute() {
   const sessionId = searchParams.get('session');
   const requestedDate = searchParams.get('date');
   const initialDate = parseLocalDate(requestedDate) ? requestedDate! : todayLocalDate();
+  const returnTo = parsePlanningReturnTarget(searchParams.get('return'));
 
   const snapshot = useLiveQuery(async (): Promise<SessionEditorSnapshot> => {
     const sessionValue = sessionId
@@ -665,6 +691,7 @@ export function SessionEditorRoute() {
         key={snapshot.session?.id ?? `new-${snapshot.plan.id}`}
         snapshot={snapshot}
         initialDate={initialDate}
+        returnTo={returnTo}
       />
     </section>
   );

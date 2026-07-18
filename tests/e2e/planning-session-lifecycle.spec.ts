@@ -325,7 +325,14 @@ test('Planning item becomes one synchronized scheduled and completed session', a
     .click();
 
   await page.getByRole('button', { name: 'Mark complete' }).click();
-  await expect(page).toHaveURL(/planning=completed/);
+  await expect(page).toHaveURL(/#\/calendar\?date=2026-07-10/);
+  await expect(
+    page.locator('[data-calendar-item^="session-occurrence:"]').filter({
+      hasText: 'Synthetic bridge lesson',
+    }),
+  ).toContainText('completed');
+
+  await page.goto('./#/learners?context=phase-3c-context&planning=completed&date=2026-07-10');
   const completedPlanning = page.getByRole('region', {
     name: 'Planning for Synthetic planning class',
   });

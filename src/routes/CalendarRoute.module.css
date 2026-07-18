@@ -509,3 +509,23 @@
   outline-offset: 3px;
   border-radius: 4px;
 }
+
+.dayAddButton {
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  flex-shrink: 0;
+  place-items: center;
+  margin-left: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  color: var(--heading);
+  background: var(--surface-soft);
+  text-decoration: none;
+}
+
+.dayAddButton:hover,
+.dayAddButton:focus-visible {
+  border-color: var(--accent-strong);
+  color: var(--accent-strong);
+}

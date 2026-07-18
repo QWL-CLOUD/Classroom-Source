@@ -23,6 +23,7 @@ export type LearnerPlanningItemSource = 'lesson-plan' | 'session';
 
 export interface LearnerPlanningItem {
   id: string;
+  planId: string;
   sourceType: LearnerPlanningItemSource;
   title: string;
   subject: string;
@@ -145,6 +146,7 @@ function sessionToPlanningItem(
 
   return {
     id: session.id,
+    planId: session.lessonPlanId,
     sourceType: 'session',
     title: plan?.title ?? 'Plan unavailable',
     subject: plan?.subject ?? '',
@@ -275,6 +277,7 @@ export function buildLearnersPageReadModel(
       const seriesMetadata = seriesMetadataByPlanId.get(plan.id);
       return {
         id: plan.id,
+        planId: plan.id,
         sourceType: 'lesson-plan' as const,
         title: plan.title,
         subject: plan.subject,

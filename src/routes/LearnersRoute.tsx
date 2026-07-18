@@ -7,16 +7,18 @@ import {
   Clock3,
   Layers3,
   Pencil,
+  Trash2,
   UserRound,
   Users,
 } from 'lucide-react';
-import { useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import type { LearnerContext } from '@/domain/models/entities';
 import type { LearnerPlanningView } from '@/domain/readModels/learnerReadModels';
 import type { LearnerPlanningItem } from '@/features/learners/learnerReadModel';
 import { formatLessonSeriesPositionLabel } from '@/features/planning/lessonSeriesPresentation';
+import { planningMutationService } from '@/features/planning/planningMutationService';
 import {
   buildLearnersPageReadModel,
   getLearnerKindLabel,
@@ -43,6 +45,28 @@ function contextKindIcon(kind: LearnerContext['kind']): ReactNode {
 }
 
 function PlanningItemCard({ item }: { item: LearnerPlanningItem }) {
+  const [deleteArmed, setDeleteArmed] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function removePlan(): Promise<void> {
+    if (deleting) return;
+    if (!deleteArmed) {
+      setDeleteArmed(true);
+      setDeleteError(null);
+      return;
+    }
+
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await planningMutationService.deletePlan(item.planId, { includeSessions: true });
+    } catch (cause) {
+      setDeleteError(cause instanceof Error ? cause.message : 'The plan could not be deleted.');
+      setDeleting(false);
+    }
+  }
+
   return (
     <li>
       <article className={styles.planningItem} aria-label={`${item.title}, ${item.stateLabel}`}>
@@ -77,8 +101,44 @@ function PlanningItemCard({ item }: { item: LearnerPlanningItem }) {
                 <Pencil aria-hidden="true" size={16} /> Edit plan
               </a>
             ) : null}
+            <button
+              className={deleteArmed ? styles.deleteConfirmButton : 'button'}
+              type="button"
+              disabled={deleting}
+              onClick={() => void removePlan()}
+            >
+              <Trash2 aria-hidden="true" size={16} />
+              {deleting
+                ? 'Deleting…'
+                : deleteArmed
+                  ? item.sourceType === 'session'
+                    ? 'Confirm delete plan and session'
+                    : 'Confirm delete plan'
+                  : 'Delete plan'}
+            </button>
           </div>
         </div>
+
+        {deleteArmed ? (
+          <div className={styles.deleteNotice} role="alert">
+            <strong>Delete “{item.title}”?</strong>
+            <span>
+              {item.sourceType === 'session'
+                ? `Its ${item.stateLabel.toLowerCase()} session will also be removed from Today, Week, and Calendar.`
+                : 'The unscheduled planning item will be removed.'}{' '}
+              You can undo the entire deletion.
+            </span>
+            <button className="button" type="button" onClick={() => setDeleteArmed(false)}>
+              Keep plan
+            </button>
+          </div>
+        ) : null}
+
+        {deleteError ? (
+          <p className={styles.deleteError} role="alert">
+            {deleteError}
+          </p>
+        ) : null}
 
         {item.subject ? <p className={styles.subject}>{item.subject}</p> : null}
         {item.seriesTitle && item.seriesPositionLabel ? (

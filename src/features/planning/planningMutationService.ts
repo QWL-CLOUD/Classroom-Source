@@ -53,6 +53,10 @@ interface CommitResult<T> {
 
 export type LessonSeriesMoveDirection = 'earlier' | 'later';
 
+export interface DeleteLessonPlanOptions {
+  includeSessions?: boolean;
+}
+
 function compareSeriesPlans(first: LessonPlan, second: LessonPlan): number {
   return (
     (first.sequence ?? Number.MAX_SAFE_INTEGER) - (second.sequence ?? Number.MAX_SAFE_INTEGER) ||
@@ -260,7 +264,7 @@ export class PlanningMutationService {
     return result.value;
   }
 
-  async deletePlan(id: string): Promise<void> {
+  async deletePlan(id: string, options: DeleteLessonPlanOptions = {}): Promise<void> {
     const log = await this.db.transaction(
       'rw',
       this.db.lessonPlans,
@@ -268,11 +272,10 @@ export class PlanningMutationService {
       this.db.changeLog,
       async () => {
         const existing = await this.requirePlan(id);
-        const sessions = await this.db.sessionOccurrences
-          .where('lessonPlanId')
-          .equals(id)
-          .toArray();
-        if (sessions.length > 0) {
+        const sessions = (
+          await this.db.sessionOccurrences.where('lessonPlanId').equals(id).toArray()
+        ).map((value) => sessionOccurrenceSchema.parse(value));
+        if (sessions.length > 0 && !options.includeSessions) {
           throw new Error('Remove the scheduled session before deleting this plan.');
         }
         const timestamp = this.now();
@@ -288,17 +291,21 @@ export class PlanningMutationService {
         );
         const commands: PlanningCommandPair = {
           forward: createPlanningCommand([
+            ...sessions.map((session) => deleteSessionOperation(session.id)),
             deleteLessonPlanOperation(id),
             ...normalizedPeers.map(putLessonPlanOperation),
           ]),
           inverse: createPlanningCommand([
             putLessonPlanOperation(existing),
+            ...sessions.map(putSessionOperation),
             ...peers.map(putLessonPlanOperation),
           ]),
         };
         const nextLog = this.createChangeLog(
           'planning.plan.delete',
-          `Delete plan “${existing.title}”`,
+          sessions.length > 0
+            ? `Delete plan “${existing.title}” and ${sessions.length} session${sessions.length === 1 ? '' : 's'}`
+            : `Delete plan “${existing.title}”`,
           commands,
         );
 

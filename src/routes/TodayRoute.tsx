@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   Bell,
   CalendarDays,
+  CalendarPlus,
   ChevronLeft,
   ChevronRight,
   Clock3,
@@ -15,6 +16,7 @@ import {
   buildScheduleBlockHierarchyMetadata,
   type ScheduleBlockHierarchyMetadata,
 } from '@/features/editing/scheduleBlockHierarchy';
+import { buildPlanningEntryHref } from '@/features/planning/planningNavigation';
 import { buildWeekHref } from '@/features/week/weekNavigation';
 import { useWeekPlanningReadModel } from '@/features/week/useWeekPlanningReadModel';
 import type {
@@ -209,6 +211,12 @@ export function TodayRoute() {
               onChange={(event: ChangeEvent<HTMLInputElement>) => setDate(event.target.value)}
             />
           </label>
+          <a
+            className="button button-primary"
+            href={buildPlanningEntryHref({ date, returnTo: 'today' })}
+          >
+            <CalendarPlus aria-hidden="true" size={17} /> New plan
+          </a>
         </div>
       </header>
 
@@ -462,7 +470,7 @@ export function TodayRoute() {
                           {item.sourceType === 'session-occurrence' ? (
                             <a
                               className={styles.occurrenceEdit}
-                              href={`#/planning/session?session=${encodeURIComponent(item.sourceRecordId)}`}
+                              href={`#/planning/session?session=${encodeURIComponent(item.sourceRecordId)}&date=${date}&return=today`}
                               aria-label={`Manage ${item.title} session`}
                             >
                               Manage session

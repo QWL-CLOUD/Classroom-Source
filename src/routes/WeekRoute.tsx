@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, type ChangeEvent, type CSSProperties } from
 import { useSearchParams } from 'react-router-dom';
 
 import { useUiStore } from '@/app/uiStore';
+import { buildPlanningEntryHref } from '@/features/planning/planningNavigation';
 import {
   buildScheduleBlockHierarchyMetadata,
   type ScheduleBlockHierarchyMetadata,
@@ -295,14 +296,13 @@ export function WeekRoute() {
                     <p>{day.shortDateLabel}</p>
                   </div>
 
-                  <button
+                  <a
                     className={styles.addButton}
-                    type="button"
-                    disabled
-                    aria-label={`Add to ${day.label}`}
+                    href={buildPlanningEntryHref({ date: day.date, returnTo: 'week' })}
+                    aria-label={`Add lesson plan to ${day.label}`}
                   >
-                    <Plus size={21} />
-                  </button>
+                    <Plus aria-hidden="true" size={21} />
+                  </a>
                 </header>
 
                 {day.items.length > 0 ? (
@@ -371,7 +371,7 @@ export function WeekRoute() {
                           {item.sourceType === 'session-occurrence' ? (
                             <a
                               className={styles.occurrenceEdit}
-                              href={`#/planning/session?session=${encodeURIComponent(item.sourceRecordId)}`}
+                              href={`#/planning/session?session=${encodeURIComponent(item.sourceRecordId)}&date=${day.date}&return=week`}
                               aria-label={`Manage ${item.title} session`}
                             >
                               Manage session
