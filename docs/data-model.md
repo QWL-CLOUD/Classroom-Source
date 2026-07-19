@@ -93,3 +93,14 @@ follow-up Task remains linked.
 
 The `learnerNotices` table and indexes for context, type, status, date, and update time upgrade Dexie
 to schema version 3 while preserving version 1 and version 2 records.
+
+## Personal Agenda
+
+Personal Agenda is a pure read model over Tasks, Reminders, Calendar Events, Learner Notices, learner
+contexts, Sessions, and Lesson Plans. It assigns each eligible source record to one stable section:
+Overdue, Today, Upcoming, Waiting, or Unscheduled follow-up. The view never writes an Agenda row or
+creates a duplicate source entity.
+
+Task, Reminder, and Learner Notice actions from Agenda call their existing transactional mutation
+services, so global Undo/Redo continues to operate on the original record. Phase 3D-4 does not change
+the Dexie schema; the database remains at version 3.

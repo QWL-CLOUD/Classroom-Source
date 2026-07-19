@@ -1,0 +1,49 @@
+.wrapper {
+  display: grid;
+  gap: 12px;
+}
+
+.heading {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  color: var(--heading);
+}
+
+.heading h2 {
+  margin: 0;
+}
+
+.counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.counts span {
+  padding: 6px 9px;
+  border-radius: 999px;
+  color: #40524f;
+  background: var(--surface-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.counts span[data-emphasis='true'] {
+  color: #6e302b;
+  background: #fff1ee;
+}
+
+.counts strong {
+  color: var(--heading);
+}
+
+.wrapper p {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.wrapper .button {
+  justify-self: start;
+}

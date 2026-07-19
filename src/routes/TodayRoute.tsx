@@ -26,6 +26,7 @@ import type {
 } from '@/features/today/todayReadModel';
 import { buildTodayReadModel } from '@/features/today/todayReadModel';
 import { useScheduleExceptionsForRange } from '@/features/scheduleExceptions/useScheduleExceptionsForRange';
+import { AgendaSummary } from '@/features/agenda/AgendaSummary';
 import { TodayLearnerNoticeList } from '@/features/learnerNotices/TodayLearnerNoticeList';
 import { TodayReminderList } from '@/features/reminders/TodayReminderList';
 import { TaskList } from '@/features/tasks/TaskList';
@@ -234,6 +235,10 @@ export function TodayRoute() {
           <article className={`card ${styles.panel}`}>
             <h2>To-do</h2>
             <TaskList selectedDate={date} compact />
+          </article>
+
+          <article className={`card ${styles.panel}`}>
+            <AgendaSummary selectedDate={date} />
           </article>
 
           <article
