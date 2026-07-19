@@ -786,20 +786,42 @@ export function createReversibleMigrationPlan(
 
     const statusText = stringFrom(record, ['status'])?.toLowerCase();
     const completed = statusText === 'completed' || Boolean(record.completedAt);
+    const cancelled = statusText === 'cancelled' || statusText === 'canceled';
+    const waiting = statusText === 'waiting';
+    const status = completed
+      ? 'completed'
+      : cancelled
+        ? 'cancelled'
+        : waiting
+          ? 'waiting'
+          : 'active';
+    const scheduledDate = isValidDate(record.scheduledDate)
+      ? String(record.scheduledDate)
+      : undefined;
+    const dueDateValue = record.dueDate ?? record.date;
+    const dueDate = isValidDate(dueDateValue) ? String(dueDateValue) : undefined;
     const target = taskSchema.safeParse({
       id: legacyId,
       title: stringFrom(record, ['title', 'task', 'name']),
-      status: completed ? 'completed' : 'active',
-      dueDate: isValidDate(record.dueDate ?? record.date)
-        ? (record.dueDate ?? record.date)
+      notes: stringFrom(record, ['notes', 'details', 'detail']),
+      status,
+      scheduledDate,
+      scheduledMinute: scheduledDate
+        ? parseMinute(record.scheduledMinute ?? record.scheduledTime)
         : undefined,
+      dueDate,
+      dueMinute: dueDate ? parseMinute(record.dueMinute ?? record.dueTime) : undefined,
       contextId: stringFrom(record, ['contextId', 'learnerId', 'personId']),
       linkedEntityType: stringFrom(record, ['linkedEntityType']),
       linkedEntityId: stringFrom(record, ['linkedEntityId']),
       order: Math.round(numberFrom(record, ['order', 'sortOrder']) ?? 0),
       createdAt: parseTimestamp(record.createdAt, generatedAt),
       updatedAt: parseTimestamp(record.updatedAt, generatedAt),
+      waitingAt: waiting ? parseTimestamp(record.waitingAt, generatedAt) : undefined,
       completedAt: completed ? parseTimestamp(record.completedAt, generatedAt) : undefined,
+      cancelledAt: cancelled
+        ? parseTimestamp(record.cancelledAt ?? record.canceledAt, generatedAt)
+        : undefined,
     });
 
     if (!target.success) {

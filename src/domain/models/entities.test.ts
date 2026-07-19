@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { lessonPlanSchema, scheduleBlockSchema, sessionOccurrenceSchema } from './entities';
+import {
+  lessonPlanSchema,
+  scheduleBlockSchema,
+  sessionOccurrenceSchema,
+  taskSchema,
+} from './entities';
 
 describe('domain schemas', () => {
   it('accepts a Friday-only schedule block as ordinary recurrence data', () => {
@@ -43,5 +48,33 @@ describe('domain schemas', () => {
     });
 
     expect(plan.lessonFlow).toBeUndefined();
+  });
+  it('separates task Scheduled and Due values and supports the full lifecycle', () => {
+    const task = taskSchema.parse({
+      id: 'task-1',
+      title: 'Prepare materials',
+      status: 'waiting',
+      scheduledDate: '2026-07-20',
+      scheduledMinute: 540,
+      dueDate: '2026-07-22',
+      dueMinute: 1020,
+      order: 0,
+      createdAt: '2026-07-18T12:00:00.000Z',
+      updatedAt: '2026-07-18T12:00:00.000Z',
+      waitingAt: '2026-07-18T12:00:00.000Z',
+    });
+
+    expect(task).toMatchObject({
+      status: 'waiting',
+      scheduledDate: '2026-07-20',
+      dueDate: '2026-07-22',
+    });
+    expect(() =>
+      taskSchema.parse({
+        ...task,
+        scheduledDate: undefined,
+        scheduledMinute: 540,
+      }),
+    ).toThrow();
   });
 });

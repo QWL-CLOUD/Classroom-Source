@@ -15,6 +15,11 @@ import {
   SCHEDULE_EXCEPTION_COMMAND_PREFIX,
   type ScheduleExceptionCommand,
 } from '@/features/scheduleExceptions/scheduleExceptionCommands';
+import {
+  parseTaskCommand,
+  TASK_COMMAND_PREFIX,
+  type TaskCommand,
+} from '@/features/tasks/taskCommands';
 
 import {
   CALENDAR_EVENT_COMMAND_PREFIX,
@@ -32,7 +37,8 @@ export type SupportedEditCommand =
   | { entity: 'schedule-block'; command: ScheduleBlockCommand }
   | { entity: 'schedule-exception'; command: ScheduleExceptionCommand }
   | { entity: 'planning'; command: PlanningCommand }
-  | { entity: 'learner-context'; command: LearnerContextCommand };
+  | { entity: 'learner-context'; command: LearnerContextCommand }
+  | { entity: 'task'; command: TaskCommand };
 
 export function isSupportedEditChangeLog(log: ChangeLog): boolean {
   return (
@@ -40,7 +46,8 @@ export function isSupportedEditChangeLog(log: ChangeLog): boolean {
     log.commandType.startsWith(SCHEDULE_BLOCK_COMMAND_PREFIX) ||
     log.commandType.startsWith(SCHEDULE_EXCEPTION_COMMAND_PREFIX) ||
     log.commandType.startsWith(PLANNING_COMMAND_PREFIX) ||
-    log.commandType.startsWith(LEARNER_CONTEXT_COMMAND_PREFIX)
+    log.commandType.startsWith(LEARNER_CONTEXT_COMMAND_PREFIX) ||
+    log.commandType.startsWith(TASK_COMMAND_PREFIX)
   );
 }
 
@@ -67,6 +74,12 @@ export function parseSupportedEditCommand(commandType: string, json: string): Su
     return {
       entity: 'learner-context',
       command: parseLearnerContextCommand(json),
+    };
+  }
+  if (commandType.startsWith(TASK_COMMAND_PREFIX)) {
+    return {
+      entity: 'task',
+      command: parseTaskCommand(json),
     };
   }
   if (commandType.startsWith(SCHEDULE_EXCEPTION_COMMAND_PREFIX)) {
@@ -104,6 +117,14 @@ export async function applySupportedEditCommand(
       } else {
         await db.contextMemberships.delete(operation.id);
       }
+    }
+    return;
+  }
+
+  if (parsed.entity === 'task') {
+    for (const operation of parsed.command.operations) {
+      if (operation.action === 'put') await db.tasks.put(operation.record);
+      else await db.tasks.delete(operation.id);
     }
     return;
   }

@@ -158,19 +158,36 @@ export const sessionOccurrenceSchema = z
     path: ['endMinute'],
   });
 
-export const taskSchema = z.object({
-  id: idSchema,
-  title: z.string().min(1),
-  status: z.enum(['active', 'completed']),
-  dueDate: localDateSchema.optional(),
-  contextId: idSchema.optional(),
-  linkedEntityType: z.string().optional(),
-  linkedEntityId: idSchema.optional(),
-  order: z.number().int().default(0),
-  createdAt: timestampSchema,
-  updatedAt: timestampSchema,
-  completedAt: timestampSchema.optional(),
-});
+export const taskStatusSchema = z.enum(['active', 'waiting', 'completed', 'cancelled']);
+
+export const taskSchema = z
+  .object({
+    id: idSchema,
+    title: z.string().min(1),
+    notes: z.string().optional(),
+    status: taskStatusSchema,
+    scheduledDate: localDateSchema.optional(),
+    scheduledMinute: minuteSchema.optional(),
+    dueDate: localDateSchema.optional(),
+    dueMinute: minuteSchema.optional(),
+    contextId: idSchema.optional(),
+    linkedEntityType: z.string().optional(),
+    linkedEntityId: idSchema.optional(),
+    order: z.number().int().default(0),
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+    waitingAt: timestampSchema.optional(),
+    completedAt: timestampSchema.optional(),
+    cancelledAt: timestampSchema.optional(),
+  })
+  .refine((value) => value.scheduledMinute === undefined || value.scheduledDate !== undefined, {
+    message: 'scheduledDate is required when scheduledMinute is set',
+    path: ['scheduledDate'],
+  })
+  .refine((value) => value.dueMinute === undefined || value.dueDate !== undefined, {
+    message: 'dueDate is required when dueMinute is set',
+    path: ['dueDate'],
+  });
 
 export const quickCaptureSchema = z.object({
   id: idSchema,
@@ -228,6 +245,7 @@ export type LessonFlowStep = z.infer<typeof lessonFlowStepSchema>;
 export type LessonContent = z.infer<typeof lessonContentSchema>;
 export type LessonPlan = z.infer<typeof lessonPlanSchema>;
 export type SessionOccurrence = z.infer<typeof sessionOccurrenceSchema>;
+export type TaskStatus = z.infer<typeof taskStatusSchema>;
 export type Task = z.infer<typeof taskSchema>;
 export type QuickCapture = z.infer<typeof quickCaptureSchema>;
 export type MigrationRun = z.infer<typeof migrationRunSchema>;
