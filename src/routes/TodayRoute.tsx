@@ -231,7 +231,7 @@ export function TodayRoute() {
         <div className={styles.leftColumn}>
           <article className={`card ${styles.panel}`}>
             <h2>To-do</h2>
-            <TaskList dueDate={date} compact />
+            <TaskList selectedDate={date} compact />
           </article>
 
           <article

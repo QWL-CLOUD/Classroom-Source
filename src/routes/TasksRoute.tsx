@@ -8,13 +8,12 @@ export function TasksRoute() {
           <p className="page-eyebrow">Workspace</p>
           <h1 className="page-title">Tasks</h1>
           <p className="page-subtitle">
-            This Phase 0 smoke test already shares the same IndexedDB task records with Today.
+            Plan when to work, track a separate deadline, and move the same task through Active,
+            Waiting, Completed, or Cancelled without creating duplicate records.
           </p>
         </div>
       </header>
-      <div className="card" style={{ padding: 24, maxWidth: 820 }}>
-        <TaskList />
-      </div>
+      <TaskList />
     </section>
   );
 }
