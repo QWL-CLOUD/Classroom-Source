@@ -1,7 +1,7 @@
 # Data Model Foundation
 
 The Phase 0 database includes stable tables for school years, learner contexts, recurring schedule
-blocks, date exceptions, calendar events, lesson plans, session occurrences, tasks, migration runs,
+blocks, date exceptions, calendar events, lesson plans, session occurrences, tasks, reminders, migration runs,
 quarantine records, command history, and app settings.
 
 The critical distinction is:
@@ -66,3 +66,13 @@ The commit revalidates the preview inside one Dexie transaction, refuses stale p
 target Schedule Block dates, and stores all Session replacements in one Planning change-log command.
 Global Undo/Redo therefore restores or reapplies the entire shift atomically. Cross-context,
 cross-block, parent-subtree, and automatic collision cascading remain out of scope.
+
+## Reminder foundation
+
+`Reminder` is an independent source-linked record with `sourceType`, `sourceId`, local reminder date
+and minute, lifecycle status, and optional note. It does not copy or replace its Task, Session,
+Calendar Event, or future Learner Notice source. Multiple Reminder records may share the same source.
+
+Dismiss and Snooze mutate only the Reminder. Today queries active Reminder records by `remindDate`;
+Calendar Events are no longer projected into a reminder list. Adding the `reminders` table and its
+source/date indexes upgrades Dexie to schema version 2 while preserving v1 records.
