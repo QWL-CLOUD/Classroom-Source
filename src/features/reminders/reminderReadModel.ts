@@ -54,7 +54,7 @@ function sourceDetails(
     return {
       sourceTitle: source?.title ?? 'Unavailable calendar event',
       sourceAvailable: Boolean(source),
-      sourceHref: source ? `#/calendar/events?date=${source.startDate}` : undefined,
+      sourceHref: source ? `#/calendar?date=${source.startDate}` : undefined,
     };
   }
   if (reminder.sourceType === 'session') {
@@ -66,7 +66,7 @@ function sourceDetails(
       sourceTitle: plan?.title ?? (source ? 'Planned session' : 'Unavailable session'),
       sourceAvailable: Boolean(source),
       sourceHref: source
-        ? `#/session?session=${source.id}&date=${source.date}&return=today`
+        ? `#/planning/session?session=${source.id}&date=${source.date}&return=today`
         : undefined,
     };
   }

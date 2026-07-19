@@ -110,6 +110,12 @@ describe('reminder read models', () => {
       ['Task', 'Prepare materials'],
       ['Calendar event', 'Staff meeting'],
     ]);
+    expect(items.find((item) => item.sourceType === 'session')?.sourceHref).toBe(
+      '#/planning/session?session=session-1&date=2026-07-20&return=today',
+    );
+    expect(items.find((item) => item.sourceType === 'calendar-event')?.sourceHref).toBe(
+      '#/calendar?date=2026-07-20',
+    );
   });
 
   it('snoozes across midnight without changing the source record', () => {
