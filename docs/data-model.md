@@ -1,7 +1,7 @@
 # Data Model Foundation
 
 The Phase 0 database includes stable tables for school years, learner contexts, recurring schedule
-blocks, date exceptions, calendar events, lesson plans, session occurrences, tasks, reminders, migration runs,
+blocks, date exceptions, calendar events, lesson plans, session occurrences, tasks, reminders, learner notices, migration runs,
 quarantine records, command history, and app settings.
 
 The critical distinction is:
@@ -76,3 +76,20 @@ Calendar Event, or future Learner Notice source. Multiple Reminder records may s
 Dismiss and Snooze mutate only the Reminder. Today queries active Reminder records by `remindDate`;
 Calendar Events are no longer projected into a reminder list. Adding the `reminders` table and its
 source/date indexes upgrades Dexie to schema version 2 while preserving v1 records.
+
+## Learner Support & Notices
+
+`LearnerNotice` is one shared source record linked to a stable Class, Group, or Individual context.
+Its type is Ongoing Support, Date-specific Notice, or Learner Service; its lifecycle state is Active,
+Resolved, or Archived. Today and Learners read the same record. Active Ongoing Support and Learner
+Service records appear on every selected Today date, while a Date-specific Notice appears only on
+its `noticeDate`.
+
+Creating a Notice may explicitly create a separate follow-up Task with a stable source link. The
+Notice and optional Task commit as one compound command, but their later lifecycles remain
+independent. Reminder records may also use the Notice as a source. Resolve, Archive, and Reminder
+actions never complete or delete linked Tasks. Safe Notice deletion is blocked while any Reminder or
+follow-up Task remains linked.
+
+The `learnerNotices` table and indexes for context, type, status, date, and update time upgrade Dexie
+to schema version 3 while preserving version 1 and version 2 records.
