@@ -1,0 +1,153 @@
+.panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.heading,
+.heading > div,
+.actions,
+.formActions,
+.reminderSummary {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.heading {
+  justify-content: space-between;
+}
+
+.heading > div {
+  color: var(--heading);
+}
+
+.heading span {
+  min-width: 24px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: var(--heading);
+  background: var(--surface-soft);
+  font-size: 12px;
+  text-align: center;
+}
+
+.form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.form label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: var(--heading);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.form input {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+}
+
+.noteField,
+.formActions,
+.error {
+  grid-column: 1 / -1;
+}
+
+.formActions,
+.actions {
+  flex-wrap: wrap;
+}
+
+.list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list > li {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.reminderSummary {
+  align-items: flex-start;
+}
+
+.reminderSummary > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.reminderSummary strong {
+  color: var(--heading);
+  font-size: 14px;
+}
+
+.reminderSummary span {
+  width: max-content;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #315a4f;
+  background: #e0eee7;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.reminderSummary span[data-status='dismissed'] {
+  color: #5a4d3f;
+  background: #eee8df;
+}
+
+.reminderSummary p,
+.message,
+.error {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.reminderSummary p,
+.message {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.error {
+  color: #7c302b;
+  font-size: 13px;
+}
+
+@media (max-width: 620px) {
+  .form {
+    grid-template-columns: 1fr;
+  }
+
+  .noteField,
+  .formActions,
+  .error {
+    grid-column: auto;
+  }
+}

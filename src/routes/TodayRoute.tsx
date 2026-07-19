@@ -26,6 +26,7 @@ import type {
 } from '@/features/today/todayReadModel';
 import { buildTodayReadModel } from '@/features/today/todayReadModel';
 import { useScheduleExceptionsForRange } from '@/features/scheduleExceptions/useScheduleExceptionsForRange';
+import { TodayReminderList } from '@/features/reminders/TodayReminderList';
 import { TaskList } from '@/features/tasks/TaskList';
 import { useWorkspaceReadModel } from '@/features/workspace/useWorkspaceReadModel';
 import { formatLongDate, shiftDays, todayLocalDate } from '@/shared/dates/localDate';
@@ -242,36 +243,11 @@ export function TodayRoute() {
               <Bell size={19} aria-hidden="true" />
               <h2 id="today-reminders-heading">Reminders</h2>
             </div>
-            <p className={styles.panelIntro}>Calendar events attached to the selected date.</p>
-
-            {state.status === 'loading' || planningState.status === 'loading' ? (
-              <p className={styles.mutedText}>Loading reminders…</p>
-            ) : null}
-            {state.status === 'error' ? (
-              <p className={styles.inlineError}>Reminders could not be loaded.</p>
-            ) : null}
-            {state.status === 'ready' && planningState.status === 'ready' && today ? (
-              today.reminderItems.length > 0 ? (
-                <ul
-                  className={styles.reminderList}
-                  aria-label={`Calendar reminders for ${today.label}`}
-                >
-                  {today.reminderItems.map((reminder) => (
-                    <li key={reminder.occurrenceId}>
-                      <div>
-                        <strong>{reminder.title}</strong>
-                        <span>{reminder.category}</span>
-                      </div>
-                      <time>{reminder.timeLabel}</time>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className={styles.mutedText}>
-                  No calendar reminders or dated events for this date.
-                </p>
-              )
-            ) : null}
+            <p className={styles.panelIntro}>
+              Active reminder records scheduled for the selected date. Dismissing a reminder never
+              completes its source task or changes its source record.
+            </p>
+            <TodayReminderList selectedDate={date} />
           </article>
 
           <article className={`card ${styles.panel}`}>

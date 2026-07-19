@@ -45,15 +45,6 @@ export interface TodayTimelineItem {
   statusLabel: string;
 }
 
-export interface TodayReminderItem {
-  occurrenceId: string;
-  sourceRecordId: string;
-  title: string;
-  category: string;
-  timeLabel: string;
-  spanPosition: TodaySpanPosition;
-}
-
 export interface TodayReadModel {
   date: string;
   label: string;
@@ -61,7 +52,6 @@ export interface TodayReadModel {
   isPastDate: boolean;
   isFutureDate: boolean;
   timelineItems: TodayTimelineItem[];
-  reminderItems: TodayReminderItem[];
   focusItem: TodayTimelineItem | null;
   focusLabel: TodayFocusLabel | null;
   sourceScheduleBlockCount: number;
@@ -412,17 +402,6 @@ function chooseFocusItem(
   };
 }
 
-function toReminderItem(item: TodayItemDraft): TodayReminderItem {
-  return {
-    occurrenceId: item.occurrenceId,
-    sourceRecordId: item.sourceRecordId,
-    title: item.title,
-    category: item.category,
-    timeLabel: item.timeLabel,
-    spanPosition: item.spanPosition,
-  };
-}
-
 export function buildTodayReadModel(
   selectedDate: string,
   scheduleBlocks: readonly ScheduleBlock[],
@@ -470,7 +449,6 @@ export function buildTodayReadModel(
       };
     });
 
-  const reminderItems = eventItems.slice().sort(compareTodayItems).map(toReminderItem);
   const focus = chooseFocusItem(timelineItems, selectedDate, currentDate);
 
   return {
@@ -480,7 +458,6 @@ export function buildTodayReadModel(
     isPastDate: selectedDate < currentDate,
     isFutureDate: selectedDate > currentDate,
     timelineItems,
-    reminderItems,
     focusItem: focus.item,
     focusLabel: focus.label,
     sourceScheduleBlockCount: visibleScheduleBlocks.length,

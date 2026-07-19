@@ -13,6 +13,7 @@ import {
   toCalendarEventEditorValues,
   type CalendarEventEditorValues,
 } from '@/features/editing/calendarEventEditorModel';
+import { ReminderPanel } from '@/features/reminders/ReminderPanel';
 import { useWorkspaceReadModel } from '@/features/workspace/useWorkspaceReadModel';
 import { formatLongDate } from '@/shared/dates/localDate';
 import { useDateSearchParam } from '@/shared/dates/useDateSearchParam';
@@ -190,6 +191,16 @@ function CalendarEventForm({
           />
         </label>
       </div>
+
+      {event ? (
+        <ReminderPanel
+          sourceType="calendar-event"
+          sourceId={event.id}
+          sourceTitle={event.title}
+          defaultDate={event.startDate}
+          defaultMinute={event.startMinute}
+        />
+      ) : null}
 
       {error ? (
         <p className={styles.error} role="alert">

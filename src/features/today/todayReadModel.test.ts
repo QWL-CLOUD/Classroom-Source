@@ -79,15 +79,11 @@ describe('Today read model', () => {
     expect(model.timelineItems.find((item) => item.title === 'Chinese lesson')?.parentTitle).toBe(
       'Grade 3 day',
     );
-    expect(model.reminderItems.map((item) => item.title)).toEqual([
-      'School holiday',
-      'Staff meeting',
-    ]);
     expect(model.sourceScheduleBlockCount).toBe(2);
     expect(model.sourceCalendarEventCount).toBe(2);
   });
 
-  it('suppresses only an exact dated duplicate and retains its calendar reminder', () => {
+  it('suppresses only an exact dated duplicate in the timeline', () => {
     const model = buildTodayReadModel(
       '2026-07-15',
       [
@@ -114,7 +110,6 @@ describe('Today read model', () => {
 
     expect(model.timelineItems).toHaveLength(1);
     expect(model.timelineItems[0]?.sourceType).toBe('calendar-event');
-    expect(model.reminderItems).toHaveLength(1);
     expect(model.hiddenDuplicateCount).toBe(1);
   });
 

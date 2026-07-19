@@ -99,6 +99,19 @@ const syntheticTodayRecords = {
       source: 'synthetic-e2e',
     },
   ],
+  reminders: [
+    {
+      id: 'phase-2d-real-reminder',
+      sourceType: 'calendar-event',
+      sourceId: 'phase-2d-timed-event',
+      remindDate: '2026-07-15',
+      remindMinute: 570,
+      status: 'active',
+      note: 'Bring the updated agenda.',
+      createdAt: '2026-07-15T08:00:00.000Z',
+      updatedAt: '2026-07-15T08:00:00.000Z',
+    },
+  ],
   learnerContexts: [
     {
       id: 'phase-2d-class-context',
@@ -194,12 +207,13 @@ test('Today composes the selected date from v20 schedule and calendar records', 
   ).toBeVisible();
 
   const reminders = page.getByRole('list', {
-    name: 'Calendar reminders for Wednesday, July 15, 2026',
+    name: 'Reminders for Wednesday, July 15, 2026',
   });
-  await expect(reminders.getByText('Synthetic school holiday')).toBeVisible();
   await expect(reminders.getByText('Synthetic staff meeting')).toBeVisible();
-  await expect(reminders.getByText('Synthetic duplicated lesson')).toBeVisible();
-  await expect(reminders.getByText('Synthetic summer institute')).toBeVisible();
+  await expect(reminders.getByText('Calendar event')).toBeVisible();
+  await expect(reminders.getByText('9:30 AM')).toBeVisible();
+  await expect(reminders.getByText('Bring the updated agenda.')).toBeVisible();
+  await expect(reminders.getByText('Synthetic school holiday')).toHaveCount(0);
 
   await expect(
     page.getByText('1 exact dated duplicate suppressed in this timeline.'),
