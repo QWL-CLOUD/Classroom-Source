@@ -19,6 +19,7 @@ export interface LearnerContextQuery {
 export interface CoreRecordCounts {
   schoolYears: number;
   learnerContexts: number;
+  learnerNotices: number;
   scheduleBlocks: number;
   calendarEvents: number;
   lessonPlans: number;

@@ -1,0 +1,104 @@
+.wrapper {
+  display: grid;
+  gap: 12px;
+}
+
+.quickForm {
+  display: grid;
+  gap: 10px;
+}
+
+.quickForm label {
+  display: grid;
+  gap: 5px;
+  color: var(--heading);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.quickForm input,
+.quickForm select {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  background: #fff;
+  font: inherit;
+}
+
+.checkboxLabel {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.checkboxLabel input {
+  width: auto;
+}
+
+.rule,
+.message,
+.error {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.rule,
+.message {
+  color: #43564f;
+}
+
+.error {
+  padding: 9px 10px;
+  border-radius: 9px;
+  color: #7a302c;
+  background: #f7e7e5;
+}
+
+.list {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list li {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.list li > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.list span {
+  color: #355f54;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.list strong {
+  color: var(--heading);
+  font-size: 14px;
+}
+
+.list small {
+  color: #43564f;
+  font-size: 12px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}

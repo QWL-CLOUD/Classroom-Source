@@ -135,9 +135,16 @@ describe('ReminderMutationService', () => {
     expect((await database.tasks.get('task-1'))?.status).toBe('active');
   });
 
-  it('validates Task, Session, and Calendar Event sources and defers Learner Notice UI', async () => {
+  it('validates Task, Session, Calendar Event, and Learner Notice sources', async () => {
     const service = serviceWithIds(
-      ['event-reminder', 'event-log', 'session-reminder', 'session-log'],
+      [
+        'event-reminder',
+        'event-log',
+        'session-reminder',
+        'session-log',
+        'notice-reminder',
+        'notice-log',
+      ],
       ['2026-07-18T12:00:00.000Z', '2026-07-18T12:05:00.000Z'],
     );
 
@@ -169,6 +176,24 @@ describe('ReminderMutationService', () => {
         remindDate: '2026-07-20',
         remindMinute: 600,
       }),
-    ).rejects.toThrow('Learner Notice reminders');
+    ).rejects.toThrow('Learner notice source not found.');
+
+    await database.learnerNotices.put({
+      id: 'notice-1',
+      contextId: 'context-1',
+      kind: 'ongoing-support',
+      title: 'Synthetic support',
+      status: 'active',
+      createdAt: '2026-07-18T12:00:00.000Z',
+      updatedAt: '2026-07-18T12:00:00.000Z',
+    });
+    await expect(
+      service.create({
+        sourceType: 'learner-notice',
+        sourceId: 'notice-1',
+        remindDate: '2026-07-20',
+        remindMinute: 600,
+      }),
+    ).resolves.toMatchObject({ sourceType: 'learner-notice', sourceId: 'notice-1' });
   });
 });

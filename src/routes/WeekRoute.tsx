@@ -152,7 +152,7 @@ export function WeekRoute() {
       const target = itemRefs.current.get(focusId);
       if (!target) return;
       target.scrollIntoView({
-        behavior: 'smooth',
+        behavior: 'auto',
         block: 'nearest',
         inline: 'center',
       });

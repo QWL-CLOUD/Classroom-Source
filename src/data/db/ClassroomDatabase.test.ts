@@ -12,7 +12,7 @@ afterEach(async () => {
 });
 
 describe('ClassroomDatabase schema upgrades', () => {
-  it('upgrades v1 data to schema v2 and adds the Reminder store without losing Tasks', async () => {
+  it('upgrades legacy data to schema v3 and adds Reminder and Learner Notice stores without losing Tasks', async () => {
     const name = `classroom-v20-upgrade-${crypto.randomUUID()}`;
     names.push(name);
     const legacy = new Dexie(name);
@@ -33,7 +33,7 @@ describe('ClassroomDatabase schema upgrades', () => {
     const upgraded = new ClassroomDatabase(name);
     await upgraded.open();
 
-    expect(upgraded.verno).toBe(2);
+    expect(upgraded.verno).toBe(3);
     expect(await upgraded.tasks.get('legacy-task')).toBeDefined();
     await upgraded.reminders.put({
       id: 'reminder-1',
@@ -46,6 +46,16 @@ describe('ClassroomDatabase schema upgrades', () => {
       updatedAt: '2026-07-18T12:00:00.000Z',
     });
     expect(await upgraded.reminders.count()).toBe(1);
+    await upgraded.learnerNotices.put({
+      id: 'notice-1',
+      contextId: 'context-1',
+      kind: 'ongoing-support',
+      title: 'Synthetic support',
+      status: 'active',
+      createdAt: '2026-07-18T12:00:00.000Z',
+      updatedAt: '2026-07-18T12:00:00.000Z',
+    });
+    expect(await upgraded.learnerNotices.count()).toBe(1);
     upgraded.close();
   });
 });

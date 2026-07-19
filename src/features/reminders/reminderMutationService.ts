@@ -77,11 +77,14 @@ export class ReminderMutationService {
     const parsed = reminderEditorValuesSchema.parse(values);
     const result = await this.db.transaction(
       'rw',
-      this.db.reminders,
-      this.db.tasks,
-      this.db.sessionOccurrences,
-      this.db.calendarEvents,
-      this.db.changeLog,
+      [
+        this.db.reminders,
+        this.db.tasks,
+        this.db.learnerNotices,
+        this.db.sessionOccurrences,
+        this.db.calendarEvents,
+        this.db.changeLog,
+      ],
       async (): Promise<CommitResult<Reminder>> => {
         await this.requireSource(parsed.sourceType, parsed.sourceId);
         const now = this.now();
@@ -233,7 +236,9 @@ export class ReminderMutationService {
       }
       return;
     }
-    throw new Error('Learner Notice reminders will be enabled with Learner Support & Notices.');
+    if (!(await this.db.learnerNotices.get(sourceId))) {
+      throw new Error('Learner notice source not found.');
+    }
   }
 
   private async requireReminder(id: string): Promise<Reminder> {

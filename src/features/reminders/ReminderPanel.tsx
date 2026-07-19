@@ -11,7 +11,7 @@ import { formatReminderMinute, shiftReminderSchedule } from './reminderReadModel
 import styles from './ReminderPanel.module.css';
 
 interface ReminderPanelProps {
-  sourceType: Exclude<ReminderSourceType, 'learner-notice'>;
+  sourceType: ReminderSourceType;
   sourceId: string;
   sourceTitle: string;
   defaultDate?: string;

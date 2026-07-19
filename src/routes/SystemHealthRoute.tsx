@@ -6,6 +6,7 @@ import styles from './SystemHealthRoute.module.css';
 const countLabels: ReadonlyArray<[keyof CoreRecordCounts, string]> = [
   ['schoolYears', 'School years'],
   ['learnerContexts', 'Learner contexts'],
+  ['learnerNotices', 'Learner notices'],
   ['scheduleBlocks', 'Schedule blocks'],
   ['calendarEvents', 'Calendar events'],
   ['lessonPlans', 'Lesson plans'],
@@ -58,7 +59,7 @@ export function SystemHealthRoute() {
         <article className="card">
           <ShieldCheck size={25} />
           <span>Schema version</span>
-          <strong>2</strong>
+          <strong>3</strong>
         </article>
         <article className="card">
           <CheckCircle2 size={25} />

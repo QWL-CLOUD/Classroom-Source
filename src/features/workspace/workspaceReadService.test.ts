@@ -25,6 +25,7 @@ function createRepository(overrides: Partial<ClassroomRepository> = {}): Classro
     countCoreRecords: vi.fn().mockResolvedValue({
       schoolYears: 0,
       learnerContexts: 0,
+      learnerNotices: 0,
       scheduleBlocks: 0,
       calendarEvents: 0,
       lessonPlans: 0,
@@ -39,6 +40,7 @@ function createRepository(overrides: Partial<ClassroomRepository> = {}): Classro
       counts: {
         schoolYears: 0,
         learnerContexts: 0,
+        learnerNotices: 0,
         scheduleBlocks: 0,
         calendarEvents: 0,
         lessonPlans: 0,
