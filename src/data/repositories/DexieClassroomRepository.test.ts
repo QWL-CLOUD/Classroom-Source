@@ -266,6 +266,7 @@ describe('DexieClassroomRepository read models', () => {
     expect(summary.counts).toMatchObject({
       schoolYears: 1,
       learnerContexts: 1,
+      learnerNotices: 0,
       scheduleBlocks: 0,
       calendarEvents: 0,
       quarantine: 0,

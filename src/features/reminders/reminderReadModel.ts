@@ -1,5 +1,6 @@
 import type {
   CalendarEvent,
+  LearnerNotice,
   LessonPlan,
   Reminder,
   ReminderSourceType,
@@ -14,6 +15,7 @@ export interface ReminderSourceSnapshot {
   sessions: readonly SessionOccurrence[];
   lessonPlans: readonly LessonPlan[];
   calendarEvents: readonly CalendarEvent[];
+  learnerNotices: readonly LearnerNotice[];
 }
 
 export interface ReminderListItem extends Reminder {
@@ -68,9 +70,13 @@ function sourceDetails(
         : undefined,
     };
   }
+  const source = snapshot.learnerNotices.find((notice) => notice.id === reminder.sourceId);
   return {
-    sourceTitle: 'Learner notice',
-    sourceAvailable: false,
+    sourceTitle: source?.title ?? 'Unavailable learner notice',
+    sourceAvailable: Boolean(source),
+    sourceHref: source
+      ? `#/learners?context=${encodeURIComponent(source.contextId)}&support=active`
+      : undefined,
   };
 }
 

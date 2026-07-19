@@ -44,6 +44,7 @@ export interface LearnerContextDeleteImpact {
   lessonPlans: number;
   sessions: number;
   tasks: number;
+  learnerNotices: number;
   totalLinkedRecords: number;
   canDelete: boolean;
 }
@@ -69,6 +70,7 @@ export function learnerContextDeleteImpactItems(
     { label: 'Plans', count: impact.lessonPlans },
     { label: 'Sessions', count: impact.sessions },
     { label: 'Tasks', count: impact.tasks },
+    { label: 'Learner notices', count: impact.learnerNotices },
   ].filter((item) => item.count > 0);
 }
 
@@ -148,6 +150,7 @@ export class LearnerContextMutationService {
         this.db.lessonPlans,
         this.db.sessionOccurrences,
         this.db.tasks,
+        this.db.learnerNotices,
       ],
       async () => {
         const context = await this.requireContext(id);
@@ -168,6 +171,7 @@ export class LearnerContextMutationService {
         this.db.lessonPlans,
         this.db.sessionOccurrences,
         this.db.tasks,
+        this.db.learnerNotices,
         this.db.changeLog,
       ],
       async () => {
@@ -242,6 +246,7 @@ export class LearnerContextMutationService {
       lessonPlans,
       sessions,
       tasks,
+      learnerNotices,
     ] = await Promise.all([
       this.db.contextMemberships.where('containerContextId').equals(context.id).toArray(),
       this.db.contextMemberships.where('memberContextId').equals(context.id).toArray(),
@@ -251,12 +256,20 @@ export class LearnerContextMutationService {
       this.db.lessonPlans.where('contextId').equals(context.id).count(),
       this.db.sessionOccurrences.where('contextId').equals(context.id).count(),
       this.db.tasks.where('contextId').equals(context.id).count(),
+      this.db.learnerNotices.where('contextId').equals(context.id).count(),
     ]);
     const memberships = new Set(
       [...containerMemberships, ...memberMemberships].map((membership) => membership.id),
     ).size;
     const totalLinkedRecords =
-      memberships + scheduleBlocks + calendarEvents + lessonSeries + lessonPlans + sessions + tasks;
+      memberships +
+      scheduleBlocks +
+      calendarEvents +
+      lessonSeries +
+      lessonPlans +
+      sessions +
+      tasks +
+      learnerNotices;
 
     return {
       contextId: context.id,
@@ -268,6 +281,7 @@ export class LearnerContextMutationService {
       lessonPlans,
       sessions,
       tasks,
+      learnerNotices,
       totalLinkedRecords,
       canDelete: totalLinkedRecords === 0,
     };

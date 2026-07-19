@@ -184,6 +184,7 @@ describe('LearnerContextMutationService', () => {
       lessonPlans: 1,
       sessions: 1,
       tasks: 1,
+      learnerNotices: 0,
       totalLinkedRecords: 8,
       canDelete: false,
     });

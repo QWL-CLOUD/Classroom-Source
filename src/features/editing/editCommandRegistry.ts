@@ -1,6 +1,11 @@
 import type { ClassroomDatabase } from '@/data/db/ClassroomDatabase';
 import { changeLogSchema, type ChangeLog } from '@/domain/models/entities';
 import {
+  LEARNER_NOTICE_COMMAND_PREFIX,
+  parseLearnerNoticeCommand,
+  type LearnerNoticeCommand,
+} from '@/features/learnerNotices/learnerNoticeCommands';
+import {
   LEARNER_CONTEXT_COMMAND_PREFIX,
   parseLearnerContextCommand,
   type LearnerContextCommand,
@@ -43,6 +48,7 @@ export type SupportedEditCommand =
   | { entity: 'schedule-exception'; command: ScheduleExceptionCommand }
   | { entity: 'planning'; command: PlanningCommand }
   | { entity: 'learner-context'; command: LearnerContextCommand }
+  | { entity: 'learner-notice'; command: LearnerNoticeCommand }
   | { entity: 'task'; command: TaskCommand }
   | { entity: 'reminder'; command: ReminderCommand };
 
@@ -53,6 +59,7 @@ export function isSupportedEditChangeLog(log: ChangeLog): boolean {
     log.commandType.startsWith(SCHEDULE_EXCEPTION_COMMAND_PREFIX) ||
     log.commandType.startsWith(PLANNING_COMMAND_PREFIX) ||
     log.commandType.startsWith(LEARNER_CONTEXT_COMMAND_PREFIX) ||
+    log.commandType.startsWith(LEARNER_NOTICE_COMMAND_PREFIX) ||
     log.commandType.startsWith(TASK_COMMAND_PREFIX) ||
     log.commandType.startsWith(REMINDER_COMMAND_PREFIX)
   );
@@ -81,6 +88,12 @@ export function parseSupportedEditCommand(commandType: string, json: string): Su
     return {
       entity: 'learner-context',
       command: parseLearnerContextCommand(json),
+    };
+  }
+  if (commandType.startsWith(LEARNER_NOTICE_COMMAND_PREFIX)) {
+    return {
+      entity: 'learner-notice',
+      command: parseLearnerNoticeCommand(json),
     };
   }
   if (commandType.startsWith(TASK_COMMAND_PREFIX)) {
@@ -129,6 +142,20 @@ export async function applySupportedEditCommand(
         await db.contextMemberships.put(operation.record);
       } else {
         await db.contextMemberships.delete(operation.id);
+      }
+    }
+    return;
+  }
+
+  if (parsed.entity === 'learner-notice') {
+    for (const operation of parsed.command.operations) {
+      if (operation.table === 'learnerNotices') {
+        if (operation.action === 'put') await db.learnerNotices.put(operation.record);
+        else await db.learnerNotices.delete(operation.id);
+      } else if (operation.action === 'put') {
+        await db.tasks.put(operation.record);
+      } else {
+        await db.tasks.delete(operation.id);
       }
     }
     return;

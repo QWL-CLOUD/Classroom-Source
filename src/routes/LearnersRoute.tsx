@@ -20,6 +20,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ZodError } from 'zod';
 
 import type { LearnerContext } from '@/domain/models/entities';
+import { LearnerNoticePanel } from '@/features/learnerNotices/LearnerNoticePanel';
 import type { LearnerPlanningView } from '@/domain/readModels/learnerReadModels';
 import {
   learnerContextDeleteImpactItems,
@@ -877,6 +878,8 @@ export function LearnersRoute() {
                   onStatusChanged={keepSelectedContextInStatus}
                   onDeleted={clearDeletedContext}
                 />
+
+                <LearnerNoticePanel context={model.selectedContext} />
 
                 <section className={`card ${styles.planningWorkspace}`}>
                   <div className={styles.planningHeader}>

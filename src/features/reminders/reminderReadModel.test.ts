@@ -41,12 +41,13 @@ describe('reminder read models', () => {
     ]);
   });
 
-  it('resolves Task, Session, and Calendar Event source titles without copying source records', () => {
+  it('resolves Task, Session, Calendar Event, and Learner Notice source titles without copying source records', () => {
     const items = buildReminderListItems(
       [
         reminder({ id: 'task-reminder', sourceType: 'task', sourceId: 'task-1' }),
         reminder({ id: 'session-reminder', sourceType: 'session', sourceId: 'session-1' }),
         reminder({ id: 'event-reminder', sourceType: 'calendar-event', sourceId: 'event-1' }),
+        reminder({ id: 'notice-reminder', sourceType: 'learner-notice', sourceId: 'notice-1' }),
       ],
       {
         tasks: [
@@ -81,6 +82,17 @@ describe('reminder read models', () => {
             updatedAt: '2026-07-18T12:00:00.000Z',
           },
         ],
+        learnerNotices: [
+          {
+            id: 'notice-1',
+            contextId: 'class-1',
+            kind: 'ongoing-support',
+            title: 'Check reading folder',
+            status: 'active',
+            createdAt: '2026-07-18T12:00:00.000Z',
+            updatedAt: '2026-07-18T12:00:00.000Z',
+          },
+        ],
         calendarEvents: [
           {
             id: 'event-1',
@@ -93,6 +105,7 @@ describe('reminder read models', () => {
     );
 
     expect(items.map((item) => [item.sourceTypeLabel, item.sourceTitle])).toEqual([
+      ['Learner notice', 'Check reading folder'],
       ['Session', 'Chinese lesson'],
       ['Task', 'Prepare materials'],
       ['Calendar event', 'Staff meeting'],

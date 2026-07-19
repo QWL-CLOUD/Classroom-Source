@@ -26,6 +26,7 @@ import type {
 } from '@/features/today/todayReadModel';
 import { buildTodayReadModel } from '@/features/today/todayReadModel';
 import { useScheduleExceptionsForRange } from '@/features/scheduleExceptions/useScheduleExceptionsForRange';
+import { TodayLearnerNoticeList } from '@/features/learnerNotices/TodayLearnerNoticeList';
 import { TodayReminderList } from '@/features/reminders/TodayReminderList';
 import { TaskList } from '@/features/tasks/TaskList';
 import { useWorkspaceReadModel } from '@/features/workspace/useWorkspaceReadModel';
@@ -255,7 +256,7 @@ export function TodayRoute() {
               <Users size={19} aria-hidden="true" />
               <h2>Students to notice</h2>
             </div>
-            <p>No learner notices have been migrated yet.</p>
+            <TodayLearnerNoticeList selectedDate={date} />
             {state.status === 'ready' && state.data.learnerContexts.length > 0 ? (
               <p className={styles.contextNote}>
                 {state.data.learnerContexts.length} active learner{' '}

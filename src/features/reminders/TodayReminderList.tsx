@@ -18,13 +18,15 @@ export function TodayReminderList({ selectedDate }: { selectedDate: string }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const data = useLiveQuery(async () => {
-    const [reminderValues, tasks, sessions, lessonPlanValues, calendarEvents] = await Promise.all([
-      classroomDb.reminders.where('remindDate').equals(selectedDate).toArray(),
-      classroomDb.tasks.toArray(),
-      classroomDb.sessionOccurrences.toArray(),
-      classroomDb.lessonPlans.toArray(),
-      classroomDb.calendarEvents.toArray(),
-    ]);
+    const [reminderValues, tasks, sessions, lessonPlanValues, calendarEvents, learnerNotices] =
+      await Promise.all([
+        classroomDb.reminders.where('remindDate').equals(selectedDate).toArray(),
+        classroomDb.tasks.toArray(),
+        classroomDb.sessionOccurrences.toArray(),
+        classroomDb.lessonPlans.toArray(),
+        classroomDb.calendarEvents.toArray(),
+        classroomDb.learnerNotices.toArray(),
+      ]);
     const reminders = selectActiveRemindersForDate(
       reminderValues.map((value) => reminderSchema.parse(value)),
       selectedDate,
@@ -34,6 +36,7 @@ export function TodayReminderList({ selectedDate }: { selectedDate: string }) {
       sessions,
       lessonPlans: lessonPlanValues.map((value) => lessonPlanSchema.parse(value)),
       calendarEvents,
+      learnerNotices,
     });
   }, [selectedDate]);
   const items = useMemo(() => data ?? [], [data]);

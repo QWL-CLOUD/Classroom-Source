@@ -41,6 +41,7 @@ export class EditHistoryService {
       [
         this.db.calendarEvents,
         this.db.learnerContexts,
+        this.db.learnerNotices,
         this.db.contextMemberships,
         this.db.scheduleBlocks,
         this.db.scheduleExceptions,
@@ -78,6 +79,7 @@ export class EditHistoryService {
       [
         this.db.calendarEvents,
         this.db.learnerContexts,
+        this.db.learnerNotices,
         this.db.contextMemberships,
         this.db.scheduleBlocks,
         this.db.scheduleExceptions,

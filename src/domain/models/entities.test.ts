@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  learnerNoticeSchema,
   lessonPlanSchema,
   reminderSchema,
   scheduleBlockSchema,
@@ -78,6 +79,27 @@ describe('domain schemas', () => {
       }),
     ).toThrow();
   });
+
+  it('requires a date for date-specific learner notices while keeping support records open-ended', () => {
+    const support = learnerNoticeSchema.parse({
+      id: 'notice-support',
+      contextId: 'context-1',
+      kind: 'ongoing-support',
+      title: 'Reading support',
+      status: 'active',
+      createdAt: '2026-07-18T12:00:00.000Z',
+      updatedAt: '2026-07-18T12:00:00.000Z',
+    });
+    expect(support.noticeDate).toBeUndefined();
+    expect(() =>
+      learnerNoticeSchema.parse({
+        ...support,
+        id: 'notice-date',
+        kind: 'date-specific-notice',
+      }),
+    ).toThrow('requires a date');
+  });
+
   it('models Reminder as a separate source-linked record', () => {
     const reminder = reminderSchema.parse({
       id: 'reminder-1',

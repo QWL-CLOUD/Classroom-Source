@@ -158,6 +158,38 @@ export const sessionOccurrenceSchema = z
     path: ['endMinute'],
   });
 
+export const learnerNoticeKindSchema = z.enum([
+  'ongoing-support',
+  'date-specific-notice',
+  'learner-service',
+]);
+
+export const learnerNoticeStatusSchema = z.enum(['active', 'resolved', 'archived']);
+
+export const learnerNoticeSchema = z
+  .object({
+    id: idSchema,
+    contextId: idSchema,
+    kind: learnerNoticeKindSchema,
+    title: z.string().min(1).max(240),
+    details: z.string().max(5000).optional(),
+    noticeDate: localDateSchema.optional(),
+    status: learnerNoticeStatusSchema.default('active'),
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+    resolvedAt: timestampSchema.optional(),
+    archivedAt: timestampSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.kind === 'date-specific-notice' && !value.noticeDate) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A date-specific notice requires a date.',
+        path: ['noticeDate'],
+      });
+    }
+  });
+
 export const reminderSourceTypeSchema = z.enum([
   'task',
   'session',
@@ -268,6 +300,9 @@ export type LessonFlowStep = z.infer<typeof lessonFlowStepSchema>;
 export type LessonContent = z.infer<typeof lessonContentSchema>;
 export type LessonPlan = z.infer<typeof lessonPlanSchema>;
 export type SessionOccurrence = z.infer<typeof sessionOccurrenceSchema>;
+export type LearnerNoticeKind = z.infer<typeof learnerNoticeKindSchema>;
+export type LearnerNoticeStatus = z.infer<typeof learnerNoticeStatusSchema>;
+export type LearnerNotice = z.infer<typeof learnerNoticeSchema>;
 export type ReminderSourceType = z.infer<typeof reminderSourceTypeSchema>;
 export type ReminderStatus = z.infer<typeof reminderStatusSchema>;
 export type Reminder = z.infer<typeof reminderSchema>;

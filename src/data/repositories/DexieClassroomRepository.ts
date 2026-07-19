@@ -285,6 +285,7 @@ export class DexieClassroomRepository implements ClassroomRepository {
     const [
       schoolYears,
       learnerContexts,
+      learnerNotices,
       scheduleBlocks,
       calendarEvents,
       lessonPlans,
@@ -296,6 +297,7 @@ export class DexieClassroomRepository implements ClassroomRepository {
     ] = await Promise.all([
       this.db.schoolYears.count(),
       this.db.learnerContexts.count(),
+      this.db.learnerNotices.count(),
       this.db.scheduleBlocks.count(),
       this.db.calendarEvents.count(),
       this.db.lessonPlans.count(),
@@ -309,6 +311,7 @@ export class DexieClassroomRepository implements ClassroomRepository {
     return {
       schoolYears,
       learnerContexts,
+      learnerNotices,
       scheduleBlocks,
       calendarEvents,
       lessonPlans,
