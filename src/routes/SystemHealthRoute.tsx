@@ -11,6 +11,7 @@ const countLabels: ReadonlyArray<[keyof CoreRecordCounts, string]> = [
   ['lessonPlans', 'Lesson plans'],
   ['sessions', 'Sessions'],
   ['tasks', 'Tasks'],
+  ['reminders', 'Reminders'],
   ['migrationRuns', 'Migration runs'],
   ['quarantine', 'Quarantine records'],
 ];
@@ -57,7 +58,7 @@ export function SystemHealthRoute() {
         <article className="card">
           <ShieldCheck size={25} />
           <span>Schema version</span>
-          <strong>1</strong>
+          <strong>2</strong>
         </article>
         <article className="card">
           <CheckCircle2 size={25} />

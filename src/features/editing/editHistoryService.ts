@@ -48,6 +48,7 @@ export class EditHistoryService {
         this.db.lessonPlans,
         this.db.sessionOccurrences,
         this.db.tasks,
+        this.db.reminders,
         this.db.changeLog,
       ],
       async () => {
@@ -84,6 +85,7 @@ export class EditHistoryService {
         this.db.lessonPlans,
         this.db.sessionOccurrences,
         this.db.tasks,
+        this.db.reminders,
         this.db.changeLog,
       ],
       async () => {

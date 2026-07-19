@@ -24,6 +24,7 @@ export interface CoreRecordCounts {
   lessonPlans: number;
   sessions: number;
   tasks: number;
+  reminders: number;
   migrationRuns: number;
   quarantine: number;
 }

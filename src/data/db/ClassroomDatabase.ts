@@ -10,6 +10,7 @@ import type {
   MigrationRun,
   QuarantineRecord,
   QuickCapture,
+  Reminder,
   ScheduleBlock,
   ScheduleException,
   SchoolYear,
@@ -29,6 +30,7 @@ export class ClassroomDatabase extends Dexie {
   sessionOccurrences!: EntityTable<SessionOccurrence, 'id'>;
   tasks!: EntityTable<Task, 'id'>;
   quickCaptures!: EntityTable<QuickCapture, 'id'>;
+  reminders!: EntityTable<Reminder, 'id'>;
   migrationRuns!: EntityTable<MigrationRun, 'id'>;
   quarantineRecords!: EntityTable<QuarantineRecord, 'id'>;
   changeLog!: EntityTable<ChangeLog, 'id'>;
@@ -49,6 +51,26 @@ export class ClassroomDatabase extends Dexie {
       sessionOccurrences: 'id, date, lessonPlanId, contextId, scheduleBlockId, deliveryState',
       tasks: 'id, status, dueDate, contextId, order, updatedAt',
       quickCaptures: 'id, capturedOn, createdAt',
+      migrationRuns: 'id, status, startedAt',
+      quarantineRecords: 'id, migrationRunId, entityType, legacyStoreKey, createdAt',
+      changeLog: 'id, createdAt, undoneAt, commandType',
+      appSettings: 'key, updatedAt',
+    });
+
+    this.version(2).stores({
+      schoolYears: 'id, active, startsOn, endsOn',
+      learnerContexts: 'id, kind, schoolYearId, status, name',
+      contextMemberships: 'id, containerContextId, memberContextId',
+      scheduleBlocks: 'id, parentId, contextId, *weekdays, effectiveFrom, effectiveTo, sortOrder',
+      scheduleExceptions: 'id, date, scheduleBlockId, action',
+      calendarEvents: 'id, startDate, endDate, category, contextId',
+      lessonSeries: 'id, contextId, subject',
+      lessonPlans: 'id, contextId, workflowState, seriesId, preferredScheduleBlockId, updatedAt',
+      sessionOccurrences: 'id, date, lessonPlanId, contextId, scheduleBlockId, deliveryState',
+      tasks: 'id, status, scheduledDate, dueDate, contextId, order, updatedAt',
+      quickCaptures: 'id, capturedOn, createdAt',
+      reminders:
+        'id, [sourceType+sourceId], sourceType, sourceId, status, remindDate, remindMinute, updatedAt',
       migrationRuns: 'id, status, startedAt',
       quarantineRecords: 'id, migrationRunId, entityType, legacyStoreKey, createdAt',
       changeLog: 'id, createdAt, undoneAt, commandType',

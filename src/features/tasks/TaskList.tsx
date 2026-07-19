@@ -14,6 +14,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 
 import { classroomDb } from '@/data/db/ClassroomDatabase';
 import type { LearnerContext, Task, TaskStatus } from '@/domain/models/entities';
+import { ReminderPanel } from '@/features/reminders/ReminderPanel';
 import { formatShortDate } from '@/shared/dates/localDate';
 
 import { taskMutationService, type TaskEditorValues } from './taskMutationService';
@@ -367,6 +368,14 @@ function TaskCard({
           </div>
 
           {task.notes ? <p className={styles.notes}>{task.notes}</p> : null}
+
+          <ReminderPanel
+            sourceType="task"
+            sourceId={task.id}
+            sourceTitle={task.title}
+            defaultDate={task.scheduledDate ?? task.dueDate}
+            defaultMinute={task.scheduledMinute ?? task.dueMinute}
+          />
 
           {error ? (
             <p className={styles.error} role="alert">

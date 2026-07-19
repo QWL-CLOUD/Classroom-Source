@@ -29,6 +29,7 @@ import {
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
 import { minuteToTime } from '@/features/editing/calendarEventEditorModel';
 import { LessonFlowEditor, LessonFlowPreview } from '@/features/planning/LessonFlowEditor';
+import { ReminderPanel } from '@/features/reminders/ReminderPanel';
 import {
   buildPlanningSurfaceHref,
   parsePlanningReturnTarget,
@@ -569,6 +570,16 @@ function SessionEditorForm({
           />
         )}
       </section>
+
+      {session ? (
+        <ReminderPanel
+          sourceType="session"
+          sourceId={session.id}
+          sourceTitle={selectedPlan.title}
+          defaultDate={session.date}
+          defaultMinute={session.startMinute}
+        />
+      ) : null}
 
       {error ? (
         <p className={styles.error} role="alert">

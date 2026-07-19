@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   lessonPlanSchema,
+  reminderSchema,
   scheduleBlockSchema,
   sessionOccurrenceSchema,
   taskSchema,
@@ -76,5 +77,23 @@ describe('domain schemas', () => {
         scheduledMinute: 540,
       }),
     ).toThrow();
+  });
+  it('models Reminder as a separate source-linked record', () => {
+    const reminder = reminderSchema.parse({
+      id: 'reminder-1',
+      sourceType: 'task',
+      sourceId: 'task-1',
+      remindDate: '2026-07-20',
+      remindMinute: 540,
+      status: 'active',
+      createdAt: '2026-07-18T12:00:00.000Z',
+      updatedAt: '2026-07-18T12:00:00.000Z',
+    });
+
+    expect(reminder).toMatchObject({
+      sourceType: 'task',
+      sourceId: 'task-1',
+      status: 'active',
+    });
   });
 });

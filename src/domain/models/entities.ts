@@ -158,6 +158,29 @@ export const sessionOccurrenceSchema = z
     path: ['endMinute'],
   });
 
+export const reminderSourceTypeSchema = z.enum([
+  'task',
+  'session',
+  'calendar-event',
+  'learner-notice',
+]);
+
+export const reminderStatusSchema = z.enum(['active', 'dismissed']);
+
+export const reminderSchema = z.object({
+  id: idSchema,
+  sourceType: reminderSourceTypeSchema,
+  sourceId: idSchema,
+  remindDate: localDateSchema,
+  remindMinute: minuteSchema,
+  status: reminderStatusSchema.default('active'),
+  note: z.string().max(1000).optional(),
+  createdAt: timestampSchema,
+  updatedAt: timestampSchema,
+  dismissedAt: timestampSchema.optional(),
+  snoozedAt: timestampSchema.optional(),
+});
+
 export const taskStatusSchema = z.enum(['active', 'waiting', 'completed', 'cancelled']);
 
 export const taskSchema = z
@@ -245,6 +268,9 @@ export type LessonFlowStep = z.infer<typeof lessonFlowStepSchema>;
 export type LessonContent = z.infer<typeof lessonContentSchema>;
 export type LessonPlan = z.infer<typeof lessonPlanSchema>;
 export type SessionOccurrence = z.infer<typeof sessionOccurrenceSchema>;
+export type ReminderSourceType = z.infer<typeof reminderSourceTypeSchema>;
+export type ReminderStatus = z.infer<typeof reminderStatusSchema>;
+export type Reminder = z.infer<typeof reminderSchema>;
 export type TaskStatus = z.infer<typeof taskStatusSchema>;
 export type Task = z.infer<typeof taskSchema>;
 export type QuickCapture = z.infer<typeof quickCaptureSchema>;

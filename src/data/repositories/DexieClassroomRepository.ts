@@ -290,6 +290,7 @@ export class DexieClassroomRepository implements ClassroomRepository {
       lessonPlans,
       sessions,
       tasks,
+      reminders,
       migrationRuns,
       quarantine,
     ] = await Promise.all([
@@ -300,6 +301,7 @@ export class DexieClassroomRepository implements ClassroomRepository {
       this.db.lessonPlans.count(),
       this.db.sessionOccurrences.count(),
       this.db.tasks.count(),
+      this.db.reminders.count(),
       this.db.migrationRuns.count(),
       this.db.quarantineRecords.count(),
     ]);
@@ -312,6 +314,7 @@ export class DexieClassroomRepository implements ClassroomRepository {
       lessonPlans,
       sessions,
       tasks,
+      reminders,
       migrationRuns,
       quarantine,
     };
