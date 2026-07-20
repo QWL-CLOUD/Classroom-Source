@@ -18,4 +18,6 @@
   --border: #d9dfdc;
   --border-soft: #e7ebe9;
   --shadow-soft: 0 12px 30px rgb(48 68 72 / 7%);
+  --danger-strong: #8f3f38;
+  --danger-soft: #fff0ed;
 }

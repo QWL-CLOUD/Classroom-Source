@@ -173,7 +173,7 @@ export function ScheduleBlockEditorRoute() {
 
   return (
     <section className={styles.page} aria-labelledby="schedule-editor-heading">
-      <header className={styles.header}>
+      <header className={`${styles.header} editor-page-header`}>
         <div>
           <span className="eyebrow">Calendar &amp; Schedule</span>
           <h1 id="schedule-editor-heading">Manage recurring schedule</h1>
@@ -271,26 +271,6 @@ export function ScheduleBlockEditorRoute() {
                       Contains {childCountLabel(selectedChildCount)}.
                     </p>
                   ) : null}
-                </div>
-                <div className={styles.actions}>
-                  {selectedBlock ? (
-                    <button
-                      className={styles.archiveButton}
-                      type="button"
-                      onClick={handleArchive}
-                      disabled={saving || selectedChildCount > 0}
-                      aria-describedby={
-                        selectedChildCount > 0 ? 'archive-children-help' : undefined
-                      }
-                    >
-                      <Archive size={17} aria-hidden="true" />
-                      Archive
-                    </button>
-                  ) : null}
-                  <button className="button button-primary" type="submit" disabled={saving}>
-                    <Save size={17} aria-hidden="true" />
-                    {saving ? 'Saving…' : 'Save block'}
-                  </button>
                 </div>
               </div>
 
@@ -493,6 +473,29 @@ export function ScheduleBlockEditorRoute() {
                     <small>Calendar and Today continue to use active schedule defaults.</small>
                   </span>
                 </label>
+              </div>
+
+              <div
+                className={`editor-action-bar ${styles.actions}`}
+                role="group"
+                aria-label="Editor actions"
+              >
+                <button className="button button-primary" type="submit" disabled={saving}>
+                  <Save size={17} aria-hidden="true" />
+                  {saving ? 'Saving…' : 'Save block'}
+                </button>
+                {selectedBlock ? (
+                  <button
+                    className={styles.archiveButton}
+                    type="button"
+                    onClick={handleArchive}
+                    disabled={saving || selectedChildCount > 0}
+                    aria-describedby={selectedChildCount > 0 ? 'archive-children-help' : undefined}
+                  >
+                    <Archive size={17} aria-hidden="true" />
+                    Archive
+                  </button>
+                ) : null}
               </div>
             </form>
           )}

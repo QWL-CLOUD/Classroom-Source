@@ -587,7 +587,11 @@ function SessionEditorForm({
         </p>
       ) : null}
 
-      <div className={styles.actions}>
+      <div
+        className={`editor-action-bar ${styles.actions}`}
+        role="group"
+        aria-label="Editor actions"
+      >
         <button
           className="button button-primary"
           type="button"
@@ -691,7 +695,7 @@ export function SessionEditorRoute() {
 
   return (
     <section className="page">
-      <header className="page-header">
+      <header className="page-header editor-page-header">
         <div>
           <p className="page-eyebrow">Phase 3C</p>
           <h1>Session</h1>

@@ -216,7 +216,7 @@ export function ScheduleOccurrenceEditorRoute() {
 
   return (
     <section className={styles.page} aria-labelledby="schedule-occurrence-heading">
-      <header className={styles.header}>
+      <header className={`${styles.header} editor-page-header`}>
         <div>
           <p className="page-eyebrow">Schedule exception</p>
           <h1 className="page-title" id="schedule-occurrence-heading">
@@ -361,7 +361,11 @@ export function ScheduleOccurrenceEditorRoute() {
             </label>
           </div>
 
-          <div className={styles.actions}>
+          <div
+            className={`editor-action-bar ${styles.actions}`}
+            role="group"
+            aria-label="Editor actions"
+          >
             <button className="button button-primary" type="submit" disabled={saving}>
               <Save aria-hidden="true" size={18} /> {saving ? 'Saving…' : 'Save changes'}
             </button>
