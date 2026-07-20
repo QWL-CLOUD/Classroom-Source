@@ -1,6 +1,18 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 
+async function runTaskMenuAction(task: ReturnType<Page['getByRole']>, name: string): Promise<void> {
+  const summary = task.locator('summary', { hasText: 'More task actions' });
+  const menu = summary.locator('..');
+  await expect(summary).toBeVisible();
+  await summary.click();
+
+  const action = menu.getByRole('button', { name, exact: true });
+  await expect(action).toBeVisible();
+  await expect(action).toBeEnabled();
+  await action.click();
+}
+
 async function seedTaskContext(page: Page): Promise<void> {
   await page.evaluate(async () => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -41,6 +53,7 @@ test('Tasks and Today share one undoable task through the full lifecycle', async
   await seedTaskContext(page);
   await page.reload();
 
+  await page.getByRole('button', { name: 'New task' }).click();
   const newTask = page.getByRole('region', { name: 'New task' });
   await newTask.getByLabel('Task title').fill('Prepare lifecycle materials');
   await newTask.getByLabel('Context').selectOption('phase-3d-1-class');
@@ -73,16 +86,16 @@ test('Tasks and Today share one undoable task through the full lifecycle', async
   await task.getByRole('button', { name: 'Reopen' }).click();
   await expect(page.getByRole('region', { name: 'Active' }).getByRole('article')).toHaveCount(1);
 
-  await task.getByRole('button', { name: 'Move to Waiting' }).click();
+  await runTaskMenuAction(task, 'Move to Waiting');
   await expect(page.getByRole('region', { name: 'Waiting' }).getByRole('article')).toHaveCount(1);
-  await task.getByRole('button', { name: 'Restore' }).click();
+  await runTaskMenuAction(task, 'Restore');
   await expect(page.getByRole('region', { name: 'Active' }).getByRole('article')).toHaveCount(1);
 
-  await task.getByRole('button', { name: 'Cancel task' }).click();
+  await runTaskMenuAction(task, 'Cancel task');
   await expect(page.getByRole('region', { name: 'Cancelled' }).getByRole('article')).toHaveCount(1);
-  await task.getByRole('button', { name: 'Restore' }).click();
+  await runTaskMenuAction(task, 'Restore');
 
-  await task.getByRole('button', { name: 'Edit Prepare lifecycle materials' }).click();
+  await runTaskMenuAction(task, 'Edit Prepare lifecycle materials');
   await task.getByLabel('Task title').fill('Prepare revised lifecycle materials');
   await task.getByRole('group', { name: 'Scheduled' }).getByLabel('Date').fill('2026-07-21');
   await task.getByRole('button', { name: 'Save task' }).click();
@@ -97,7 +110,7 @@ test('Tasks and Today share one undoable task through the full lifecycle', async
 
   await page.goto('./#/tasks');
   task = page.getByRole('article', { name: 'Prepare revised lifecycle materials task' });
-  await task.getByRole('button', { name: 'Delete' }).click();
+  await runTaskMenuAction(task, 'Delete');
   await task.getByRole('button', { name: 'Confirm delete' }).click();
   await expect(task).toHaveCount(0);
 

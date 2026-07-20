@@ -67,8 +67,7 @@ export function AgendaRoute() {
           <p className="page-eyebrow">Workspace</p>
           <h1 className="page-title">Personal Agenda</h1>
           <p className="page-subtitle">
-            One live view of Tasks, deadlines, Reminders, personal events, and active learner
-            support. Every action updates the original record—Agenda never stores a duplicate.
+            See what needs attention across Tasks, Reminders, personal events, and learner support.
           </p>
         </div>
         <div className={styles.dateToolbar} aria-label="Agenda date navigation">
@@ -148,7 +147,7 @@ export function AgendaRoute() {
             {agenda.sections.map((section) => (
               <section
                 key={section.id}
-                className={`card ${styles.section}`}
+                className={`${styles.section} ${section.items.length === 0 ? styles.emptySection : ''}`}
                 aria-labelledby={`agenda-${section.id}`}
               >
                 <header className={styles.sectionHeader}>
@@ -168,12 +167,23 @@ export function AgendaRoute() {
                         <div className={styles.itemIcon}>{sourceIcon(item)}</div>
                         <div className={styles.itemBody}>
                           <div className={styles.itemHeading}>
+                            {item.sourceType === 'reminder' ? (
+                              <span className={styles.relationshipLabel}>Reminder for</span>
+                            ) : null}
                             <a href={item.href}>{item.title}</a>
                             <span>{item.sourceLabel}</span>
                           </div>
                           <p className={styles.timing}>{item.timingLabel}</p>
                           {item.contextName ? <p>{item.contextName}</p> : null}
-                          {item.detailLabel ? <p>{item.detailLabel}</p> : null}
+                          {item.detailLabel ? (
+                            <p
+                              className={
+                                item.sourceType === 'reminder' ? styles.reminderDetail : ''
+                              }
+                            >
+                              {item.detailLabel}
+                            </p>
+                          ) : null}
                         </div>
                         <div className={styles.actions}>
                           {item.sourceType === 'task' && item.taskStatus === 'active' ? (
