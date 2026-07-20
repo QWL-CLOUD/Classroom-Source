@@ -10,7 +10,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ZodError } from 'zod';
 
@@ -124,6 +124,8 @@ function PlanningEditorForm({
             '',
         ),
   );
+  const latestValuesRef = useRef(values);
+  latestValuesRef.current = values;
   const [saving, setSaving] = useState(false);
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -183,35 +185,38 @@ function PlanningEditorForm({
     ? currentSeriesPlans.findIndex((candidate) => candidate.id === plan.id)
     : -1;
 
-  function update<K extends keyof LessonPlanEditorValues>(
-    key: K,
-    value: LessonPlanEditorValues[K],
-  ): void {
-    setValues((current) => ({ ...current, [key]: value }));
+  function applyValues(nextValues: LessonPlanEditorValues): void {
+    latestValuesRef.current = nextValues;
+    setValues(nextValues);
     setError(null);
     setDeleteArmed(false);
   }
 
+  function update<K extends keyof LessonPlanEditorValues>(
+    key: K,
+    value: LessonPlanEditorValues[K],
+  ): void {
+    applyValues({ ...latestValuesRef.current, [key]: value });
+  }
+
   function updateSeriesChoice(value: string): void {
     if (value === '__new__') {
-      setValues((current) => ({ ...current, seriesMode: 'new', seriesId: '' }));
+      applyValues({ ...latestValuesRef.current, seriesMode: 'new', seriesId: '' });
     } else if (value) {
-      setValues((current) => ({
-        ...current,
+      applyValues({
+        ...latestValuesRef.current,
         seriesMode: 'existing',
         seriesId: value,
         newSeriesTitle: '',
-      }));
+      });
     } else {
-      setValues((current) => ({
-        ...current,
+      applyValues({
+        ...latestValuesRef.current,
         seriesMode: 'none',
         seriesId: '',
         newSeriesTitle: '',
-      }));
+      });
     }
-    setError(null);
-    setDeleteArmed(false);
   }
 
   async function moveWithinSeries(direction: 'earlier' | 'later'): Promise<void> {
@@ -244,11 +249,16 @@ function PlanningEditorForm({
     setSaving(true);
     setError(null);
     try {
+      const currentValues = latestValuesRef.current;
       if (planningOccurrence && !plan) {
-        const result = await service.createPlanForScheduleOccurrence(selectedContext.id, values, {
-          scheduleBlockId: planningOccurrence.block.id,
-          date: planningOccurrence.date,
-        });
+        const result = await service.createPlanForScheduleOccurrence(
+          selectedContext.id,
+          currentValues,
+          {
+            scheduleBlockId: planningOccurrence.block.id,
+            date: planningOccurrence.date,
+          },
+        );
         if (!result.created) {
           const params = new URLSearchParams({
             plan: result.plan.id,
@@ -271,8 +281,8 @@ function PlanningEditorForm({
       }
 
       const saved = plan
-        ? await service.updatePlan(plan.id, values)
-        : await service.createPlan(selectedContext.id, values);
+        ? await service.updatePlan(plan.id, currentValues)
+        : await service.createPlan(selectedContext.id, currentValues);
       if (scheduleAfterSave) {
         window.location.hash = buildSessionEditorHref({
           planId: saved.id,
@@ -455,9 +465,7 @@ function PlanningEditorForm({
         }}
         disabled={saving}
         onChange={(content: LessonContentEditorValues) => {
-          setValues((current) => ({ ...current, ...content }));
-          setError(null);
-          setDeleteArmed(false);
+          applyValues({ ...latestValuesRef.current, ...content });
         }}
       />
 

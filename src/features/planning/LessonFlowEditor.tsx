@@ -45,6 +45,8 @@ export function LessonFlowEditor({
 }: LessonFlowEditorProps) {
   const [pendingFocusStepId, setPendingFocusStepId] = useState<string | null>(null);
   const titleInputRefs = useRef(new Map<string, HTMLInputElement>());
+  const latestValuesRef = useRef(values);
+  latestValuesRef.current = values;
   const parsedDurations = values.lessonFlow.map((step) => ({
     ...step,
     durationMinutes: step.durationMinutes ? Number(step.durationMinutes) : undefined,
@@ -69,7 +71,9 @@ export function LessonFlowEditor({
     key: K,
     value: LessonContentEditorValues[K],
   ): void {
-    onChange({ ...values, [key]: value });
+    const nextValues = { ...latestValuesRef.current, [key]: value };
+    latestValuesRef.current = nextValues;
+    onChange(nextValues);
   }
 
   function applyLessonFlow(lessonFlow: LessonFlowStepEditorValues[], focusStepId?: string): void {
@@ -78,12 +82,12 @@ export function LessonFlowEditor({
   }
 
   function addStep(index: number, phase?: LessonFlowPhase): void {
-    const result = insertLessonFlowStep(values.lessonFlow, index, phase);
+    const result = insertLessonFlowStep(latestValuesRef.current.lessonFlow, index, phase);
     applyLessonFlow(result.steps, result.insertedStepId);
   }
 
   function duplicateStep(index: number): void {
-    const result = duplicateLessonFlowStep(values.lessonFlow, index);
+    const result = duplicateLessonFlowStep(latestValuesRef.current.lessonFlow, index);
     applyLessonFlow(result.steps, result.insertedStepId);
   }
 
@@ -185,7 +189,9 @@ export function LessonFlowEditor({
                           disabled={disabled || index === 0}
                           onClick={(event) => {
                             closeStepMenu(event.currentTarget);
-                            applyLessonFlow(moveLessonFlowStep(values.lessonFlow, index, -1));
+                            applyLessonFlow(
+                              moveLessonFlowStep(latestValuesRef.current.lessonFlow, index, -1),
+                            );
                           }}
                         >
                           <ArrowUp aria-hidden="true" size={15} /> Move earlier
@@ -195,7 +201,9 @@ export function LessonFlowEditor({
                           disabled={disabled || index === values.lessonFlow.length - 1}
                           onClick={(event) => {
                             closeStepMenu(event.currentTarget);
-                            applyLessonFlow(moveLessonFlowStep(values.lessonFlow, index, 1));
+                            applyLessonFlow(
+                              moveLessonFlowStep(latestValuesRef.current.lessonFlow, index, 1),
+                            );
                           }}
                         >
                           <ArrowDown aria-hidden="true" size={15} /> Move later
@@ -207,7 +215,9 @@ export function LessonFlowEditor({
                           onClick={(event) => {
                             closeStepMenu(event.currentTarget);
                             applyLessonFlow(
-                              values.lessonFlow.filter((_, stepIndex) => stepIndex !== index),
+                              latestValuesRef.current.lessonFlow.filter(
+                                (_, stepIndex) => stepIndex !== index,
+                              ),
                             );
                           }}
                         >
@@ -231,7 +241,9 @@ export function LessonFlowEditor({
                         onChange={(event) =>
                           updateContent(
                             'lessonFlow',
-                            updateStep(values.lessonFlow, index, { title: event.target.value }),
+                            updateStep(latestValuesRef.current.lessonFlow, index, {
+                              title: event.target.value,
+                            }),
                           )
                         }
                       />
@@ -246,7 +258,7 @@ export function LessonFlowEditor({
                         onChange={(event) =>
                           updateContent(
                             'lessonFlow',
-                            updateStep(values.lessonFlow, index, {
+                            updateStep(latestValuesRef.current.lessonFlow, index, {
                               phase: event.target.value as LessonFlowPhase,
                             }),
                           )
@@ -270,7 +282,7 @@ export function LessonFlowEditor({
                         onChange={(event) =>
                           updateContent(
                             'lessonFlow',
-                            updateStep(values.lessonFlow, index, {
+                            updateStep(latestValuesRef.current.lessonFlow, index, {
                               durationMinutes: event.target.value,
                             }),
                           )
@@ -288,7 +300,9 @@ export function LessonFlowEditor({
                         onChange={(event) =>
                           updateContent(
                             'lessonFlow',
-                            updateStep(values.lessonFlow, index, { details: event.target.value }),
+                            updateStep(latestValuesRef.current.lessonFlow, index, {
+                              details: event.target.value,
+                            }),
                           )
                         }
                       />
@@ -304,7 +318,7 @@ export function LessonFlowEditor({
                         onChange={(event) =>
                           updateContent(
                             'lessonFlow',
-                            updateStep(values.lessonFlow, index, {
+                            updateStep(latestValuesRef.current.lessonFlow, index, {
                               teacherNotes: event.target.value,
                             }),
                           )
@@ -320,7 +334,7 @@ export function LessonFlowEditor({
             className={styles.addStepButton}
             type="button"
             disabled={disabled}
-            onClick={() => addStep(values.lessonFlow.length)}
+            onClick={() => addStep(latestValuesRef.current.lessonFlow.length)}
           >
             <Plus aria-hidden="true" size={17} /> Add step
           </button>

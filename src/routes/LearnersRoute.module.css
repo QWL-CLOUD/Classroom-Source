@@ -818,3 +818,95 @@
     width: 100%;
   }
 }
+
+.mobileContextSummary {
+  display: none;
+}
+
+.mobileSelectedContext {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 50px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.mobileSelectedContext > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.mobileSelectedContext strong {
+  overflow-wrap: anywhere;
+  color: var(--heading);
+}
+
+.mobileSelectedContext small {
+  color: var(--text-secondary);
+}
+
+.mobileContextPicker {
+  min-width: 0;
+}
+
+.mobileContextPicker > summary {
+  list-style: none;
+}
+
+.mobileContextPicker > summary::-webkit-details-marker {
+  display: none;
+}
+
+.mobilePickerPanel {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: var(--surface-card);
+}
+
+.mobileContextSelect {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.mobileContextSelect select {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  color: var(--text-primary);
+  background: var(--surface);
+  font: inherit;
+}
+
+@media (max-width: 900px) {
+  .contextPanel {
+    display: none;
+  }
+
+  .mobileContextSummary {
+    min-width: 0;
+    display: grid;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 16px;
+    border: 1px solid var(--border-soft);
+    border-radius: 16px;
+    background: var(--surface-card);
+  }
+
+  .mobileContextPicker,
+  .mobileContextPicker > summary {
+    width: 100%;
+  }
+}
