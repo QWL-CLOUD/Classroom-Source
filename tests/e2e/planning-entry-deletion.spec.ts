@@ -75,7 +75,8 @@ test('Today creates one dated lesson session and returns to the selected day', a
   await seedFoundation(page);
   await page.reload();
 
-  await page.getByRole('link', { name: 'New plan' }).click();
+  await page.locator('summary[aria-label="Add to 2026-07-17"]').click();
+  await page.getByRole('link', { name: /New plan/ }).click();
   await expect(page).toHaveURL(/#\/planning\/edit\?date=2026-07-17&return=today/);
   await expect(page.getByRole('heading', { name: 'Choose who this lesson is for' })).toBeVisible();
   await expect(

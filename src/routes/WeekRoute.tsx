@@ -1,4 +1,4 @@
-import { CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { CalendarDays, CalendarPlus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef, type ChangeEvent, type CSSProperties } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -314,7 +314,8 @@ export function WeekRoute() {
                     href={buildPlanningEntryHref({ date: day.date, returnTo: 'week' })}
                     aria-label={`Add lesson plan to ${day.label}`}
                   >
-                    <Plus aria-hidden="true" size={21} />
+                    <CalendarPlus aria-hidden="true" size={17} />
+                    <span>Add plan</span>
                   </a>
                 </header>
 

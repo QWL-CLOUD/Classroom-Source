@@ -218,7 +218,7 @@ test('Today composes the selected date from v20 schedule and calendar records', 
   await expect(
     page.getByText('1 exact dated duplicate suppressed in this timeline.'),
   ).toBeVisible();
-  await expect(page.getByText('1 active learner context is connected to v20')).toBeVisible();
+  await expect(page.getByText('1 active learner context is connected to v20')).toHaveCount(0);
   await expect(page.getByText('Quarantined Today item')).toHaveCount(0);
   await expect(
     page.getByText('Quarantined imports remain isolated and are not shown in Today.'),
