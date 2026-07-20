@@ -52,6 +52,7 @@ import {
 } from '@/features/planning/planningMutationService';
 
 import { formatLongDate, parseLocalDate, todayLocalDate } from '@/shared/dates/localDate';
+import { EditorActionMenu } from '@/shared/ui/EditorActionMenu';
 
 import styles from './PlanningEditorRoute.module.css';
 
@@ -321,11 +322,11 @@ function PlanningEditorForm({
   }
 
   return (
-    <section className={`card ${styles.editor}`} aria-label="Planning item editor">
+    <section className={styles.editor} aria-label="Planning item editor">
       <div className={styles.editorHeader}>
         <div>
           <p className="page-eyebrow">Planning item</p>
-          <h2>{plan ? 'Edit plan' : 'New plan'}</h2>
+          <h1>{plan ? 'Edit plan' : 'New plan'}</h1>
           <p>{selectedContext.name}</p>
         </div>
         <a className="button" href={backHref}>
@@ -554,19 +555,21 @@ function PlanningEditorForm({
           </a>
         ) : null}
         {plan ? (
-          <button
-            className={deleteArmed ? styles.dangerButton : 'button'}
-            type="button"
-            disabled={saving}
-            onClick={() => void remove()}
-          >
-            <Trash2 aria-hidden="true" size={17} />
-            {deleteArmed
-              ? sessions.length > 0
-                ? 'Confirm delete plan and sessions'
-                : 'Confirm delete plan'
-              : 'Delete plan'}
-          </button>
+          <EditorActionMenu>
+            <button
+              className={deleteArmed ? 'button button-danger' : 'button'}
+              type="button"
+              disabled={saving}
+              onClick={() => void remove()}
+            >
+              <Trash2 aria-hidden="true" size={17} />
+              {deleteArmed
+                ? sessions.length > 0
+                  ? 'Confirm delete plan and sessions'
+                  : 'Confirm delete plan'
+                : 'Delete plan'}
+            </button>
+          </EditorActionMenu>
         ) : null}
       </div>
     </section>
@@ -613,7 +616,7 @@ function PlanningContextPicker({
         <Users aria-hidden="true" size={22} />
         <div>
           <p className="page-eyebrow">Planning destination</p>
-          <h2 id="planning-context-heading">Choose who this lesson is for</h2>
+          <h1 id="planning-context-heading">Choose who this lesson is for</h1>
           <p>
             {planningOccurrence
               ? 'The Schedule Block suggests a context when available, but you may choose any active Class, Group, or Individual.'
@@ -901,18 +904,6 @@ export function PlanningEditorRoute() {
 
   return (
     <section className="page">
-      <header className="page-header editor-page-header">
-        <div>
-          <p className="page-eyebrow">Phase 3C-6B</p>
-          <h1>Planning</h1>
-          <p>
-            {snapshot.planningOccurrence
-              ? `Plan the ${snapshot.planningOccurrence.block.title} occurrence on ${formatLongDate(initialDate)} without hard-binding its suggested learner context.`
-              : `Create reusable teaching content, then keep it unscheduled or place it on ${formatLongDate(initialDate)}.`}
-          </p>
-        </div>
-      </header>
-
       {!snapshot.context ? (
         snapshot.contexts.length > 0 ? (
           <PlanningContextPicker

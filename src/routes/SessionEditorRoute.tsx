@@ -51,6 +51,7 @@ import type { SeriesBumpPreview } from '@/features/planning/seriesBumpPlanner';
 import { resolveScheduleOccurrence } from '@/features/scheduleExceptions/scheduleOccurrenceResolver';
 import { useScheduleExceptionsForRange } from '@/features/scheduleExceptions/useScheduleExceptionsForRange';
 import { formatLongDate, parseLocalDate, todayLocalDate } from '@/shared/dates/localDate';
+import { EditorActionMenu } from '@/shared/ui/EditorActionMenu';
 
 import styles from './SessionEditorRoute.module.css';
 
@@ -314,12 +315,14 @@ function SessionEditorForm({
     session?.deliveryState === 'completed' ? 'completed' : session ? 'upcoming' : 'unscheduled';
 
   return (
-    <section className={`card ${styles.editor}`} aria-label="Session editor">
+    <section className={styles.editor} aria-label="Session editor">
       <div className={styles.editorHeader}>
         <div>
-          <p className="page-eyebrow">Scheduled session</p>
-          <h2>{selectedPlan.title}</h2>
-          <p>{selectedContext.name}</p>
+          <p className="page-eyebrow">Scheduled teaching</p>
+          <h1>Session</h1>
+          <p>
+            <strong>{selectedPlan.title}</strong> · {selectedContext.name}
+          </p>
         </div>
         <a
           className="button"
@@ -350,7 +353,7 @@ function SessionEditorForm({
         <div className={styles.sectionHeading}>
           <div>
             <p className="page-eyebrow">Schedule</p>
-            <h3 id="session-schedule-heading">Date and time</h3>
+            <h2 id="session-schedule-heading">Date and time</h2>
           </div>
         </div>
 
@@ -426,7 +429,7 @@ function SessionEditorForm({
           <div className={styles.bumpHeader}>
             <div>
               <p className="page-eyebrow">Lesson Series</p>
-              <h3 id="series-bump-heading">Bump this lesson forward</h3>
+              <h2 id="series-bump-heading">Bump this lesson forward</h2>
               <p>
                 Preview one-occurrence shifts for this Session and later scheduled lessons in the
                 same Series. Nothing changes until you confirm.
@@ -526,7 +529,7 @@ function SessionEditorForm({
         <div className={styles.contentHeader}>
           <div>
             <p className="page-eyebrow">Teaching content</p>
-            <h3 id="session-content-heading">Session lesson flow</h3>
+            <h2 id="session-content-heading">Session lesson flow</h2>
             <p>
               {values.contentMode === 'inherit'
                 ? 'Inherited from the planning item. Plan edits continue to flow into this session.'
@@ -560,6 +563,7 @@ function SessionEditorForm({
         ) : (
           <LessonFlowEditor
             idPrefix="session-content"
+            headingLevel={3}
             values={{
               learningTarget: values.learningTarget,
               notes: values.notes,
@@ -619,15 +623,17 @@ function SessionEditorForm({
         ) : null}
 
         {session ? (
-          <button
-            className={unscheduleArmed ? styles.dangerButton : 'button'}
-            type="button"
-            disabled={saving}
-            onClick={() => void unschedule()}
-          >
-            <Undo2 aria-hidden="true" size={17} />
-            {unscheduleArmed ? 'Confirm unschedule' : 'Return to Unscheduled'}
-          </button>
+          <EditorActionMenu>
+            <button
+              className={unscheduleArmed ? 'button button-danger' : 'button'}
+              type="button"
+              disabled={saving}
+              onClick={() => void unschedule()}
+            >
+              <Undo2 aria-hidden="true" size={17} />
+              {unscheduleArmed ? 'Confirm unschedule' : 'Return to Unscheduled'}
+            </button>
+          </EditorActionMenu>
         ) : null}
       </div>
     </section>
@@ -695,15 +701,8 @@ export function SessionEditorRoute() {
 
   return (
     <section className="page">
-      <header className="page-header editor-page-header">
-        <div>
-          <p className="page-eyebrow">Phase 3C</p>
-          <h1>Session</h1>
-          <p>Schedule the lesson, inherit its teaching flow, or customize this occurrence.</p>
-        </div>
-      </header>
       <SessionEditorForm
-        key={snapshot.session?.id ?? `new-${snapshot.plan.id}`}
+        key={snapshot.session?.id ?? `new-${snapshot.plan.id}-${snapshot.plan.updatedAt}`}
         snapshot={snapshot}
         initialDate={initialDate}
         returnTo={returnTo}
