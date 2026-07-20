@@ -16,7 +16,6 @@ import { classroomDb } from '@/data/db/ClassroomDatabase';
 import type { LearnerContext, Task, TaskStatus } from '@/domain/models/entities';
 import { ReminderPanel } from '@/features/reminders/ReminderPanel';
 import { formatShortDate } from '@/shared/dates/localDate';
-import { EditorActionMenu } from '@/shared/ui/EditorActionMenu';
 
 import { taskMutationService, type TaskEditorValues } from './taskMutationService';
 import { buildTaskWorkspaceReadModel, selectTodayTasks } from './taskReadModel';
@@ -256,7 +255,7 @@ function TaskEditor({
       <div className={styles.editorActions}>
         {onCancel ? (
           <button className="button button-quiet" type="button" onClick={onCancel} disabled={busy}>
-            Cancel
+            Cancel edit
           </button>
         ) : null}
         <button
@@ -330,6 +329,16 @@ function TaskCard({
               </span>
               <h3>{task.title}</h3>
             </div>
+            <button
+              className={styles.iconButton}
+              type="button"
+              aria-label={`Edit ${task.title}`}
+              title="Edit task"
+              onClick={() => setEditing(true)}
+              disabled={busy}
+            >
+              <Edit3 size={17} aria-hidden="true" />
+            </button>
           </div>
 
           <div className={styles.metaList}>
@@ -375,107 +384,96 @@ function TaskCard({
           ) : null}
 
           <div className={styles.taskActions}>
-            <div className={styles.primaryTaskActions}>
-              {task.status === 'active' || task.status === 'waiting' ? (
-                <button
-                  className="button"
-                  type="button"
-                  onClick={() => void run(() => taskMutationService.complete(task.id))}
-                  disabled={busy}
-                >
-                  <Check size={16} aria-hidden="true" /> Complete
-                </button>
-              ) : null}
-
-              {task.status === 'completed' ? (
-                <button
-                  className="button"
-                  type="button"
-                  onClick={() => void run(() => taskMutationService.reopen(task.id))}
-                  disabled={busy}
-                >
-                  <RotateCcw size={16} aria-hidden="true" /> Reopen
-                </button>
-              ) : null}
-            </div>
-
-            <EditorActionMenu label="More task actions">
-              <button
-                className="button button-quiet"
-                type="button"
-                aria-label={`Edit ${task.title}`}
-                onClick={() => setEditing(true)}
-                disabled={busy}
-              >
-                <Edit3 size={16} aria-hidden="true" /> Edit task
-              </button>
-
-              {task.status === 'active' ? (
-                <button
-                  className="button button-quiet"
-                  type="button"
-                  onClick={() => void run(() => taskMutationService.wait(task.id))}
-                  disabled={busy}
-                >
-                  <Hourglass size={16} aria-hidden="true" /> Move to Waiting
-                </button>
-              ) : null}
-
-              {task.status === 'waiting' || task.status === 'cancelled' ? (
-                <button
-                  className="button button-quiet"
-                  type="button"
-                  onClick={() => void run(() => taskMutationService.restore(task.id))}
-                  disabled={busy}
-                >
-                  <RotateCcw size={16} aria-hidden="true" /> Restore
-                </button>
-              ) : null}
-
-              {task.status === 'active' || task.status === 'waiting' ? (
-                <button
-                  className="button button-quiet"
-                  type="button"
-                  onClick={() => void run(() => taskMutationService.cancel(task.id))}
-                  disabled={busy}
-                >
-                  <Ban size={16} aria-hidden="true" /> Cancel task
-                </button>
-              ) : null}
-
-              <button
-                className="button button-danger"
-                type="button"
-                aria-label="Delete"
-                onClick={() => setConfirmingDelete(true)}
-                disabled={busy}
-              >
-                <Trash2 size={16} aria-hidden="true" /> Delete task
-              </button>
-            </EditorActionMenu>
-          </div>
-
-          {confirmingDelete ? (
-            <div className={styles.deleteConfirm} role="group" aria-label={`Delete ${task.title}`}>
-              <span>Delete permanently?</span>
+            {task.status === 'active' || task.status === 'waiting' ? (
               <button
                 className="button"
                 type="button"
-                onClick={() => setConfirmingDelete(false)}
+                onClick={() => void run(() => taskMutationService.complete(task.id))}
                 disabled={busy}
               >
-                Keep
+                <Check size={16} aria-hidden="true" /> Complete
               </button>
+            ) : null}
+
+            {task.status === 'completed' ? (
               <button
-                className="button button-danger"
+                className="button"
                 type="button"
-                onClick={() => void run(() => taskMutationService.delete(task.id))}
+                onClick={() => void run(() => taskMutationService.reopen(task.id))}
                 disabled={busy}
               >
-                Confirm delete
+                <RotateCcw size={16} aria-hidden="true" /> Reopen
               </button>
-            </div>
-          ) : null}
+            ) : null}
+
+            {task.status === 'active' ? (
+              <button
+                className="button"
+                type="button"
+                onClick={() => void run(() => taskMutationService.wait(task.id))}
+                disabled={busy}
+              >
+                <Hourglass size={16} aria-hidden="true" /> Move to Waiting
+              </button>
+            ) : null}
+
+            {task.status === 'waiting' || task.status === 'cancelled' ? (
+              <button
+                className="button"
+                type="button"
+                onClick={() => void run(() => taskMutationService.restore(task.id))}
+                disabled={busy}
+              >
+                <RotateCcw size={16} aria-hidden="true" /> Restore
+              </button>
+            ) : null}
+
+            {task.status === 'active' || task.status === 'waiting' ? (
+              <button
+                className="button"
+                type="button"
+                onClick={() => void run(() => taskMutationService.cancel(task.id))}
+                disabled={busy}
+              >
+                <Ban size={16} aria-hidden="true" /> Cancel task
+              </button>
+            ) : null}
+
+            {!confirmingDelete ? (
+              <button
+                className="button button-quiet"
+                type="button"
+                onClick={() => setConfirmingDelete(true)}
+                disabled={busy}
+              >
+                <Trash2 size={16} aria-hidden="true" /> Delete
+              </button>
+            ) : (
+              <div
+                className={styles.deleteConfirm}
+                role="group"
+                aria-label={`Delete ${task.title}`}
+              >
+                <span>Delete permanently?</span>
+                <button
+                  className="button"
+                  type="button"
+                  onClick={() => setConfirmingDelete(false)}
+                  disabled={busy}
+                >
+                  Keep
+                </button>
+                <button
+                  className="button"
+                  type="button"
+                  onClick={() => void run(() => taskMutationService.delete(task.id))}
+                  disabled={busy}
+                >
+                  Confirm delete
+                </button>
+              </div>
+            )}
+          </div>
         </>
       )}
     </article>
@@ -585,7 +583,6 @@ function TodayTaskList({ selectedDate }: { selectedDate: string }) {
 }
 
 export function TaskList({ selectedDate, compact = false }: TaskListProps) {
-  const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const data = useLiveQuery(async () => {
@@ -624,42 +621,20 @@ export function TaskList({ selectedDate, compact = false }: TaskListProps) {
 
   return (
     <div className={styles.workspace}>
-      <div className={styles.workspaceToolbar}>
-        <button
-          className="button button-primary"
-          type="button"
-          onClick={() => setCreating((current) => !current)}
-          aria-expanded={creating}
-          aria-controls="new-task-panel"
-        >
-          <Plus size={17} aria-hidden="true" /> {creating ? 'Close new task' : 'New task'}
-        </button>
-      </div>
-
-      {creating ? (
-        <section
-          id="new-task-panel"
-          className={styles.createPanel}
-          aria-labelledby="new-task-heading"
-        >
-          <div className={styles.sectionHeading}>
-            <div>
-              <p className={styles.kicker}>Create task</p>
-              <h2 id="new-task-heading">New task</h2>
-            </div>
+      <section className={`card ${styles.createPanel}`} aria-labelledby="new-task-heading">
+        <div className={styles.sectionHeading}>
+          <div>
+            <p className={styles.kicker}>Shared workspace record</p>
+            <h2 id="new-task-heading">New task</h2>
           </div>
-          <TaskEditor
-            contexts={contexts}
-            submitLabel="Create task"
-            busy={busy}
-            onCancel={() => setCreating(false)}
-            onSubmit={async (values) => {
-              await run(() => taskMutationService.create(values));
-              setCreating(false);
-            }}
-          />
-        </section>
-      ) : null}
+        </div>
+        <TaskEditor
+          contexts={contexts}
+          submitLabel="Create task"
+          busy={busy}
+          onSubmit={(values) => run(() => taskMutationService.create(values))}
+        />
+      </section>
 
       {error ? (
         <p className={styles.error} role="alert">
@@ -670,12 +645,9 @@ export function TaskList({ selectedDate, compact = false }: TaskListProps) {
       {!data ? (
         <p className={styles.message}>Loading tasks…</p>
       ) : data.model.total === 0 ? (
-        <section className={styles.emptyState}>
+        <section className={`card ${styles.emptyState}`}>
           <h2>No tasks yet</h2>
-          <p>Create the first task when you are ready. Scheduled tasks will appear on Today.</p>
-          <button className="button button-primary" type="button" onClick={() => setCreating(true)}>
-            <Plus size={17} aria-hidden="true" /> New task
-          </button>
+          <p>Create a task above. Scheduled tasks will appear on the matching Today date.</p>
         </section>
       ) : (
         <div className={styles.sections} aria-label="Task lifecycle sections">

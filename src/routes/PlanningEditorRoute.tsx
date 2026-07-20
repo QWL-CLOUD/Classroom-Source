@@ -10,7 +10,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ZodError } from 'zod';
 
@@ -52,7 +52,6 @@ import {
 } from '@/features/planning/planningMutationService';
 
 import { formatLongDate, parseLocalDate, todayLocalDate } from '@/shared/dates/localDate';
-import { EditorActionMenu } from '@/shared/ui/EditorActionMenu';
 
 import styles from './PlanningEditorRoute.module.css';
 
@@ -124,8 +123,6 @@ function PlanningEditorForm({
             '',
         ),
   );
-  const latestValuesRef = useRef(values);
-  latestValuesRef.current = values;
   const [saving, setSaving] = useState(false);
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -185,38 +182,35 @@ function PlanningEditorForm({
     ? currentSeriesPlans.findIndex((candidate) => candidate.id === plan.id)
     : -1;
 
-  function applyValues(nextValues: LessonPlanEditorValues): void {
-    latestValuesRef.current = nextValues;
-    setValues(nextValues);
-    setError(null);
-    setDeleteArmed(false);
-  }
-
   function update<K extends keyof LessonPlanEditorValues>(
     key: K,
     value: LessonPlanEditorValues[K],
   ): void {
-    applyValues({ ...latestValuesRef.current, [key]: value });
+    setValues((current) => ({ ...current, [key]: value }));
+    setError(null);
+    setDeleteArmed(false);
   }
 
   function updateSeriesChoice(value: string): void {
     if (value === '__new__') {
-      applyValues({ ...latestValuesRef.current, seriesMode: 'new', seriesId: '' });
+      setValues((current) => ({ ...current, seriesMode: 'new', seriesId: '' }));
     } else if (value) {
-      applyValues({
-        ...latestValuesRef.current,
+      setValues((current) => ({
+        ...current,
         seriesMode: 'existing',
         seriesId: value,
         newSeriesTitle: '',
-      });
+      }));
     } else {
-      applyValues({
-        ...latestValuesRef.current,
+      setValues((current) => ({
+        ...current,
         seriesMode: 'none',
         seriesId: '',
         newSeriesTitle: '',
-      });
+      }));
     }
+    setError(null);
+    setDeleteArmed(false);
   }
 
   async function moveWithinSeries(direction: 'earlier' | 'later'): Promise<void> {
@@ -249,16 +243,11 @@ function PlanningEditorForm({
     setSaving(true);
     setError(null);
     try {
-      const currentValues = latestValuesRef.current;
       if (planningOccurrence && !plan) {
-        const result = await service.createPlanForScheduleOccurrence(
-          selectedContext.id,
-          currentValues,
-          {
-            scheduleBlockId: planningOccurrence.block.id,
-            date: planningOccurrence.date,
-          },
-        );
+        const result = await service.createPlanForScheduleOccurrence(selectedContext.id, values, {
+          scheduleBlockId: planningOccurrence.block.id,
+          date: planningOccurrence.date,
+        });
         if (!result.created) {
           const params = new URLSearchParams({
             plan: result.plan.id,
@@ -281,8 +270,8 @@ function PlanningEditorForm({
       }
 
       const saved = plan
-        ? await service.updatePlan(plan.id, currentValues)
-        : await service.createPlan(selectedContext.id, currentValues);
+        ? await service.updatePlan(plan.id, values)
+        : await service.createPlan(selectedContext.id, values);
       if (scheduleAfterSave) {
         window.location.hash = buildSessionEditorHref({
           planId: saved.id,
@@ -332,11 +321,11 @@ function PlanningEditorForm({
   }
 
   return (
-    <section className={styles.editor} aria-label="Planning item editor">
+    <section className={`card ${styles.editor}`} aria-label="Planning item editor">
       <div className={styles.editorHeader}>
         <div>
           <p className="page-eyebrow">Planning item</p>
-          <h1>{plan ? 'Edit plan' : 'New plan'}</h1>
+          <h2>{plan ? 'Edit plan' : 'New plan'}</h2>
           <p>{selectedContext.name}</p>
         </div>
         <a className="button" href={backHref}>
@@ -465,7 +454,9 @@ function PlanningEditorForm({
         }}
         disabled={saving}
         onChange={(content: LessonContentEditorValues) => {
-          applyValues({ ...latestValuesRef.current, ...content });
+          setValues((current) => ({ ...current, ...content }));
+          setError(null);
+          setDeleteArmed(false);
         }}
       />
 
@@ -531,11 +522,7 @@ function PlanningEditorForm({
         </p>
       ) : null}
 
-      <div
-        className={`editor-action-bar ${styles.actions}`}
-        role="group"
-        aria-label="Editor actions"
-      >
+      <div className={styles.actions}>
         <button
           className="button button-primary"
           type="button"
@@ -563,21 +550,19 @@ function PlanningEditorForm({
           </a>
         ) : null}
         {plan ? (
-          <EditorActionMenu>
-            <button
-              className={deleteArmed ? 'button button-danger' : 'button'}
-              type="button"
-              disabled={saving}
-              onClick={() => void remove()}
-            >
-              <Trash2 aria-hidden="true" size={17} />
-              {deleteArmed
-                ? sessions.length > 0
-                  ? 'Confirm delete plan and sessions'
-                  : 'Confirm delete plan'
-                : 'Delete plan'}
-            </button>
-          </EditorActionMenu>
+          <button
+            className={deleteArmed ? styles.dangerButton : 'button'}
+            type="button"
+            disabled={saving}
+            onClick={() => void remove()}
+          >
+            <Trash2 aria-hidden="true" size={17} />
+            {deleteArmed
+              ? sessions.length > 0
+                ? 'Confirm delete plan and sessions'
+                : 'Confirm delete plan'
+              : 'Delete plan'}
+          </button>
         ) : null}
       </div>
     </section>
@@ -624,7 +609,7 @@ function PlanningContextPicker({
         <Users aria-hidden="true" size={22} />
         <div>
           <p className="page-eyebrow">Planning destination</p>
-          <h1 id="planning-context-heading">Choose who this lesson is for</h1>
+          <h2 id="planning-context-heading">Choose who this lesson is for</h2>
           <p>
             {planningOccurrence
               ? 'The Schedule Block suggests a context when available, but you may choose any active Class, Group, or Individual.'
@@ -912,6 +897,18 @@ export function PlanningEditorRoute() {
 
   return (
     <section className="page">
+      <header className="page-header">
+        <div>
+          <p className="page-eyebrow">Phase 3C-6B</p>
+          <h1>Planning</h1>
+          <p>
+            {snapshot.planningOccurrence
+              ? `Plan the ${snapshot.planningOccurrence.block.title} occurrence on ${formatLongDate(initialDate)} without hard-binding its suggested learner context.`
+              : `Create reusable teaching content, then keep it unscheduled or place it on ${formatLongDate(initialDate)}.`}
+          </p>
+        </div>
+      </header>
+
       {!snapshot.context ? (
         snapshot.contexts.length > 0 ? (
           <PlanningContextPicker

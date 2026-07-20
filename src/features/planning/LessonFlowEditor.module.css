@@ -1,8 +1,8 @@
 .editor {
   display: grid;
-  gap: 15px;
-  margin-top: 20px;
-  padding-top: 20px;
+  gap: 16px;
+  margin-top: 22px;
+  padding-top: 22px;
   border-top: 1px solid var(--border);
 }
 
@@ -16,8 +16,8 @@
   justify-content: space-between;
 }
 
-.sectionHeading :is(h2, h3),
-.preview h3 {
+.sectionHeading h3,
+.preview h4 {
   margin: 0;
   color: var(--heading);
 }
@@ -91,26 +91,23 @@
 }
 
 .stepCard {
-  padding: 13px;
-  border: 1px solid #becbc5;
-  border-left: 4px solid #537c6e;
-  border-radius: 11px;
-  background: #f9fbfa;
+  padding: 15px;
+  border: 1px solid #b8c7bf;
+  border-left: 5px solid #537c6e;
+  border-radius: 12px;
+  background: #f7faf8;
 }
 
 .stepHeader {
-  align-items: flex-start;
-  margin-bottom: 11px;
+  margin-bottom: 13px;
 }
 
-.stepIdentity {
-  min-width: 0;
+.stepHeader > div:first-child {
   display: grid;
-  gap: 2px;
+  gap: 3px;
 }
 
 .stepHeader strong {
-  overflow-wrap: anywhere;
   color: var(--heading);
 }
 
@@ -122,136 +119,44 @@
   text-transform: uppercase;
 }
 
-.stepMeta {
-  color: var(--text-secondary);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.stepMenu {
-  position: relative;
-  z-index: 5;
-  flex: 0 0 auto;
-}
-
-.stepMenuSummary {
-  min-height: 34px;
-  display: inline-flex;
-  gap: 5px;
-  align-items: center;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  color: var(--heading);
-  background: #fff;
-  font-size: 12px;
-  font-weight: 800;
-  list-style: none;
-  cursor: pointer;
-}
-
-.stepMenuSummary::-webkit-details-marker {
-  display: none;
-}
-
-.stepMenu[open] .stepMenuSummary {
-  border-color: var(--accent-strong);
-  box-shadow: 0 0 0 3px rgb(53 95 84 / 18%);
-}
-
-.stepMenuPanel {
-  position: absolute;
-  top: calc(100% + 7px);
-  right: 0;
-  width: min(210px, calc(100vw - 42px));
-  display: grid;
-  gap: 3px;
-  padding: 7px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: #fff;
-  box-shadow: 0 16px 38px rgb(40 58 62 / 20%);
-}
-
-.stepMenuPanel button {
-  min-height: 36px;
+.stepActions {
   display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 0 9px;
-  border: 0;
+  gap: 6px;
+}
+
+.iconButton,
+.removeButton {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  color: var(--heading);
-  background: transparent;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 750;
-  text-align: left;
+  color: #385148;
+  background: #fff;
   cursor: pointer;
 }
 
-.stepMenuPanel button:hover,
-.stepMenuPanel button:focus-visible {
-  background: var(--surface-soft);
+.removeButton {
+  color: #7a352f;
+  border-color: #d5aaa3;
 }
 
-.stepMenuPanel button:disabled {
+.iconButton:disabled,
+.removeButton:disabled {
   opacity: 0.45;
-  cursor: default;
-}
-
-.stepMenuPanel .deleteMenuItem {
-  color: var(--danger-strong);
-}
-
-.addStepButton {
-  width: 100%;
-  min-height: 44px;
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  justify-content: center;
-  border: 1px dashed #9fb1a8;
-  border-radius: 11px;
-  color: var(--accent-strong);
-  background: #f7faf8;
-  font: inherit;
-  font-weight: 850;
-  cursor: pointer;
-}
-
-.addStepButton:hover,
-.addStepButton:focus-visible {
-  border-style: solid;
-  background: #eff5f1;
-}
-
-.addStepButton:disabled {
-  opacity: 0.5;
   cursor: default;
 }
 
 .emptyFlow,
 .emptyPreview {
   margin: 0;
-  padding: 15px;
+  padding: 17px;
   border: 1px dashed #aebdb5;
   border-radius: 11px;
   color: #4f5955;
   background: #f7faf8;
   line-height: 1.5;
-}
-
-.emptyFlow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.emptyFlow p {
-  margin: 0;
 }
 
 .preview {
@@ -333,18 +238,5 @@
   .sectionHeading,
   .stepHeader {
     align-items: flex-start;
-  }
-
-  .stepCard {
-    padding: 12px;
-  }
-
-  .stepMenuPanel {
-    right: 0;
-  }
-
-  .emptyFlow,
-  .emptyFlow .button {
-    width: 100%;
   }
 }

@@ -260,7 +260,7 @@ test('Planning item becomes one synchronized scheduled and completed session', a
     name: 'Planning for Synthetic planning class',
   });
   await planning.getByRole('link', { name: 'New plan' }).click();
-  await expect(page.getByRole('heading', { level: 1, name: 'New plan' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: 'Planning' })).toBeVisible();
 
   await page.getByLabel('Title').fill('Synthetic bridge lesson');
   await page.getByLabel('Subject').fill('Language');
@@ -387,12 +387,8 @@ test('Lesson flow inherits into a session, supports an override, and can return 
   await expect(page.getByRole('heading', { level: 1, name: 'Session' })).toBeVisible();
   await page.getByRole('textbox', { name: 'Date', exact: true }).fill('2026-07-17');
   await expect(page.getByText('Plan content · live inheritance')).toBeVisible();
-  const inheritedPreview = page.getByRole('region', { name: 'Lesson flow preview' });
-  await expect(inheritedPreview.getByText('2 steps · 20 min')).toBeVisible();
-  await expect(inheritedPreview.getByText('Welcome and notice', { exact: true })).toBeVisible();
-  await expect(
-    inheritedPreview.getByText('Guided partner practice', { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText('Welcome and notice', { exact: true })).toBeVisible();
+  await expect(page.getByText('Guided partner practice', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Schedule session' }).click();
 
   const upcoming = page.getByRole('region', {

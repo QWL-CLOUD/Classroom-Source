@@ -1,8 +1,4 @@
-.editor {
-  min-width: 0;
-  padding: 0 0 96px;
-}
-
+.editor,
 .statePanel,
 .errorPanel {
   padding: 22px;
@@ -19,11 +15,9 @@
 
 .editorHeader {
   margin-bottom: 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border-soft);
 }
 
-.editorHeader h1,
+.editorHeader h2,
 .errorPanel h1 {
   margin: 0;
   color: var(--heading);
@@ -140,6 +134,22 @@
   margin-top: 20px;
 }
 
+.dangerButton {
+  min-height: 40px;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
+  border: 1px solid #a94d45;
+  border-radius: 10px;
+  color: #fff;
+  background: #8f3f38;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .statePanel {
   color: #4f5955;
 }
@@ -154,11 +164,7 @@
   }
 
   .editorHeader,
-  .actions {
-    width: 100%;
-  }
-
-  .editorHeader > *,
+  .actions,
   .actions > * {
     width: 100%;
   }
@@ -177,7 +183,7 @@
   align-items: flex-start;
 }
 
-.contextPicker h1,
+.contextPicker h2,
 .contextPicker p {
   margin: 0;
 }

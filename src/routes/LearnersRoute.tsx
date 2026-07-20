@@ -747,7 +747,7 @@ export function LearnersRoute() {
           <p className="page-eyebrow">Organize</p>
           <h1 className="page-title">Learners</h1>
           <p className="page-subtitle">
-            Open a Class, Group, or Individual to review planning, support, and context settings.
+            Classes, Groups, and Individuals share one planning system without a duplicate calendar.
           </p>
         </div>
         {model ? (
@@ -763,7 +763,7 @@ export function LearnersRoute() {
       {state.status === 'loading' ? (
         <div className={`card ${styles.statePanel}`} role="status">
           <Clock3 aria-hidden="true" size={24} />
-          <p>Loading learner contexts…</p>
+          <p>Loading learner contexts from the v20 database…</p>
         </div>
       ) : null}
 
@@ -779,304 +779,238 @@ export function LearnersRoute() {
 
       {state.status === 'ready' && model ? (
         state.data.contexts.length > 0 ? (
-          <>
-            <div
-              className={styles.mobileContextSummary}
+          <div className={styles.layout}>
+            <section
+              className={`card ${styles.contextPanel}`}
               role="region"
-              aria-label="Selected learner context"
+              aria-label="Learner contexts"
             >
-              {model.selectedContext ? (
-                <div className={styles.mobileSelectedContext}>
-                  <span className={styles.contextIconLarge}>
-                    {contextKindIcon(model.selectedContext.kind)}
-                  </span>
-                  <span>
-                    <strong>{model.selectedContext.name}</strong>
-                    <small>
-                      {getLearnerKindLabel(model.selectedContext.kind)} ·{' '}
-                      {model.selectedContext.status === 'active' ? 'Active' : 'Archived'}
-                    </small>
-                  </span>
+              <div className={styles.contextPanelHeader}>
+                <div>
+                  <p className="page-eyebrow">
+                    {contextStatus === 'active' ? 'Active contexts' : 'Archived contexts'}
+                  </p>
+                  <h2>{model.activeSchoolYearLabel}</h2>
                 </div>
-              ) : null}
-              <details className={styles.mobileContextPicker}>
-                <summary className="button">Change learner</summary>
-                <div className={styles.mobilePickerPanel}>
-                  <div className={styles.lifecycleTabs} role="group" aria-label="Context lifecycle">
-                    <button
-                      className={contextStatus === 'active' ? styles.activeLifecycleTab : ''}
-                      type="button"
-                      aria-pressed={contextStatus === 'active'}
-                      onClick={() => selectContextStatus('active')}
-                    >
-                      Active <span>{model.contextStatusCounts.active}</span>
-                    </button>
-                    <button
-                      className={contextStatus === 'archived' ? styles.activeLifecycleTab : ''}
-                      type="button"
-                      aria-pressed={contextStatus === 'archived'}
-                      onClick={() => selectContextStatus('archived')}
-                    >
-                      Archived <span>{model.contextStatusCounts.archived}</span>
-                    </button>
-                  </div>
-                  <label className={styles.mobileContextSelect}>
-                    <span>Class, Group, or Individual</span>
-                    <select
-                      value={model.selectedContext?.id ?? ''}
-                      onChange={(event) => {
-                        const context = state.data.contexts.find(
-                          (candidate) => candidate.id === event.target.value,
-                        );
-                        if (context) selectContext(context);
-                      }}
-                    >
-                      {model.contextGroups.flatMap((group) =>
-                        group.contexts.map((context) => (
-                          <option key={context.id} value={context.id}>
-                            {context.name} · {group.label.replace(/s$/, '')}
-                          </option>
-                        )),
-                      )}
-                    </select>
-                  </label>
-                </div>
-              </details>
-            </div>
+                <span>{model.contextStatusCounts[contextStatus]}</span>
+              </div>
 
-            <div className={styles.layout}>
-              <section
-                className={`card ${styles.contextPanel}`}
-                role="region"
-                aria-label="Learner contexts"
-              >
-                <div className={styles.contextPanelHeader}>
-                  <div>
-                    <p className="page-eyebrow">
-                      {contextStatus === 'active' ? 'Active contexts' : 'Archived contexts'}
-                    </p>
-                    <h2>{model.activeSchoolYearLabel}</h2>
-                  </div>
-                  <span>{model.contextStatusCounts[contextStatus]}</span>
-                </div>
-
-                <div className={styles.lifecycleTabs} role="group" aria-label="Context lifecycle">
-                  <button
-                    className={contextStatus === 'active' ? styles.activeLifecycleTab : ''}
-                    type="button"
-                    aria-pressed={contextStatus === 'active'}
-                    onClick={() => selectContextStatus('active')}
-                  >
-                    Active <span>{model.contextStatusCounts.active}</span>
-                  </button>
-                  <button
-                    className={contextStatus === 'archived' ? styles.activeLifecycleTab : ''}
-                    type="button"
-                    aria-pressed={contextStatus === 'archived'}
-                    onClick={() => selectContextStatus('archived')}
-                  >
-                    Archived <span>{model.contextStatusCounts.archived}</span>
-                  </button>
-                </div>
-
-                <div className={styles.contextGroups}>
-                  {model.contextGroups.map((group) => (
-                    <section
-                      key={`${contextStatus}-${group.kind}`}
-                      aria-labelledby={`learner-${contextStatus}-${group.kind}-heading`}
-                    >
-                      <div className={styles.groupHeading}>
-                        <h3 id={`learner-${contextStatus}-${group.kind}-heading`}>{group.label}</h3>
-                        <span>{group.contexts.length}</span>
-                      </div>
-                      {group.contexts.length > 0 ? (
-                        <ul className={styles.contextList}>
-                          {group.contexts.map((context) => {
-                            const selected = context.id === model.selectedContext?.id;
-                            return (
-                              <li key={context.id}>
-                                <button
-                                  className={`${styles.contextButton} ${
-                                    selected ? styles.selectedContext : ''
-                                  }`}
-                                  type="button"
-                                  aria-pressed={selected}
-                                  aria-label={`Open ${context.name} ${getLearnerKindLabel(
-                                    context.kind,
-                                  ).toLowerCase()}`}
-                                  onClick={() => selectContext(context)}
-                                >
-                                  <span className={styles.contextIcon}>
-                                    {contextKindIcon(context.kind)}
-                                  </span>
-                                  <span>
-                                    <strong>{context.name}</strong>
-                                    <small>
-                                      {getLearnerKindLabel(context.kind)}
-                                      {context.status === 'archived' ? ' · Archived' : ''}
-                                    </small>
-                                  </span>
-                                </button>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      ) : (
-                        <p className={styles.emptyGroup}>
-                          No {contextStatus} {group.label.toLowerCase()}.
-                        </p>
-                      )}
-                    </section>
-                  ))}
-                </div>
-              </section>
-
-              {model.selectedContext ? (
-                <section
-                  className={styles.planningPanel}
-                  role="region"
-                  aria-label={`Planning for ${model.selectedContext.name}`}
+              <div className={styles.lifecycleTabs} role="group" aria-label="Context lifecycle">
+                <button
+                  className={contextStatus === 'active' ? styles.activeLifecycleTab : ''}
+                  type="button"
+                  aria-pressed={contextStatus === 'active'}
+                  onClick={() => selectContextStatus('active')}
                 >
-                  <section className={`card ${styles.planningWorkspace}`}>
-                    <div className={styles.planningHeader}>
-                      <div>
-                        <p className="page-eyebrow">Planning</p>
-                        <h2>{planningViewLabels[planningView]}</h2>
-                      </div>
-                      <div className={styles.planningActions}>
-                        {planningView === 'upcoming' ? (
-                          <div className={styles.dateControls}>
-                            <label>
-                              <span>From</span>
-                              <input
-                                className="input"
-                                type="date"
-                                value={anchorDate}
-                                onChange={(event) => updateSearchParam('date', event.target.value)}
-                              />
-                            </label>
-                            <button
-                              className="button"
-                              type="button"
-                              onClick={() => updateSearchParam('date', todayLocalDate())}
-                            >
-                              Today
-                            </button>
-                          </div>
-                        ) : null}
-                        {model.selectedContext.status === 'active' ? (
-                          <a
-                            className="button button-primary"
-                            href={`#/planning/edit?context=${encodeURIComponent(model.selectedContext.id)}`}
-                          >
-                            <CalendarPlus aria-hidden="true" size={16} /> New plan
-                          </a>
-                        ) : (
-                          <span className={styles.archivedPlanRestriction}>
-                            Restore this context to add a Plan.
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                  Active <span>{model.contextStatusCounts.active}</span>
+                </button>
+                <button
+                  className={contextStatus === 'archived' ? styles.activeLifecycleTab : ''}
+                  type="button"
+                  aria-pressed={contextStatus === 'archived'}
+                  onClick={() => selectContextStatus('archived')}
+                >
+                  Archived <span>{model.contextStatusCounts.archived}</span>
+                </button>
+              </div>
 
-                    <div className={styles.tabs} role="tablist" aria-label="Learner planning views">
-                      {(Object.keys(planningViewLabels) as LearnerPlanningView[]).map((view) => {
-                        const count =
-                          view === 'upcoming'
-                            ? model.upcomingItems.length
-                            : view === 'unscheduled'
-                              ? model.unscheduledItems.length
-                              : view === 'completed'
-                                ? model.completedItems.length
-                                : model.seriesItems.length;
-                        return (
+              <div className={styles.contextGroups}>
+                {model.contextGroups.map((group) => (
+                  <section
+                    key={`${contextStatus}-${group.kind}`}
+                    aria-labelledby={`learner-${contextStatus}-${group.kind}-heading`}
+                  >
+                    <div className={styles.groupHeading}>
+                      <h3 id={`learner-${contextStatus}-${group.kind}-heading`}>{group.label}</h3>
+                      <span>{group.contexts.length}</span>
+                    </div>
+                    {group.contexts.length > 0 ? (
+                      <ul className={styles.contextList}>
+                        {group.contexts.map((context) => {
+                          const selected = context.id === model.selectedContext?.id;
+                          return (
+                            <li key={context.id}>
+                              <button
+                                className={`${styles.contextButton} ${
+                                  selected ? styles.selectedContext : ''
+                                }`}
+                                type="button"
+                                aria-pressed={selected}
+                                aria-label={`Open ${context.name} ${getLearnerKindLabel(
+                                  context.kind,
+                                ).toLowerCase()}`}
+                                onClick={() => selectContext(context)}
+                              >
+                                <span className={styles.contextIcon}>
+                                  {contextKindIcon(context.kind)}
+                                </span>
+                                <span>
+                                  <strong>{context.name}</strong>
+                                  <small>
+                                    {getLearnerKindLabel(context.kind)}
+                                    {context.status === 'archived' ? ' · Archived' : ''}
+                                  </small>
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <p className={styles.emptyGroup}>
+                        No {contextStatus} {group.label.toLowerCase()}.
+                      </p>
+                    )}
+                  </section>
+                ))}
+              </div>
+            </section>
+
+            {model.selectedContext ? (
+              <section
+                className={styles.planningPanel}
+                role="region"
+                aria-label={`Planning for ${model.selectedContext.name}`}
+              >
+                <LearnerContextLifecycleCard
+                  key={model.selectedContext.id}
+                  context={model.selectedContext}
+                  onStatusChanged={keepSelectedContextInStatus}
+                  onDeleted={clearDeletedContext}
+                />
+
+                <LearnerNoticePanel context={model.selectedContext} />
+
+                <section className={`card ${styles.planningWorkspace}`}>
+                  <div className={styles.planningHeader}>
+                    <div>
+                      <p className="page-eyebrow">Planning</p>
+                      <h2>{planningViewLabels[planningView]}</h2>
+                    </div>
+                    <div className={styles.planningActions}>
+                      {planningView === 'upcoming' ? (
+                        <div className={styles.dateControls}>
+                          <label>
+                            <span>From</span>
+                            <input
+                              className="input"
+                              type="date"
+                              value={anchorDate}
+                              onChange={(event) => updateSearchParam('date', event.target.value)}
+                            />
+                          </label>
                           <button
-                            key={view}
-                            id={`learner-planning-tab-${view}`}
-                            className={planningView === view ? styles.activeTab : ''}
+                            className="button"
                             type="button"
-                            role="tab"
-                            aria-selected={planningView === view}
-                            aria-controls="learner-planning-panel"
-                            onClick={() => updateSearchParam('planning', view)}
+                            onClick={() => updateSearchParam('date', todayLocalDate())}
                           >
-                            {planningViewLabels[view]} <span>{count}</span>
+                            Today
                           </button>
-                        );
-                      })}
-                    </div>
-
-                    <div
-                      id="learner-planning-panel"
-                      className={styles.tabPanel}
-                      role="tabpanel"
-                      aria-labelledby={`learner-planning-tab-${planningView}`}
-                    >
-                      {planningView === 'series' && model.seriesItems.length > 0 ? (
-                        <ul
-                          className={styles.planningList}
-                          aria-label={`Lesson series for ${model.selectedContext.name}`}
-                        >
-                          {model.seriesItems.map((item) => (
-                            <LessonSeriesCard key={item.id} item={item} />
-                          ))}
-                        </ul>
-                      ) : planningItems.length > 0 ? (
-                        <ul
-                          className={styles.planningList}
-                          aria-label={`${planningViewLabels[planningView]} planning for ${model.selectedContext.name}`}
-                        >
-                          {planningItems.map((item) => (
-                            <PlanningItemCard key={`${item.sourceType}:${item.id}`} item={item} />
-                          ))}
-                        </ul>
-                      ) : (
-                        <div className={styles.emptyPlanning} role="status">
-                          {planningView === 'completed' ? (
-                            <CheckCircle2 aria-hidden="true" size={28} />
-                          ) : planningView === 'series' ? (
-                            <Layers3 aria-hidden="true" size={28} />
-                          ) : planningView === 'upcoming' ? (
-                            <CalendarDays aria-hidden="true" size={28} />
-                          ) : (
-                            <BookOpen aria-hidden="true" size={28} />
-                          )}
-                          <div>
-                            <h3>{emptyPlanningMessage(planningView)}</h3>
-                            <p>
-                              Planning records will appear here when they are connected to this
-                              context.
-                            </p>
-                          </div>
                         </div>
+                      ) : null}
+                      {model.selectedContext.status === 'active' ? (
+                        <a
+                          className="button button-primary"
+                          href={`#/planning/edit?context=${encodeURIComponent(model.selectedContext.id)}`}
+                        >
+                          <CalendarPlus aria-hidden="true" size={16} /> New plan
+                        </a>
+                      ) : (
+                        <span className={styles.archivedPlanRestriction}>
+                          Restore this context to add a Plan.
+                        </span>
                       )}
                     </div>
-                  </section>
-
-                  <LearnerNoticePanel context={model.selectedContext} />
-
-                  <LearnerContextLifecycleCard
-                    key={model.selectedContext.id}
-                    context={model.selectedContext}
-                    onStatusChanged={keepSelectedContextInStatus}
-                    onDeleted={clearDeletedContext}
-                  />
-                </section>
-              ) : (
-                <div className={`card ${styles.emptyLearners}`} role="status">
-                  <Archive aria-hidden="true" size={30} />
-                  <div>
-                    <h2>No {contextStatus} learner contexts</h2>
-                    <p>
-                      {contextStatus === 'active'
-                        ? 'Restore an archived context or import an active Class, Group, or Individual.'
-                        : 'Archived Classes, Groups, and Individuals will remain available here with their history.'}
-                    </p>
                   </div>
+
+                  <div className={styles.tabs} role="tablist" aria-label="Learner planning views">
+                    {(Object.keys(planningViewLabels) as LearnerPlanningView[]).map((view) => {
+                      const count =
+                        view === 'upcoming'
+                          ? model.upcomingItems.length
+                          : view === 'unscheduled'
+                            ? model.unscheduledItems.length
+                            : view === 'completed'
+                              ? model.completedItems.length
+                              : model.seriesItems.length;
+                      return (
+                        <button
+                          key={view}
+                          id={`learner-planning-tab-${view}`}
+                          className={planningView === view ? styles.activeTab : ''}
+                          type="button"
+                          role="tab"
+                          aria-selected={planningView === view}
+                          aria-controls="learner-planning-panel"
+                          onClick={() => updateSearchParam('planning', view)}
+                        >
+                          {planningViewLabels[view]} <span>{count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div
+                    id="learner-planning-panel"
+                    className={styles.tabPanel}
+                    role="tabpanel"
+                    aria-labelledby={`learner-planning-tab-${planningView}`}
+                  >
+                    {planningView === 'series' && model.seriesItems.length > 0 ? (
+                      <ul
+                        className={styles.planningList}
+                        aria-label={`Lesson series for ${model.selectedContext.name}`}
+                      >
+                        {model.seriesItems.map((item) => (
+                          <LessonSeriesCard key={item.id} item={item} />
+                        ))}
+                      </ul>
+                    ) : planningItems.length > 0 ? (
+                      <ul
+                        className={styles.planningList}
+                        aria-label={`${planningViewLabels[planningView]} planning for ${model.selectedContext.name}`}
+                      >
+                        {planningItems.map((item) => (
+                          <PlanningItemCard key={`${item.sourceType}:${item.id}`} item={item} />
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className={styles.emptyPlanning} role="status">
+                        {planningView === 'completed' ? (
+                          <CheckCircle2 aria-hidden="true" size={28} />
+                        ) : planningView === 'series' ? (
+                          <Layers3 aria-hidden="true" size={28} />
+                        ) : planningView === 'upcoming' ? (
+                          <CalendarDays aria-hidden="true" size={28} />
+                        ) : (
+                          <BookOpen aria-hidden="true" size={28} />
+                        )}
+                        <div>
+                          <h3>{emptyPlanningMessage(planningView)}</h3>
+                          <p>
+                            Planning records will appear here when they are connected to this
+                            context.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              </section>
+            ) : (
+              <div className={`card ${styles.emptyLearners}`} role="status">
+                <Archive aria-hidden="true" size={30} />
+                <div>
+                  <h2>No {contextStatus} learner contexts</h2>
+                  <p>
+                    {contextStatus === 'active'
+                      ? 'Restore an archived context or import an active Class, Group, or Individual.'
+                      : 'Archived Classes, Groups, and Individuals will remain available here with their history.'}
+                  </p>
                 </div>
-              )}
-            </div>
-          </>
+              </div>
+            )}
+          </div>
         ) : (
           <div className={`card ${styles.emptyLearners}`} role="status">
             <Users aria-hidden="true" size={30} />
