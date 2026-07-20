@@ -208,7 +208,11 @@ function CalendarEventForm({
         </p>
       ) : null}
 
-      <div className={styles.formActions}>
+      <div
+        className={`editor-action-bar ${styles.formActions}`}
+        role="group"
+        aria-label="Editor actions"
+      >
         <button
           className="button button-primary"
           type="button"
@@ -268,7 +272,7 @@ export function CalendarEventEditorRoute() {
 
   return (
     <section className="page">
-      <header className="page-header">
+      <header className="page-header editor-page-header">
         <div>
           <p className="page-eyebrow">Phase 2F</p>
           <h1>Calendar event editor</h1>

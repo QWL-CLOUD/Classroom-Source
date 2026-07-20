@@ -18,6 +18,8 @@ This repository is the React + TypeScript source rebuild of Classroom. The legac
   learner lifecycle, occurrence-first planning, safe deletion, and lifecycle closure complete
 - Phase 3D-1–3D-4: Task lifecycle, source-linked Reminders, Learner Support & Notices, and the
   real-time Personal Agenda aggregation complete
+- Phase 3D-5B-1: global shell and responsive foundation adds a mobile navigation drawer,
+  route-aware content widths, shared editor headers, and sticky editor actions
 
 ## Phase 2 capabilities
 
