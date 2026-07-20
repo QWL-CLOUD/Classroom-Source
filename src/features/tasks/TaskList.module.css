@@ -378,3 +378,45 @@
     flex: 1;
   }
 }
+
+.workspaceToolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.createPanel {
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  background: var(--surface-card);
+}
+
+.taskActions {
+  justify-content: space-between;
+}
+
+.primaryTaskActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  align-items: center;
+}
+
+.emptyState {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+  background: transparent;
+}
+
+@media (max-width: 520px) {
+  .workspaceToolbar,
+  .workspaceToolbar > *,
+  .taskActions,
+  .taskActions > *,
+  .primaryTaskActions,
+  .primaryTaskActions > * {
+    width: 100%;
+  }
+}
