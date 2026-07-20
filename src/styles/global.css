@@ -73,6 +73,10 @@ p {
   margin-bottom: 28px;
 }
 
+.page-header > * {
+  min-width: 0;
+}
+
 .page-eyebrow {
   margin: 0 0 7px;
   color: var(--text-muted);
@@ -121,6 +125,12 @@ p {
   cursor: pointer;
   font-weight: 700;
   text-decoration: none;
+}
+
+.button-icon {
+  width: 42px;
+  flex: 0 0 auto;
+  padding-inline: 0;
 }
 
 .button-primary {

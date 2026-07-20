@@ -127,7 +127,7 @@ test('Lesson Flow supports adjacent creation, duplication, reordering, and focus
     .getByLabel('Ergonomic lesson flow, Scheduled');
   await scheduled.getByRole('link', { name: 'Manage session' }).click();
 
-  const editorActions = page.getByRole('group', { name: 'Editor actions' });
+  const editorActions = page.getByRole('group', { name: 'Editor actions', exact: true });
   await expect(editorActions.getByRole('button', { name: 'Save session' })).toBeVisible();
   await editorActions.locator('summary').click();
   await expect(editorActions.getByRole('button', { name: 'Return to Unscheduled' })).toBeVisible();

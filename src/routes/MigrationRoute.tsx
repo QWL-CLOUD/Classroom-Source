@@ -133,7 +133,7 @@ function PlanReport({
     {
       label: 'Deferred',
       value: plan.summary.deferredRecords,
-      detail: 'Waiting for a future v20 schema',
+      detail: 'Not supported by the current import format',
       tone: 'deferred',
     },
     {
@@ -160,15 +160,15 @@ function PlanReport({
     <section className={styles.planSection} aria-labelledby="migration-plan-heading">
       <div className={styles.planHeader}>
         <div>
-          <p className="page-eyebrow">Phase 1D · Safe execution</p>
+          <p className="page-eyebrow">Migration plan</p>
           <h3 id="migration-plan-heading">Reversible migration plan</h3>
         </div>
         <span className={styles.planStatus}>{alreadyCommitted ? 'Committed' : 'Draft'}</span>
       </div>
 
       <p className={styles.planIntro}>
-        The plan contains transformed v20 records and matching inverse deletes. Review, deferred,
-        and skipped records remain outside active v20 tables.
+        The plan contains transformed Classroom records and matching inverse deletes. Review,
+        deferred, and skipped records remain outside active Classroom tables.
       </p>
 
       <dl className={styles.planMetadata}>
@@ -471,7 +471,7 @@ function AcceptanceReportCard({ report }: { report: MigrationAcceptanceReport })
     <section className={`card ${styles.acceptanceCard}`} aria-labelledby="acceptance-heading">
       <div className={styles.planHeader}>
         <div>
-          <p className="page-eyebrow">Phase 1E · Completion evidence</p>
+          <p className="page-eyebrow">Completion evidence</p>
           <h2 id="acceptance-heading">Migration completion report</h2>
         </div>
         <span className={styles.acceptanceStatus} data-status={report.status}>
@@ -484,7 +484,7 @@ function AcceptanceReportCard({ report }: { report: MigrationAcceptanceReport })
           ? 'The migration remains committed, but one or more independent acceptance checks failed.'
           : report.status === 'passed'
             ? 'The committed migration passed every source, database, rollback, and privacy check.'
-            : 'The committed migration passed integrity checks; deferred and review items remain for later phases.'}
+            : 'The committed migration passed integrity checks; deferred and review items remain for follow-up.'}
       </Notice>
 
       <dl className={styles.acceptanceSummary}>
@@ -849,9 +849,9 @@ export function MigrationRoute() {
           <p className="page-eyebrow">System</p>
           <h1 className="page-title">Migration center</h1>
           <p className="page-subtitle">
-            Phase 1E adds independent real-backup acceptance, persistent completion evidence, and
-            privacy-safe JSON and Markdown reports after the verified migration transaction. Legacy{' '}
-            <code>cos-*</code> storage remains read-only.
+            Review a private backup locally, create a reversible migration plan, and keep completion
+            evidence in privacy-safe JSON and Markdown reports. Legacy <code>cos-*</code> storage
+            remains read-only.
           </p>
         </div>
       </header>

@@ -5,7 +5,7 @@ export function ExportRoute() {
     <PagePlaceholder
       eyebrow="System"
       title="Export & Backup"
-      description="A versioned v20 export format will be added before any migration can be committed."
+      description="A versioned Classroom backup format is not available in this build."
     />
   );
 }

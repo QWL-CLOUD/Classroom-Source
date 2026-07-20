@@ -5,7 +5,7 @@ export function InsightsRoute() {
     <PagePlaceholder
       eyebrow="Reflect"
       title="Teaching Insights"
-      description="Reflection and teaching memory arrive in Phase 4."
+      description="Review reflection and teaching memory here when Teaching Insights becomes available."
     />
   );
 }
