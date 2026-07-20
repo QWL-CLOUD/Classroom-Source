@@ -5,7 +5,7 @@ export function LibraryRoute() {
     <PagePlaceholder
       eyebrow="Organize"
       title="Library"
-      description="Activities, Resources, Assessments, and Standards arrive in Phase 3."
+      description="Keep reusable activities, resources, assessments, and standards together when the Library becomes available."
     />
   );
 }

@@ -274,11 +274,11 @@ export function CalendarEventEditorRoute() {
     <section className="page">
       <header className="page-header editor-page-header">
         <div>
-          <p className="page-eyebrow">Phase 2F</p>
+          <p className="page-eyebrow">Calendar events</p>
           <h1>Calendar event editor</h1>
           <p>
-            Create, edit, and delete dated events with validation, transactions, change history, and
-            undo/redo.
+            Create and maintain dated events. Every change stays available through Classroom Undo
+            and Redo.
           </p>
         </div>
         <div className={styles.headerActions}>
@@ -336,7 +336,7 @@ export function CalendarEventEditorRoute() {
           {state.status === 'ready' && events.length === 0 ? (
             <div className={styles.emptyState}>
               <h3>No dated events in this month</h3>
-              <p>Recurring schedule blocks remain read-only in Phase 2F.</p>
+              <p>Recurring schedule blocks are managed separately in Schedule.</p>
             </div>
           ) : null}
           {state.status === 'ready' && events.length > 0 ? (

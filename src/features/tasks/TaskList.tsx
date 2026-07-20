@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type FormEvent } from 'react';
+import { useId, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   Ban,
   CalendarClock,
@@ -25,6 +25,7 @@ import styles from './TaskList.module.css';
 interface TaskListProps {
   selectedDate?: string;
   compact?: boolean;
+  defaultScheduledDate?: string;
 }
 
 interface TaskEditorProps {
@@ -139,6 +140,7 @@ function TaskEditor({
             }
             maxLength={240}
             required
+            autoFocus
           />
         </label>
         <label className={styles.field} htmlFor={`${id}-context`}>
@@ -577,15 +579,16 @@ function TodayTaskList({ selectedDate }: { selectedDate: string }) {
           ))}
         </ul>
       )}
-      <a className={styles.manageLink} href="#/tasks">
+      <a className={styles.manageLink} href={`#/tasks?date=${encodeURIComponent(selectedDate)}`}>
         Manage all tasks
       </a>
     </div>
   );
 }
 
-export function TaskList({ selectedDate, compact = false }: TaskListProps) {
+export function TaskList({ selectedDate, compact = false, defaultScheduledDate }: TaskListProps) {
   const [creating, setCreating] = useState(false);
+  const newTaskButtonRef = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const data = useLiveQuery(async () => {
@@ -607,6 +610,11 @@ export function TaskList({ selectedDate, compact = false }: TaskListProps) {
 
   if (compact && selectedDate) return <TodayTaskList selectedDate={selectedDate} />;
 
+  function closeCreatePanel(): void {
+    setCreating(false);
+    requestAnimationFrame(() => newTaskButtonRef.current?.focus());
+  }
+
   async function run(action: () => Promise<unknown>): Promise<void> {
     if (busy) return;
     setBusy(true);
@@ -626,9 +634,13 @@ export function TaskList({ selectedDate, compact = false }: TaskListProps) {
     <div className={styles.workspace}>
       <div className={styles.workspaceToolbar}>
         <button
+          ref={newTaskButtonRef}
           className="button button-primary"
           type="button"
-          onClick={() => setCreating((current) => !current)}
+          onClick={() => {
+            if (creating) closeCreatePanel();
+            else setCreating(true);
+          }}
           aria-expanded={creating}
           aria-controls="new-task-panel"
         >
@@ -650,12 +662,13 @@ export function TaskList({ selectedDate, compact = false }: TaskListProps) {
           </div>
           <TaskEditor
             contexts={contexts}
+            defaultScheduledDate={defaultScheduledDate}
             submitLabel="Create task"
             busy={busy}
-            onCancel={() => setCreating(false)}
+            onCancel={closeCreatePanel}
             onSubmit={async (values) => {
               await run(() => taskMutationService.create(values));
-              setCreating(false);
+              closeCreatePanel();
             }}
           />
         </section>

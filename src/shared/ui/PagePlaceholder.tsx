@@ -15,7 +15,12 @@ export function PagePlaceholder({ eyebrow, title, description, children }: PageP
           <p className="page-subtitle">{description}</p>
         </div>
       </header>
-      {children ?? <div className="card empty-state">This workspace opens in a later phase.</div>}
+      {children ?? (
+        <div className="card empty-state">
+          <h2>Not available in this build</h2>
+          <p>This workspace is reserved for a future Classroom update.</p>
+        </div>
+      )}
     </section>
   );
 }

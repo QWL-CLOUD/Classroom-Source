@@ -5,7 +5,7 @@ export function SettingsRoute() {
     <PagePlaceholder
       eyebrow="System"
       title="Settings"
-      description="Only lightweight UI preferences will use localStorage; domain records remain in IndexedDB."
+      description="Classroom preferences will appear here without mixing them into teaching records."
     />
   );
 }

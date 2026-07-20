@@ -7,7 +7,7 @@ export function ImportRoute() {
     <PagePlaceholder
       eyebrow="System"
       title="Import Center"
-      description="Structured file import is a later phase. Legacy backup scanning is available now."
+      description="Scan a legacy backup locally before deciding whether to migrate supported records."
     >
       <div className="card empty-state">
         <FileJson size={34} />
