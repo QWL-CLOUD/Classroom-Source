@@ -189,10 +189,10 @@
 }
 
 .mobileWeekday {
-  display: none;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -316,48 +316,6 @@
     flex-basis: 100%;
     text-align: left;
   }
-
-  .weekdayRow {
-    display: none;
-  }
-
-  .monthGrid {
-    grid-template-columns: 1fr;
-  }
-
-  .day,
-  .day:nth-child(7n),
-  .day:nth-last-child(-n + 7) {
-    min-height: 0;
-    border-right: 0;
-    border-bottom: 1px solid var(--border-soft);
-  }
-
-  .day:last-child {
-    border-bottom: 0;
-  }
-
-  .day article {
-    min-height: 0;
-    padding: 14px;
-  }
-
-  .adjacentMonthDay {
-    display: none;
-  }
-
-  .mobileWeekday {
-    display: inline;
-  }
-
-  .itemList {
-    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-  }
-
-  .noItems {
-    margin: 8px 0 4px;
-    text-align: left;
-  }
 }
 
 @media (max-width: 620px) {
@@ -376,9 +334,158 @@
     justify-content: center;
   }
 
+  .legend {
+    gap: 8px 14px;
+    padding: 12px 14px;
+  }
+
+  .legend p {
+    display: none;
+  }
+
   .itemList {
     grid-template-columns: 1fr;
   }
+}
+
+.mobileCalendar {
+  border-top: 1px solid var(--border);
+}
+
+.mobileMonthList {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mobileDay {
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface-card);
+}
+
+.mobileDay > article {
+  display: grid;
+  gap: 10px;
+  padding: 14px 2px 16px;
+}
+
+.mobileDayHeader {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mobileDayHeader > div {
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.mobileDateLabel {
+  color: var(--heading);
+  font-size: 20px;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.mobileNoItems {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.mobileCounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mobileCounts span {
+  padding: 4px 7px;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--surface-soft);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.mobileHighlights {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mobileHighlights li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'type time'
+    'title time';
+  gap: 2px 10px;
+  padding-left: 10px;
+  border-left: 3px solid var(--border);
+}
+
+.mobileHighlights span {
+  grid-area: type;
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.mobileHighlights strong {
+  grid-area: title;
+  overflow-wrap: anywhere;
+  color: var(--heading);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.mobileHighlights time {
+  grid-area: time;
+  align-self: center;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.dayDetails {
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.dayDetails summary {
+  padding: 9px 0;
+  color: var(--accent-strong);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mobileItemList {
+  padding: 2px 0 12px;
+}
+
+.mobileItemList .occurrenceEdit {
+  opacity: 1;
+}
+
+.viewInWeek {
+  width: fit-content;
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 /* Phase 2B WCAG AA contrast override */
@@ -510,17 +617,31 @@
   border-radius: 4px;
 }
 
+.calendarCard .occurrenceEdit {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.calendarCard .item:hover .occurrenceEdit,
+.calendarCard .item:focus-within .occurrenceEdit {
+  opacity: 1;
+}
+
 .dayAddButton {
-  width: 28px;
-  height: 28px;
-  display: inline-grid;
+  min-height: 28px;
+  display: inline-flex;
   flex-shrink: 0;
-  place-items: center;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
   margin-left: auto;
+  padding: 0 7px;
   border: 1px solid var(--border-soft);
   border-radius: 9px;
   color: var(--heading);
   background: var(--surface-soft);
+  font-size: 10px;
+  font-weight: 800;
   text-decoration: none;
 }
 

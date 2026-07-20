@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
-  StickyNote,
   Users,
 } from 'lucide-react';
 import { useMemo, type ChangeEvent } from 'react';
@@ -33,6 +32,7 @@ import { TaskList } from '@/features/tasks/TaskList';
 import { useWorkspaceReadModel } from '@/features/workspace/useWorkspaceReadModel';
 import { formatLongDate, shiftDays, todayLocalDate } from '@/shared/dates/localDate';
 import { useDateSearchParam } from '@/shared/dates/useDateSearchParam';
+import { WorkspaceAddMenu } from '@/shared/ui/WorkspaceAddMenu';
 
 import styles from './TodayRoute.module.css';
 
@@ -192,98 +192,42 @@ export function TodayRoute() {
           <p className="page-subtitle">Previewing {formatLongDate(date)}</p>
         </div>
 
-        <div className={styles.dateToolbar} aria-label="Today date navigation">
-          <button
-            className="button button-icon"
-            type="button"
-            aria-label={`Previous day, ${formatLongDate(previousDate)}`}
-            onClick={() => setDate(previousDate)}
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <button className="button" type="button" onClick={() => setDate(currentDate)}>
-            Today
-          </button>
-          <button
-            className="button button-icon"
-            type="button"
-            aria-label={`Next day, ${formatLongDate(nextDate)}`}
-            onClick={() => setDate(nextDate)}
-          >
-            <ChevronRight size={18} />
-          </button>
-          <label className={styles.datePicker}>
-            <span className="sr-only">Selected date</span>
-            <input
-              className="input"
-              type="date"
-              value={date}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => setDate(event.target.value)}
-            />
-          </label>
-          <a
-            className="button button-primary"
-            href={buildPlanningEntryHref({ date, returnTo: 'today' })}
-          >
-            <CalendarPlus aria-hidden="true" size={17} /> New plan
-          </a>
+        <div className={styles.headerControls}>
+          <div className={styles.dateToolbar} aria-label="Today date navigation">
+            <button
+              className="button button-icon"
+              type="button"
+              aria-label={`Previous day, ${formatLongDate(previousDate)}`}
+              onClick={() => setDate(previousDate)}
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button className="button" type="button" onClick={() => setDate(currentDate)}>
+              Today
+            </button>
+            <button
+              className="button button-icon"
+              type="button"
+              aria-label={`Next day, ${formatLongDate(nextDate)}`}
+              onClick={() => setDate(nextDate)}
+            >
+              <ChevronRight size={18} />
+            </button>
+            <label className={styles.datePicker}>
+              <span className="sr-only">Selected date</span>
+              <input
+                className="input"
+                type="date"
+                value={date}
+                onChange={(event: ChangeEvent<HTMLInputElement>) => setDate(event.target.value)}
+              />
+            </label>
+          </div>
+          <WorkspaceAddMenu date={date} returnTo="today" includeWorkspaceItems />
         </div>
       </header>
 
       <div className={styles.layout}>
-        <div className={styles.leftColumn}>
-          <article className={`card ${styles.panel}`}>
-            <h2>To-do</h2>
-            <TaskList selectedDate={date} compact />
-          </article>
-
-          <article className={`card ${styles.panel}`}>
-            <AgendaSummary selectedDate={date} />
-          </article>
-
-          <article
-            className={`card ${styles.panel} ${styles.warmPanel}`}
-            aria-labelledby="today-reminders-heading"
-          >
-            <div className={styles.panelHeading}>
-              <Bell size={19} aria-hidden="true" />
-              <h2 id="today-reminders-heading">Reminders</h2>
-            </div>
-            <p className={styles.panelIntro}>
-              Active reminder records scheduled for the selected date. Dismissing a reminder never
-              completes its source task or changes its source record.
-            </p>
-            <TodayReminderList selectedDate={date} />
-          </article>
-
-          <article className={`card ${styles.panel}`}>
-            <div className={styles.panelHeading}>
-              <Users size={19} aria-hidden="true" />
-              <h2>Students to notice</h2>
-            </div>
-            <TodayLearnerNoticeList selectedDate={date} />
-            {state.status === 'ready' && state.data.learnerContexts.length > 0 ? (
-              <p className={styles.contextNote}>
-                {state.data.learnerContexts.length} active learner{' '}
-                {state.data.learnerContexts.length === 1 ? 'context is' : 'contexts are'} connected
-                to v20 and available in Learners.
-              </p>
-            ) : null}
-          </article>
-
-          <article className={`card ${styles.panel}`}>
-            <h2>Quick capture</h2>
-            <textarea
-              className={styles.capture}
-              placeholder="Idea, reminder, learner moment, or teaching note…"
-              disabled
-            />
-            <button className="button" type="button" disabled>
-              <StickyNote size={17} /> Save capture
-            </button>
-          </article>
-        </div>
-
         <article
           className={styles.scheduleColumn}
           role="region"
@@ -533,6 +477,36 @@ export function TodayRoute() {
             </>
           ) : null}
         </article>
+
+        <div className={styles.leftColumn}>
+          <article className={`card ${styles.panel}`}>
+            <h2>To-do</h2>
+            <TaskList selectedDate={date} compact />
+          </article>
+
+          <article className={`card ${styles.panel}`}>
+            <AgendaSummary selectedDate={date} />
+          </article>
+
+          <article
+            className={`card ${styles.panel} ${styles.warmPanel}`}
+            aria-labelledby="today-reminders-heading"
+          >
+            <div className={styles.panelHeading}>
+              <Bell size={19} aria-hidden="true" />
+              <h2 id="today-reminders-heading">Reminders</h2>
+            </div>
+            <TodayReminderList selectedDate={date} />
+          </article>
+
+          <article className={`card ${styles.panel}`}>
+            <div className={styles.panelHeading}>
+              <Users size={19} aria-hidden="true" />
+              <h2>Students to notice</h2>
+            </div>
+            <TodayLearnerNoticeList selectedDate={date} />
+          </article>
+        </div>
       </div>
     </section>
   );

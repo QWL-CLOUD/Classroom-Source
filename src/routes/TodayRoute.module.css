@@ -1,3 +1,11 @@
+.headerControls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
 .dateToolbar {
   display: flex;
   flex-wrap: wrap;
@@ -12,11 +20,14 @@
 
 .layout {
   display: grid;
-  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  grid-template-areas: 'support schedule';
   gap: 28px;
+  align-items: start;
 }
 
 .leftColumn {
+  grid-area: support;
   display: grid;
   align-content: start;
   gap: 18px;
@@ -136,6 +147,7 @@
 }
 
 .scheduleColumn {
+  grid-area: schedule;
   min-width: 0;
 }
 
@@ -432,12 +444,25 @@
 @media (max-width: 1040px) {
   .layout {
     grid-template-columns: 1fr;
+    grid-template-areas:
+      'schedule'
+      'support';
+  }
+
+  .leftColumn {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 680px) {
+  .headerControls,
   .dateToolbar {
+    width: 100%;
     justify-content: flex-start;
+  }
+
+  .leftColumn {
+    grid-template-columns: 1fr;
   }
 
   .datePicker,

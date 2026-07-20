@@ -173,7 +173,7 @@ test('Calendar renders migrated events and recurring schedule blocks across navi
 
   await expect(page.getByText('Quarantined hidden event')).toHaveCount(0);
   await expect(
-    page.getByText('Quarantined imports remain isolated and are not shown in this calendar.'),
+    page.getByText('Some imported records need review and are not shown here.'),
   ).toBeVisible();
 
   const accessibilityResults = await new AxeBuilder({ page }).analyze();
