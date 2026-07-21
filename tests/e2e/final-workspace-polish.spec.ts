@@ -55,7 +55,8 @@ test('workspace navigation preserves context and final focus patterns stay acces
   await expect(page).toHaveURL(/#\/tasks\?date=2026-07-20$/);
   await expect(page).toHaveTitle('Tasks · Classroom');
 
-  const newTaskButton = page.getByRole('button', { name: 'New task' }).first();
+  const newTaskButton = page.getByRole('button', { name: 'New task' });
+  await expect(newTaskButton).toHaveCount(1);
   await newTaskButton.click();
   const newTask = page.getByRole('region', { name: 'New task' });
   await expect(newTask.getByRole('textbox', { name: 'Task title' })).toBeFocused();
