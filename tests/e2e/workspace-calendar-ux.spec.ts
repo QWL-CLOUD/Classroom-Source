@@ -103,12 +103,33 @@ test('Today prioritizes the schedule and uses one date-aware Add menu', async ({
 test('Week names the day action and mobile Calendar stays compact until expanded', async ({
   page,
 }) => {
+  await page.clock.setFixedTime(new Date('2026-07-20T16:00:00.000Z'));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('./#/week?date=2026-07-20&view=everything');
   await seedWorkspaceUx(page);
   await page.reload();
 
   const monday = page.locator('[data-date="2026-07-20"]');
+  const mondayHeading = monday.getByRole('heading', { level: 2, name: 'Monday' });
+  await expect(mondayHeading).toBeVisible();
+  await expect(monday.getByText('Today', { exact: true })).toBeVisible();
+
+  const mondayHeadingLayout = await mondayHeading.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return {
+      height: element.getBoundingClientRect().height,
+      overflowWrap: styles.overflowWrap,
+      whiteSpace: styles.whiteSpace,
+      wordBreak: styles.wordBreak,
+    };
+  });
+  expect(mondayHeadingLayout).toMatchObject({
+    overflowWrap: 'normal',
+    whiteSpace: 'nowrap',
+    wordBreak: 'normal',
+  });
+  expect(mondayHeadingLayout.height).toBeLessThan(40);
+
   await expect(monday.getByRole('link', { name: /Add lesson plan to Monday/ })).toContainText(
     'Add plan',
   );
