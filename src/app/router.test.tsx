@@ -13,6 +13,6 @@ function renderToday() {
 describe('Today route', () => {
   it('uses the URL date as the visible page date', () => {
     renderToday();
-    expect(screen.getAllByText(/Tuesday, July 14, 2026/)).toHaveLength(2);
+    expect(screen.getAllByText(/Tuesday, July 14, 2026/)).toHaveLength(1);
   });
 });
