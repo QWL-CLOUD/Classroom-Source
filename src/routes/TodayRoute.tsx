@@ -240,8 +240,9 @@ export function TodayRoute() {
         >
           <div className={styles.scheduleHeader}>
             <div>
-              <p className="page-eyebrow">Today schedule</p>
-              <h2>{formatLongDate(date)}</h2>
+              <h2 className={styles.scheduleSectionTitle}>
+                {date === currentDate ? 'Today schedule' : 'Schedule'}
+              </h2>
               {today ? (
                 <p className={styles.scheduleSummary}>
                   {today.sourceScheduleBlockCount} schedule{' '}

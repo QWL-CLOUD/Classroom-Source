@@ -93,6 +93,10 @@ test('Today prioritizes the schedule and uses one date-aware Add menu', async ({
   await page.setViewportSize({ width: 390, height: 844 });
 
   const schedule = page.getByRole('region', { name: 'Schedule for Monday, July 20, 2026' });
+  await expect(schedule.getByRole('heading', { level: 2, name: 'Today schedule' })).toBeVisible();
+  await expect(schedule.getByText('Monday, July 20, 2026', { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel('Selected date')).toHaveValue('2026-07-20');
+
   const toDo = page.getByRole('heading', { name: 'To-do' });
   const [scheduleBox, toDoBox] = await Promise.all([schedule.boundingBox(), toDo.boundingBox()]);
   if (!scheduleBox || !toDoBox) throw new Error('Today mobile geometry could not be measured.');

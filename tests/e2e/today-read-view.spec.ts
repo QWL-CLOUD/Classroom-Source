@@ -173,7 +173,7 @@ test('Today composes the selected date from v20 schedule and calendar records', 
   await expect(
     schedule.getByRole('heading', {
       level: 2,
-      name: 'Wednesday, July 15, 2026',
+      name: 'Schedule',
     }),
   ).toBeVisible();
   await expect(
