@@ -2,8 +2,6 @@ import {
   Archive,
   BookOpen,
   CalendarDays,
-  ChevronLeft,
-  ChevronRight,
   ClipboardCheck,
   Download,
   HeartPulse,
@@ -12,8 +10,10 @@ import {
   Library,
   ListTodo,
   Menu,
+  Redo2,
   Settings,
   Sparkles,
+  Undo2,
   Users,
   X,
 } from 'lucide-react';
@@ -254,7 +254,8 @@ export function AppShell() {
                 title={history.undoLabel ? `Undo ${history.undoLabel}` : 'Nothing to undo'}
                 onClick={() => void history.undo()}
               >
-                <ChevronLeft size={20} />
+                <Undo2 size={18} aria-hidden="true" />
+                <span className={styles.historyLabel}>Undo</span>
               </button>
               <button
                 type="button"
@@ -263,7 +264,8 @@ export function AppShell() {
                 title={history.redoLabel ? `Redo ${history.redoLabel}` : 'Nothing to redo'}
                 onClick={() => void history.redo()}
               >
-                <ChevronRight size={20} />
+                <Redo2 size={18} aria-hidden="true" />
+                <span className={styles.historyLabel}>Redo</span>
               </button>
               <span className="sr-only" role="status" aria-live="polite">
                 {history.error ?? ''}

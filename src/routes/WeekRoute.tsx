@@ -301,12 +301,12 @@ export function WeekRoute() {
                 aria-label={`${day.label}, ${itemCountLabel(day.items.length)}`}
               >
                 <header className={styles.dayHeader}>
-                  <div>
-                    <div className={styles.dayTitleLine}>
-                      <h2>{day.weekdayLabel}</h2>
+                  <div className={styles.dayIdentity}>
+                    <h2>{day.weekdayLabel}</h2>
+                    <div className={styles.dayMeta}>
+                      <p>{day.shortDateLabel}</p>
                       {day.isToday ? <span className={styles.todayLabel}>Today</span> : null}
                     </div>
-                    <p>{day.shortDateLabel}</p>
                   </div>
 
                   <a

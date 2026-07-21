@@ -66,10 +66,31 @@ async function seedWorkspaceUx(page: Page): Promise<void> {
 }
 
 test('Today prioritizes the schedule and uses one date-aware Add menu', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.clock.setFixedTime(new Date('2026-07-20T16:00:00.000Z'));
+  await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto('./#/today?date=2026-07-20');
   await seedWorkspaceUx(page);
   await page.reload();
+
+  const greeting = page.getByRole('heading', { level: 1, name: /Alyssa\.$/ });
+  const addButton = page.locator('summary[aria-label="Add to 2026-07-20"]');
+  const previousDayButton = page.getByRole('button', { name: /Previous day/ });
+  await expect(page.getByText('Today · Monday, July 20, 2026', { exact: true })).toBeVisible();
+
+  const [greetingBox, addButtonBox, previousDayBox] = await Promise.all([
+    greeting.boundingBox(),
+    addButton.boundingBox(),
+    previousDayButton.boundingBox(),
+  ]);
+  if (!greetingBox || !addButtonBox || !previousDayBox) {
+    throw new Error('Today header geometry could not be measured.');
+  }
+  expect(greetingBox.height).toBeLessThan(80);
+  expect(addButtonBox.y).toBeLessThan(previousDayBox.y);
+  await expect(page.getByRole('button', { name: 'Undo' })).toContainText('Undo');
+  await expect(page.getByRole('button', { name: 'Redo' })).toContainText('Redo');
+
+  await page.setViewportSize({ width: 390, height: 844 });
 
   const schedule = page.getByRole('region', { name: 'Schedule for Monday, July 20, 2026' });
   const toDo = page.getByRole('heading', { name: 'To-do' });
@@ -80,7 +101,7 @@ test('Today prioritizes the schedule and uses one date-aware Add menu', async ({
   await expect(page.getByText('Quick capture')).toHaveCount(0);
   await expect(page.getByRole('link', { name: 'New plan', exact: true })).toHaveCount(0);
 
-  await page.locator('summary[aria-label="Add to 2026-07-20"]').click();
+  await addButton.click();
   const addItems = page.getByRole('navigation', { name: 'Add items for 2026-07-20' });
   await expect(addItems.getByRole('link', { name: /New plan/ })).toBeVisible();
   await expect(addItems.getByRole('link', { name: /New event/ })).toBeVisible();
@@ -103,12 +124,55 @@ test('Today prioritizes the schedule and uses one date-aware Add menu', async ({
 test('Week names the day action and mobile Calendar stays compact until expanded', async ({
   page,
 }) => {
+  await page.clock.setFixedTime(new Date('2026-07-20T16:00:00.000Z'));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('./#/week?date=2026-07-20&view=everything');
   await seedWorkspaceUx(page);
   await page.reload();
 
   const monday = page.locator('[data-date="2026-07-20"]');
+  const mondayHeading = monday.getByRole('heading', { level: 2, name: 'Monday' });
+  await expect(mondayHeading).toBeVisible();
+  const todayLabel = monday.getByText('Today', { exact: true });
+  const mondayDate = monday.getByText('Jul 20', { exact: true });
+  await expect(todayLabel).toBeVisible();
+
+  const [todayLabelBox, mondayDateBox, mondayHeadingBox] = await Promise.all([
+    todayLabel.boundingBox(),
+    mondayDate.boundingBox(),
+    mondayHeading.boundingBox(),
+  ]);
+  if (!todayLabelBox || !mondayDateBox || !mondayHeadingBox) {
+    throw new Error('Week day-header geometry could not be measured.');
+  }
+  expect(Math.abs(todayLabelBox.y - mondayDateBox.y)).toBeLessThan(8);
+  expect(todayLabelBox.y).toBeGreaterThan(mondayHeadingBox.y);
+
+  const mondayHeadingLayout = await mondayHeading.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return {
+      height: element.getBoundingClientRect().height,
+      overflowWrap: styles.overflowWrap,
+      whiteSpace: styles.whiteSpace,
+      wordBreak: styles.wordBreak,
+    };
+  });
+  expect(mondayHeadingLayout).toMatchObject({
+    overflowWrap: 'normal',
+    whiteSpace: 'nowrap',
+    wordBreak: 'normal',
+  });
+  expect(mondayHeadingLayout.height).toBeLessThan(40);
+
+  const wednesdayHeading = page
+    .locator('[data-date="2026-07-22"]')
+    .getByRole('heading', { level: 2, name: 'Wednesday' });
+  await expect(wednesdayHeading).toBeVisible();
+  await expect(wednesdayHeading).toHaveCSS('white-space', 'nowrap');
+  const wednesdayHeadingBox = await wednesdayHeading.boundingBox();
+  if (!wednesdayHeadingBox) throw new Error('Wednesday heading geometry could not be measured.');
+  expect(wednesdayHeadingBox.height).toBeLessThan(40);
+
   await expect(monday.getByRole('link', { name: /Add lesson plan to Monday/ })).toContainText(
     'Add plan',
   );
