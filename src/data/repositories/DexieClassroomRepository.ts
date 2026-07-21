@@ -324,12 +324,16 @@ export class DexieClassroomRepository implements ClassroomRepository {
   }
 
   async getWorkspaceDataSummary(): Promise<WorkspaceDataSummary> {
-    const [activeSchoolYear, counts] = await Promise.all([
+    const [activeSchoolYear, counts, schoolYears] = await Promise.all([
       this.getActiveSchoolYear(),
       this.countCoreRecords(),
+      this.db.schoolYears.toArray(),
     ]);
+    const activeSchoolYearCount = schoolYears
+      .map((value) => schoolYearSchema.parse(value))
+      .filter((schoolYear) => schoolYear.active).length;
 
-    return { activeSchoolYear, counts };
+    return { activeSchoolYear, activeSchoolYearCount, counts };
   }
 }
 

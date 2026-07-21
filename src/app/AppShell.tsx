@@ -29,6 +29,8 @@ import {
 } from '@/app/navigationGroups';
 import { buildShellNavigationHref } from '@/app/workspaceNavigation';
 import { useEditHistory } from '@/features/editing/useEditHistory';
+import { presentActiveSchoolYear } from '@/features/schoolYears/schoolYearPresentation';
+import { useActiveSchoolYear } from '@/features/schoolYears/useActiveSchoolYear';
 import styles from './AppShell.module.css';
 
 const primaryNavigationLinks = [
@@ -43,25 +45,25 @@ const primaryNavigationLinks = [
 const collapsibleNavigationGroups: Array<{
   id: NavigationGroupId;
   label: string;
-  links: Array<{ to: string; label: string; icon: typeof Library }>;
+  links: Array<{ to: string; label: string; icon: typeof Library; status?: 'planned' }>;
 }> = [
   {
     id: 'resources',
     label: 'Resources',
-    links: [{ to: '/library', label: 'Library', icon: Library }],
+    links: [{ to: '/library', label: 'Library', icon: Library, status: 'planned' }],
   },
   {
     id: 'reflect',
     label: 'Reflect',
-    links: [{ to: '/insights', label: 'Teaching Insights', icon: Sparkles }],
+    links: [{ to: '/insights', label: 'Teaching Insights', icon: Sparkles, status: 'planned' }],
   },
   {
     id: 'settingsData',
     label: 'Settings & Data',
     links: [
       { to: '/import', label: 'Import Center', icon: Import },
-      { to: '/export', label: 'Export & Backup', icon: Download },
-      { to: '/settings', label: 'Settings', icon: Settings },
+      { to: '/export', label: 'Export & Backup', icon: Download, status: 'planned' },
+      { to: '/settings', label: 'Settings', icon: Settings, status: 'planned' },
       { to: '/system-health', label: 'System Health', icon: HeartPulse },
     ],
   },
@@ -103,6 +105,7 @@ export function AppShell() {
   const sidebarCollapsed = useUiStore((state) => state.sidebarCollapsed);
   const toggleSidebar = useUiStore((state) => state.toggleSidebar);
   const history = useEditHistory();
+  const activeSchoolYearState = useActiveSchoolYear();
   const location = useLocation();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [navigationGroupPreferences, setNavigationGroupPreferences] = useState(
@@ -111,6 +114,7 @@ export function AppShell() {
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileCloseButtonRef = useRef<HTMLButtonElement>(null);
   const presentation = getRoutePresentation(location.pathname);
+  const schoolYearContext = presentActiveSchoolYear(activeSchoolYearState);
 
   useEffect(() => {
     document.title = `${presentation.title} · Classroom`;
@@ -170,10 +174,12 @@ export function AppShell() {
     to,
     label,
     icon: Icon,
+    status,
   }: {
     to: string;
     label: string;
     icon: typeof Library;
+    status?: 'planned';
   }) {
     return (
       <NavLink
@@ -181,11 +187,12 @@ export function AppShell() {
         to={buildShellNavigationHref(to, location.search)}
         onClick={closeMobileNavigation}
         className={({ isActive }) => `${styles.navLink} ${isActive ? styles.activeNavLink : ''}`}
-        aria-label={sidebarCollapsed ? label : undefined}
+        aria-label={label}
         title={sidebarCollapsed ? label : undefined}
       >
         <Icon size={19} aria-hidden="true" />
-        <span>{label}</span>
+        <span className={styles.navLinkLabel}>{label}</span>
+        {status === 'planned' ? <span className={styles.navStatus}>Planned</span> : null}
       </NavLink>
     );
   }
@@ -226,7 +233,14 @@ export function AppShell() {
             </div>
             <div className={styles.brandText}>
               <div className={styles.brandName}>Classroom</div>
-              <div className={styles.schoolYear}>2026–2027</div>
+              <div
+                className={styles.schoolYear}
+                data-status={schoolYearContext.tone}
+                title={schoolYearContext.detail}
+                aria-live="polite"
+              >
+                {schoolYearContext.label}
+              </div>
             </div>
             <button
               ref={mobileCloseButtonRef}
@@ -318,7 +332,16 @@ export function AppShell() {
                 <Menu size={20} aria-hidden="true" />
               </button>
               <div>
-                <span className={styles.topbarProduct}>Classroom</span>
+                <span className={styles.topbarProduct}>
+                  <span className={styles.topbarProductName}>Classroom · </span>
+                  <span
+                    className={styles.topbarSchoolYear}
+                    data-status={schoolYearContext.tone}
+                    title={schoolYearContext.detail}
+                  >
+                    {schoolYearContext.label}
+                  </span>
+                </span>
                 <strong aria-live="polite">{presentation.title}</strong>
               </div>
             </div>

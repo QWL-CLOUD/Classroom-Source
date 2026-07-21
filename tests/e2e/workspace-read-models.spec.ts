@@ -101,15 +101,26 @@ test('repository-backed v20 counts survive reload and browser navigation', async
     name: 'Current v20 record counts',
   });
   await expect(page.getByRole('heading', { level: 1, name: 'System Health' })).toBeVisible();
-  await expect(initialRecordCounts).toContainText('Active school year:');
+  await expect(initialRecordCounts).toContainText('Active school year');
+  await expect(page.getByRole('heading', { name: 'Live checks' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Configured safeguards' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Foundation checks' })).toHaveCount(0);
 
   await seedSyntheticWorkspace(page);
   await page.reload();
 
   const recordCounts = page.getByRole('region', { name: 'Current v20 record counts' });
   await expect(page.getByRole('heading', { level: 1, name: 'System Health' })).toBeVisible();
-  await expect(page.getByText('Active school year: Synthetic 2026–2027')).toBeVisible();
-  await expect(recordCounts.getByText('School years')).toBeVisible();
+  await expect(recordCounts.getByText('Synthetic 2026–2027', { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole('complementary', { name: 'Primary navigation' })
+      .getByText('Synthetic 2026–2027', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.locator('header').getByText('Synthetic 2026–2027', { exact: true }),
+  ).toBeVisible();
+  await expect(recordCounts.getByText('School years', { exact: true })).toBeVisible();
   await expect(recordCounts.getByText('Schedule blocks')).toBeVisible();
   await expect(recordCounts.getByText('Calendar events')).toBeVisible();
   await expect(recordCounts.getByText('Learner contexts')).toBeVisible();
@@ -121,7 +132,11 @@ test('repository-backed v20 counts survive reload and browser navigation', async
   await expect(page.getByRole('heading', { level: 1, name: /^Good/ })).toBeVisible();
   await page.goBack();
   await expect(page.getByRole('heading', { level: 1, name: 'System Health' })).toBeVisible();
-  await expect(page.getByText('Active school year: Synthetic 2026–2027')).toBeVisible();
+  await expect(
+    page
+      .getByRole('region', { name: 'Current v20 record counts' })
+      .getByText('Synthetic 2026–2027', { exact: true }),
+  ).toBeVisible();
 
   const accessibilityResults = await new AxeBuilder({ page }).analyze();
   expect(

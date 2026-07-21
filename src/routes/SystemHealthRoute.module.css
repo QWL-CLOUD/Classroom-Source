@@ -7,7 +7,7 @@
 
 .summaryGrid article {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 4px 12px;
   align-items: center;
   padding: 20px;
@@ -18,14 +18,22 @@
   color: var(--accent-strong);
 }
 
+.summaryGrid article[data-tone='attention'] svg,
+.summaryGrid article[data-tone='error'] svg {
+  color: #a65a2d;
+}
+
 .summaryGrid span {
   color: var(--text-muted);
   font-size: 13px;
 }
 
 .summaryGrid strong {
+  overflow: hidden;
   color: var(--heading);
   font-size: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .healthCard {
@@ -39,6 +47,13 @@
   font:
     700 25px/1.1 Georgia,
     serif;
+}
+
+.sectionIntro {
+  margin: -6px 0 16px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .healthCard ul {
@@ -62,6 +77,15 @@
   color: #4e7a65;
 }
 
+.healthCard li[data-tone='attention'] svg,
+.healthCard li[data-tone='error'] svg {
+  color: #a65a2d;
+}
+
+.healthCard li[data-tone='checking'] svg {
+  color: var(--text-muted);
+}
+
 .healthCard li div {
   display: grid;
   gap: 3px;
@@ -76,15 +100,55 @@
   color: #4e7a65;
   font-style: normal;
   font-weight: 700;
+  text-align: right;
+}
+
+.healthCard li[data-tone='attention'] em,
+.healthCard li[data-tone='error'] em {
+  color: #8b4723;
+}
+
+.healthCard li[data-tone='checking'] em,
+.healthCard li[data-tone='configured'] em {
+  color: var(--text-muted);
 }
 
 .activeSchoolYear {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
   margin: -4px 0 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
   color: var(--text-secondary);
+  background: var(--surface-soft);
+}
+
+.activeSchoolYear[data-tone='attention'],
+.activeSchoolYear[data-tone='error'] {
+  border-color: #dfb28e;
+  background: #fff7ee;
+}
+
+.activeSchoolYear > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.activeSchoolYear span,
+.activeSchoolYear small {
+  color: var(--text-muted);
 }
 
 .activeSchoolYear strong {
+  overflow: hidden;
   color: var(--heading);
+  font-size: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .error {
@@ -124,7 +188,24 @@
   .summaryGrid {
     grid-template-columns: 1fr;
   }
+
   .counts {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .healthCard li {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .healthCard li em {
+    grid-column: 2;
+    text-align: left;
+  }
+
+  .activeSchoolYear {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

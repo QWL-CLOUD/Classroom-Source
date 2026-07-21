@@ -32,6 +32,7 @@ export interface CoreRecordCounts {
 
 export interface WorkspaceDataSummary {
   activeSchoolYear: SchoolYear | null;
+  activeSchoolYearCount: number;
   counts: CoreRecordCounts;
 }
 

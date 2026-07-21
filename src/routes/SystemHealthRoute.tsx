@@ -1,6 +1,9 @@
-import { CheckCircle2, Database, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, CircleDashed, Database, ShieldCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { classroomDb } from '@/data/db/ClassroomDatabase';
 import type { CoreRecordCounts } from '@/domain/readModels/workspaceReadModels';
 import { useWorkspaceDataSummary } from '@/features/workspace/useWorkspaceReadModel';
+import { buildLiveHealthChecks, type HealthCheckTone } from './systemHealthPresentation';
 import styles from './SystemHealthRoute.module.css';
 
 const countLabels: ReadonlyArray<[keyof CoreRecordCounts, string]> = [
@@ -17,25 +20,29 @@ const countLabels: ReadonlyArray<[keyof CoreRecordCounts, string]> = [
   ['quarantine', 'Quarantine records'],
 ];
 
+const configuredSafeguards = [
+  { name: 'React source application', detail: 'Native React route and component tree' },
+  { name: 'Hash route registry', detail: 'Workspace and editor routes are registered explicitly' },
+  { name: 'IndexedDB namespace isolation', detail: 'Database name: classroom-v20' },
+  { name: 'Repository-backed read models', detail: 'Typed v20 queries with explicit read states' },
+  { name: 'Read-only legacy scan', detail: 'No automatic cos-* writes or deletions' },
+  {
+    name: 'Privacy source scan',
+    detail: 'Known backup files and private-data signatures are blocked from source commits',
+  },
+];
+
+function CheckIcon({ tone }: { tone: HealthCheckTone }) {
+  if (tone === 'ready') return <CheckCircle2 size={20} aria-hidden="true" />;
+  if (tone === 'checking') return <CircleDashed size={20} aria-hidden="true" />;
+  return <AlertTriangle size={20} aria-hidden="true" />;
+}
+
 export function SystemHealthRoute() {
   const summaryState = useWorkspaceDataSummary();
-  const databaseStatus =
-    summaryState.status === 'ready'
-      ? 'Ready'
-      : summaryState.status === 'error'
-        ? 'Read error'
-        : 'Opening…';
-  const tests = [
-    { name: 'React source application mounted', detail: 'Native React route and component tree' },
-    { name: 'Hash routes registered', detail: 'Today, Week, Calendar, Tasks, and System routes' },
-    { name: 'IndexedDB namespace isolated', detail: 'Database name: classroom-v20' },
-    { name: 'Repository-backed read model', detail: 'Typed v20 queries with explicit states' },
-    { name: 'Legacy scan is read-only', detail: 'No automatic cos-* writes or deletions' },
-    {
-      name: 'Privacy source scan configured',
-      detail: 'Known backup files and signatures are blocked',
-    },
-  ];
+  const liveChecks = buildLiveHealthChecks(summaryState, classroomDb.verno);
+  const databaseCheck = liveChecks.find((check) => check.id === 'database')!;
+  const schoolYearCheck = liveChecks.find((check) => check.id === 'active-school-year')!;
 
   return (
     <section>
@@ -44,43 +51,64 @@ export function SystemHealthRoute() {
           <p className="page-eyebrow">Settings &amp; Data</p>
           <h1 className="page-title">System Health</h1>
           <p className="page-subtitle">
-            These checks query application code and IndexedDB directly. They do not inspect visible
-            DOM text to infer business state.
+            Live checks read the repository and IndexedDB directly. Configured safeguards are shown
+            separately so architecture declarations are never presented as runtime test results.
           </p>
         </div>
       </header>
 
       <div className={styles.summaryGrid}>
-        <article className="card">
-          <Database size={25} />
+        <article className="card" data-tone={databaseCheck.tone}>
+          <Database size={25} aria-hidden="true" />
           <span>Database</span>
-          <strong>{databaseStatus}</strong>
+          <strong>{databaseCheck.statusLabel}</strong>
         </article>
-        <article className="card">
-          <ShieldCheck size={25} />
+        <article className="card" data-tone={schoolYearCheck.tone}>
+          <CheckIcon tone={schoolYearCheck.tone} />
+          <span>Active school year</span>
+          <strong>{schoolYearCheck.statusLabel}</strong>
+        </article>
+        <article className="card" data-tone={classroomDb.verno === 3 ? 'ready' : 'attention'}>
+          <ShieldCheck size={25} aria-hidden="true" />
           <span>Schema version</span>
-          <strong>3</strong>
-        </article>
-        <article className="card">
-          <CheckCircle2 size={25} />
-          <span>Foundation checks</span>
-          <strong>
-            {tests.length} / {tests.length}
-          </strong>
+          <strong>{classroomDb.verno}</strong>
         </article>
       </div>
 
-      <section className={`card ${styles.healthCard}`} aria-labelledby="foundation-checks-heading">
-        <h2 id="foundation-checks-heading">Foundation checks</h2>
+      <section className={`card ${styles.healthCard}`} aria-labelledby="live-checks-heading">
+        <h2 id="live-checks-heading">Live checks</h2>
         <ul>
-          {tests.map((test) => (
-            <li key={test.name}>
-              <CheckCircle2 size={20} />
+          {liveChecks.map((check) => (
+            <li key={check.id} data-tone={check.tone}>
+              <CheckIcon tone={check.tone} />
               <div>
-                <strong>{test.name}</strong>
-                <span>{test.detail}</span>
+                <strong>{check.name}</strong>
+                <span>{check.detail}</span>
               </div>
-              <em>Pass</em>
+              <em>{check.statusLabel}</em>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section
+        className={`card ${styles.healthCard}`}
+        aria-labelledby="configured-safeguards-heading"
+      >
+        <h2 id="configured-safeguards-heading">Configured safeguards</h2>
+        <p className={styles.sectionIntro}>
+          These safeguards are part of the application architecture. “Configured” does not claim
+          that a fresh diagnostic test was run on this screen.
+        </p>
+        <ul>
+          {configuredSafeguards.map((safeguard) => (
+            <li key={safeguard.name} data-tone="configured">
+              <ShieldCheck size={20} aria-hidden="true" />
+              <div>
+                <strong>{safeguard.name}</strong>
+                <span>{safeguard.detail}</span>
+              </div>
+              <em>Configured</em>
             </li>
           ))}
         </ul>
@@ -96,10 +124,29 @@ export function SystemHealthRoute() {
           </p>
         ) : (
           <>
-            <p className={styles.activeSchoolYear}>
-              Active school year:{' '}
-              <strong>{summaryState.data.activeSchoolYear?.label ?? 'None configured'}</strong>
-            </p>
+            <div
+              className={styles.activeSchoolYear}
+              data-tone={schoolYearCheck.tone}
+              role={schoolYearCheck.tone === 'attention' ? 'status' : undefined}
+            >
+              <div>
+                <span>Active school year</span>
+                <strong>{summaryState.data.activeSchoolYear?.label ?? 'None configured'}</strong>
+                {summaryState.data.activeSchoolYear ? (
+                  <small>
+                    {summaryState.data.activeSchoolYear.startsOn} through{' '}
+                    {summaryState.data.activeSchoolYear.endsOn}
+                  </small>
+                ) : (
+                  <small>Classroom expects exactly one active school year.</small>
+                )}
+              </div>
+              {summaryState.data.activeSchoolYearCount !== 1 ? (
+                <Link className="button button-secondary" to="/import">
+                  Review Import Center
+                </Link>
+              ) : null}
+            </div>
             <dl className={styles.counts}>
               {countLabels.map(([name, label]) => (
                 <div key={name}>

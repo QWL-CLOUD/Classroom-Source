@@ -472,3 +472,64 @@
     transition: none;
   }
 }
+
+/* Phase 3D-5B-8: repository-backed school-year context and planned-route clarity. */
+.schoolYear[data-status='missing'],
+.schoolYear[data-status='error'] {
+  color: #fff;
+  font-weight: 700;
+}
+
+.topbarSchoolYear[data-status='missing'],
+.topbarSchoolYear[data-status='error'] {
+  color: #9b4b20;
+}
+
+.schoolYear[data-status='loading'],
+.topbarSchoolYear[data-status='loading'] {
+  color: var(--text-on-dark-muted);
+}
+
+.navLinkLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navStatus {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 2px 6px;
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 999px;
+  color: #fff;
+  background: rgb(0 0 0 / 18%);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
+  text-transform: uppercase;
+}
+
+.topbarProduct {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.topbarSchoolYear {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 880px) {
+  .topbarProduct {
+    display: flex;
+  }
+
+  .topbarProductName {
+    display: none;
+  }
+}
