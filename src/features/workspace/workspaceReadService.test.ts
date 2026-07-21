@@ -37,6 +37,7 @@ function createRepository(overrides: Partial<ClassroomRepository> = {}): Classro
     }),
     getWorkspaceDataSummary: vi.fn().mockResolvedValue({
       activeSchoolYear: null,
+      activeSchoolYearCount: 0,
       counts: {
         schoolYears: 0,
         learnerContexts: 0,

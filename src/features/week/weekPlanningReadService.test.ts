@@ -31,6 +31,7 @@ function repositoryStub(): ClassroomRepository {
     }),
     getWorkspaceDataSummary: vi.fn().mockResolvedValue({
       activeSchoolYear: null,
+      activeSchoolYearCount: 0,
       counts: {
         schoolYears: 0,
         learnerContexts: 0,

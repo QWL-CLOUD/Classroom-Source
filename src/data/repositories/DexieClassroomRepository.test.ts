@@ -56,6 +56,9 @@ describe('DexieClassroomRepository read models', () => {
       id: 'school-year-current',
       label: '2026–2027',
     });
+    await expect(repository.getWorkspaceDataSummary()).resolves.toMatchObject({
+      activeSchoolYearCount: 2,
+    });
   });
 
   it('returns overlapping calendar events in stable order', async () => {
@@ -263,6 +266,7 @@ describe('DexieClassroomRepository read models', () => {
     const summary = await repository.getWorkspaceDataSummary();
 
     expect(summary.activeSchoolYear?.id).toBe('school-year-current');
+    expect(summary.activeSchoolYearCount).toBe(1);
     expect(summary.counts).toMatchObject({
       schoolYears: 1,
       learnerContexts: 1,
