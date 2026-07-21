@@ -108,16 +108,70 @@
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 17px;
+  gap: 10px;
+}
+
+.navGroup {
+  padding-top: 10px;
+  border-top: 1px solid rgb(255 255 255 / 9%);
+}
+
+.primaryNavGroup {
+  padding-top: 0;
+  padding-bottom: 2px;
+  border-top: 0;
 }
 
 .navGroup h2 {
-  margin: 0 0 7px 12px;
+  margin: 0 0 5px;
+}
+
+.navGroupToggle {
+  width: 100%;
+  min-height: 32px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px 0 12px;
+  border: 0;
+  border-radius: 9px;
   color: var(--text-on-dark-muted);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
   font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.15em;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-align: left;
   text-transform: uppercase;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
+}
+
+.navGroupToggle:hover,
+.navGroupToggle:focus-visible {
+  color: #fff;
+  background: rgb(255 255 255 / 7%);
+}
+
+.navGroupChevron {
+  flex: 0 0 auto;
+  transition: transform 140ms ease;
+}
+
+.navGroup[data-expanded='false'] .navGroupChevron {
+  transform: rotate(-90deg);
+}
+
+.navGroupLinks {
+  display: grid;
+  gap: 3px;
+}
+
+.navGroup[data-collapsible='true'][data-expanded='false'] .navGroupLinks {
+  display: none;
 }
 
 .navLink {
@@ -142,6 +196,23 @@
 .activeNavLink {
   color: #fff;
   background: #485a63;
+}
+
+.shell[data-sidebar-collapsed='true'] .nav {
+  gap: 7px;
+}
+
+.shell[data-sidebar-collapsed='true'] .navGroup {
+  width: 100%;
+  padding-top: 7px;
+}
+
+.shell[data-sidebar-collapsed='true'] .primaryNavGroup {
+  padding-top: 0;
+}
+
+.shell[data-sidebar-collapsed='true'] .navGroup[data-collapsible='true'] .navGroupLinks {
+  display: grid;
 }
 
 .shell[data-sidebar-collapsed='true'] .navLink {
@@ -319,6 +390,12 @@
     display: inline;
   }
 
+  .shell[data-sidebar-collapsed='true']
+    .navGroup[data-collapsible='true'][data-expanded='false']
+    .navGroupLinks {
+    display: none;
+  }
+
   .desktopCollapseButton {
     display: none;
   }
@@ -390,7 +467,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sidebar {
+  .sidebar,
+  .navGroupChevron {
     transition: none;
   }
 }

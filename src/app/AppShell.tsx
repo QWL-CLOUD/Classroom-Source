@@ -2,6 +2,7 @@ import {
   Archive,
   BookOpen,
   CalendarDays,
+  ChevronDown,
   ClipboardCheck,
   Download,
   HeartPulse,
@@ -20,34 +21,43 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useUiStore } from '@/app/uiStore';
+import {
+  navigationGroupForPath,
+  readNavigationGroupPreferences,
+  writeNavigationGroupPreferences,
+  type NavigationGroupId,
+} from '@/app/navigationGroups';
 import { buildShellNavigationHref } from '@/app/workspaceNavigation';
 import { useEditHistory } from '@/features/editing/useEditHistory';
 import styles from './AppShell.module.css';
 
-const navigationGroups = [
+const primaryNavigationLinks = [
+  { to: '/today', label: 'Today', icon: LayoutDashboard },
+  { to: '/week', label: 'Week', icon: BookOpen },
+  { to: '/calendar', label: 'Calendar', icon: CalendarDays },
+  { to: '/agenda', label: 'Agenda', icon: ListTodo },
+  { to: '/tasks', label: 'Tasks', icon: ClipboardCheck },
+  { to: '/learners', label: 'Learners', icon: Users },
+];
+
+const collapsibleNavigationGroups: Array<{
+  id: NavigationGroupId;
+  label: string;
+  links: Array<{ to: string; label: string; icon: typeof Library }>;
+}> = [
   {
-    label: 'Workspace',
-    links: [
-      { to: '/today', label: 'Today', icon: LayoutDashboard },
-      { to: '/week', label: 'Week', icon: BookOpen },
-      { to: '/calendar', label: 'Calendar', icon: CalendarDays },
-      { to: '/agenda', label: 'Agenda', icon: ListTodo },
-      { to: '/tasks', label: 'Tasks', icon: ClipboardCheck },
-    ],
+    id: 'resources',
+    label: 'Resources',
+    links: [{ to: '/library', label: 'Library', icon: Library }],
   },
   {
-    label: 'Organize',
-    links: [
-      { to: '/learners', label: 'Learners', icon: Users },
-      { to: '/library', label: 'Library', icon: Library },
-    ],
-  },
-  {
+    id: 'reflect',
     label: 'Reflect',
     links: [{ to: '/insights', label: 'Teaching Insights', icon: Sparkles }],
   },
   {
-    label: 'System',
+    id: 'settingsData',
+    label: 'Settings & Data',
     links: [
       { to: '/import', label: 'Import Center', icon: Import },
       { to: '/export', label: 'Export & Backup', icon: Download },
@@ -95,6 +105,9 @@ export function AppShell() {
   const history = useEditHistory();
   const location = useLocation();
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+  const [navigationGroupPreferences, setNavigationGroupPreferences] = useState(
+    readNavigationGroupPreferences,
+  );
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const mobileCloseButtonRef = useRef<HTMLButtonElement>(null);
   const presentation = getRoutePresentation(location.pathname);
@@ -105,6 +118,17 @@ export function AppShell() {
 
   useEffect(() => {
     setMobileNavigationOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const activeGroup = navigationGroupForPath(location.pathname);
+    if (!activeGroup) return;
+    setNavigationGroupPreferences((preferences) => {
+      if (preferences[activeGroup]) return preferences;
+      const nextPreferences = { ...preferences, [activeGroup]: true };
+      writeNavigationGroupPreferences(nextPreferences);
+      return nextPreferences;
+    });
   }, [location.pathname]);
 
   useEffect(() => {
@@ -132,6 +156,38 @@ export function AppShell() {
 
   function closeMobileNavigation(): void {
     setMobileNavigationOpen(false);
+  }
+
+  function toggleNavigationGroup(groupId: NavigationGroupId): void {
+    setNavigationGroupPreferences((preferences) => {
+      const nextPreferences = { ...preferences, [groupId]: !preferences[groupId] };
+      writeNavigationGroupPreferences(nextPreferences);
+      return nextPreferences;
+    });
+  }
+
+  function renderNavigationLink({
+    to,
+    label,
+    icon: Icon,
+  }: {
+    to: string;
+    label: string;
+    icon: typeof Library;
+  }) {
+    return (
+      <NavLink
+        key={to}
+        to={buildShellNavigationHref(to, location.search)}
+        onClick={closeMobileNavigation}
+        className={({ isActive }) => `${styles.navLink} ${isActive ? styles.activeNavLink : ''}`}
+        aria-label={sidebarCollapsed ? label : undefined}
+        title={sidebarCollapsed ? label : undefined}
+      >
+        <Icon size={19} aria-hidden="true" />
+        <span>{label}</span>
+      </NavLink>
+    );
   }
 
   return (
@@ -195,25 +251,46 @@ export function AppShell() {
           </div>
 
           <nav className={styles.nav}>
-            {navigationGroups.map((group) => (
-              <section key={group.label} className={styles.navGroup}>
-                <h2>{group.label}</h2>
-                {group.links.map(({ to, label, icon: Icon }) => (
-                  <NavLink
-                    key={to}
-                    to={buildShellNavigationHref(to, location.search)}
-                    onClick={closeMobileNavigation}
-                    className={({ isActive }) =>
-                      `${styles.navLink} ${isActive ? styles.activeNavLink : ''}`
-                    }
-                    title={sidebarCollapsed ? label : undefined}
-                  >
-                    <Icon size={19} aria-hidden="true" />
-                    <span>{label}</span>
-                  </NavLink>
-                ))}
-              </section>
-            ))}
+            <section className={`${styles.navGroup} ${styles.primaryNavGroup}`} aria-label="Daily">
+              <div className={styles.navGroupLinks}>
+                {primaryNavigationLinks.map(renderNavigationLink)}
+              </div>
+            </section>
+
+            {collapsibleNavigationGroups.map((group) => {
+              const expanded = navigationGroupPreferences[group.id];
+              const headingId = `navigation-group-${group.id}-heading`;
+              const contentId = `navigation-group-${group.id}-links`;
+              return (
+                <section
+                  key={group.id}
+                  className={styles.navGroup}
+                  data-collapsible="true"
+                  data-expanded={expanded}
+                  aria-labelledby={headingId}
+                >
+                  <h2 id={headingId}>
+                    <button
+                      className={styles.navGroupToggle}
+                      type="button"
+                      aria-expanded={expanded}
+                      aria-controls={contentId}
+                      onClick={() => toggleNavigationGroup(group.id)}
+                    >
+                      <span>{group.label}</span>
+                      <ChevronDown
+                        className={styles.navGroupChevron}
+                        size={15}
+                        aria-hidden="true"
+                      />
+                    </button>
+                  </h2>
+                  <div id={contentId} className={styles.navGroupLinks}>
+                    {group.links.map(renderNavigationLink)}
+                  </div>
+                </section>
+              );
+            })}
           </nav>
 
           <div className={styles.sidebarFooter}>

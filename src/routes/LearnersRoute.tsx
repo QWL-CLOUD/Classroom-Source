@@ -744,7 +744,7 @@ export function LearnersRoute() {
     <section>
       <header className="page-header">
         <div>
-          <p className="page-eyebrow">Organize</p>
+          <p className="page-eyebrow">Workspace</p>
           <h1 className="page-title">Learners</h1>
           <p className="page-subtitle">
             Open a Class, Group, or Individual to review planning, support, and context settings.

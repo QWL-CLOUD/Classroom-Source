@@ -846,7 +846,7 @@ export function MigrationRoute() {
     <section>
       <header className="page-header">
         <div>
-          <p className="page-eyebrow">System</p>
+          <p className="page-eyebrow">Settings &amp; Data</p>
           <h1 className="page-title">Migration center</h1>
           <p className="page-subtitle">
             Review a private backup locally, create a reversible migration plan, and keep completion
