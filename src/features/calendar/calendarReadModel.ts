@@ -58,6 +58,7 @@ export interface CalendarDayItem {
   startMinute?: number;
   endMinute?: number;
   kind?: ScheduleBlock['kind'];
+  scheduleExceptionAction?: Exclude<ScheduleException['action'], 'cancel'>;
   parentTitle?: string;
   deliveryState?: SessionOccurrence['deliveryState'];
   spanPosition: CalendarSpanPosition;
@@ -168,6 +169,7 @@ function toScheduleItem(
   block: ScheduleBlock,
   date: string,
   blockById: ReadonlyMap<string, ScheduleBlock>,
+  scheduleExceptionAction?: Exclude<ScheduleException['action'], 'cancel'>,
 ): CalendarDayItem {
   const parent = block.parentId ? blockById.get(block.parentId) : undefined;
 
@@ -183,6 +185,7 @@ function toScheduleItem(
     startMinute: block.startMinute,
     endMinute: block.endMinute,
     kind: block.kind,
+    scheduleExceptionAction,
     parentTitle: parent?.title,
     spanPosition: 'single',
     sortOrder: block.sortOrder,
@@ -282,7 +285,14 @@ export function buildCalendarMonthReadModel(
       .filter((occurrence) => occurrence !== null)
       .map((occurrence) => {
         visibleScheduleBlockIds.add(occurrence.block.id);
-        return toScheduleItem(occurrence.block, date, blockById);
+        return toScheduleItem(
+          occurrence.block,
+          date,
+          blockById,
+          occurrence.exception?.action === 'modify' || occurrence.exception?.action === 'add'
+            ? occurrence.exception.action
+            : undefined,
+        );
       });
 
     const eventItems = calendarEvents

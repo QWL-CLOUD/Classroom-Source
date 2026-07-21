@@ -184,28 +184,55 @@ test('Week names the day action and mobile Calendar stays compact until expanded
   await page.goto('./#/calendar?date=2026-07-20');
   const calendar = page.getByRole('region', { name: 'July 2026 calendar' });
   await expect(calendar).toBeVisible();
-  await expect(calendar.getByRole('article')).toHaveCount(31);
+
+  const weekDetails = calendar.locator('details[data-week]');
+  await expect(weekDetails).toHaveCount(5);
+  const currentWeek = calendar.locator('details[data-week="2026-07-20"]');
+  await expect(currentWeek).toHaveAttribute('open', '');
+  await expect(currentWeek.getByText('Jul 20–26, 2026', { exact: true })).toBeVisible();
+  await expect(
+    currentWeek.getByText('Current week · Selected week', { exact: true }),
+  ).toBeVisible();
+  await expect(calendar.getByRole('article')).toHaveCount(7);
+
+  const currentWeekBox = await currentWeek.boundingBox();
+  if (!currentWeekBox) throw new Error('Current Calendar week geometry could not be measured.');
+  expect(currentWeekBox.y).toBeGreaterThanOrEqual(0);
+  expect(currentWeekBox.y).toBeLessThan(320);
+
   const mondayHighlights = calendar.getByRole('list', {
     name: 'Highlights for Monday, July 20, 2026',
   });
   await expect(mondayHighlights.getByText('Synthetic UX staff event')).toBeVisible();
-  await expect(mondayHighlights.getByText('Synthetic UX lesson block')).toBeVisible();
+  await expect(mondayHighlights.getByText('Synthetic UX lesson block')).toHaveCount(0);
 
   const mondayCard = calendar.getByRole('article', {
     name: /Monday, July 20, 2026/,
   });
-  const fullDetails = mondayCard.getByText(/View all .* and manage/);
-  await expect(fullDetails).toBeVisible();
+  await expect(mondayCard.getByText('1 schedule', { exact: true })).toBeVisible();
+  const scheduleDetails = mondayCard.getByText('Show 1 recurring schedule block', {
+    exact: true,
+  });
+  await expect(scheduleDetails).toBeVisible();
   await expect(
     page.locator('[data-calendar-item="schedule-block:phase-3d-5b-2-block:2026-07-20"]'),
   ).toBeHidden();
-  await fullDetails.click();
+  await scheduleDetails.click();
   await expect(
     page.locator('[data-calendar-item="schedule-block:phase-3d-5b-2-block:2026-07-20"]'),
   ).toBeVisible();
 
+  const tuesdayCard = calendar.getByRole('article', {
+    name: /Tuesday, July 21, 2026/,
+  });
+  await tuesdayCard.getByRole('button', { name: 'Select Tuesday, July 21, 2026' }).click();
+  await expect(page).toHaveURL(/#\/calendar\?date=2026-07-21$/);
+  await expect(
+    tuesdayCard.getByRole('button', { name: 'Select Tuesday, July 21, 2026' }),
+  ).toHaveAttribute('aria-pressed', 'true');
+
   const pageHeight = await page.evaluate(() => document.documentElement.scrollHeight);
-  expect(pageHeight).toBeLessThan(6500);
+  expect(pageHeight).toBeLessThan(3600);
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
   ).toBe(true);

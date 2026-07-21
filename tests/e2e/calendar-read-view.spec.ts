@@ -154,6 +154,10 @@ test('Calendar renders migrated events and recurring schedule blocks across navi
   // Calendar time label must remain inside its card and below the type label.
   expect(timeBox.y).toBeGreaterThan(typeBox.y);
   expect(timeBox.x + timeBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width + 1);
+  const july15Schedule = july15.getByText('2 recurring schedule blocks', { exact: true });
+  await expect(july15Schedule).toBeVisible();
+  await expect(july15.getByText('Synthetic Grade 3 day', { exact: true })).toBeHidden();
+  await july15Schedule.click();
   await expect(july15.getByText('Synthetic Grade 3 day', { exact: true })).toBeVisible();
   await expect(july15.getByText('Synthetic Chinese lesson')).toBeVisible();
   await expect(july15.getByText('Part of Synthetic Grade 3 day')).toBeVisible();
@@ -193,5 +197,6 @@ test('Calendar renders migrated events and recurring schedule blocks across navi
   await page.goBack();
   await expect(page.getByRole('heading', { level: 1, name: 'Calendar July 2026' })).toBeVisible();
   await page.reload();
+  await july15.getByText('2 recurring schedule blocks', { exact: true }).click();
   await expect(july15.getByText('Synthetic Chinese lesson')).toBeVisible();
 });

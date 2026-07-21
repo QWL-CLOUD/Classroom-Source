@@ -147,7 +147,7 @@
 
 .day {
   min-width: 0;
-  min-height: 168px;
+  min-height: 148px;
   border-right: 1px solid var(--border-soft);
   border-bottom: 1px solid var(--border-soft);
   background: var(--surface-card);
@@ -162,7 +162,7 @@
 }
 
 .day article {
-  min-height: 168px;
+  min-height: 148px;
   padding: 10px;
 }
 
@@ -181,8 +181,9 @@
 }
 
 .dayHeader {
-  display: flex;
-  gap: 7px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 5px;
   align-items: center;
   min-height: 28px;
   margin-bottom: 8px;
@@ -251,6 +252,12 @@
   border-color: #c9c1df;
   border-left-color: #6d5f9a;
   background: #f2eff9;
+}
+
+.scheduleAdjustment {
+  border-color: #d8c99e;
+  border-left-color: #967b35;
+  background: var(--surface-warm);
 }
 
 .containerItem {
@@ -627,6 +634,13 @@
   opacity: 1;
 }
 
+.dayStatus {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .dayAddButton {
   min-height: 28px;
   display: inline-flex;
@@ -634,7 +648,7 @@
   gap: 4px;
   align-items: center;
   justify-content: center;
-  margin-left: auto;
+  margin-left: 0;
   padding: 0 7px;
   border: 1px solid var(--border-soft);
   border-radius: 9px;
@@ -649,4 +663,198 @@
 .dayAddButton:focus-visible {
   border-color: var(--accent-strong);
   color: var(--accent-strong);
+}
+
+/* Phase 3D-5B-6 Calendar focus and density closure */
+.selectedDay {
+  box-shadow: inset 0 0 0 2px #6d5f9a;
+}
+
+.today.selectedDay {
+  box-shadow:
+    inset 0 0 0 2px var(--accent-strong),
+    inset 0 0 0 5px #ded8ef;
+}
+
+.selectedLabel {
+  color: #665891;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.dayNumberButton,
+.mobileDateButton {
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+
+.dayNumberButton {
+  display: inline-grid;
+  flex-shrink: 0;
+  border-radius: 10px;
+}
+
+.dayNumberButton:hover .dayNumber,
+.dayNumberButton:focus-visible .dayNumber,
+.mobileDateButton:hover,
+.mobileDateButton:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent-strong) 28%, transparent);
+  outline-offset: 2px;
+}
+
+.selectedDay .dayNumber:not([aria-current='date']) {
+  color: #fff;
+  background: #6d5f9a;
+}
+
+.compactDetails {
+  margin-top: 7px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.compactDetails summary {
+  padding: 7px 1px 2px;
+  color: var(--accent-strong);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.compactDetailsList {
+  padding-top: 7px;
+}
+
+.scheduleDetails summary {
+  color: #4f7156;
+}
+
+.mobileWeek {
+  margin: 0;
+  padding: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-card);
+}
+
+.mobileWeekDetails {
+  scroll-margin-top: 88px;
+}
+
+.mobileWeekDetails > summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 14px;
+  align-items: center;
+  padding: 14px;
+  color: var(--heading);
+  background: var(--surface-soft);
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.mobileWeekDetails[open] > summary {
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-soft) 72%, var(--surface-card));
+}
+
+.mobileWeekIdentity {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mobileWeekIdentity strong {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.mobileWeekIdentity span {
+  min-height: 14px;
+  color: var(--accent-strong);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.mobileWeekCounts {
+  color: #4f5955;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.mobileWeekDays {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0 14px;
+  list-style: none;
+}
+
+.mobileDateButton {
+  display: flex;
+  min-width: 0;
+  gap: 8px;
+  align-items: baseline;
+  border-radius: 9px;
+  text-align: left;
+}
+
+.mobileDay.selectedDay {
+  box-shadow: inset 3px 0 0 #6d5f9a;
+}
+
+.mobileDay.today.selectedDay {
+  box-shadow:
+    inset 3px 0 0 var(--accent-strong),
+    inset 6px 0 0 #ded8ef;
+}
+
+@media (max-width: 900px) {
+  .mobileCalendar {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface-card);
+  }
+
+  .mobileMonthList {
+    display: block;
+  }
+
+  .mobileDay > article {
+    padding: 14px 6px 16px;
+  }
+
+  .mobileDay:last-child {
+    border-bottom: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .mobileWeekDetails > summary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+  }
+
+  .mobileWeekCounts {
+    padding-left: 17px;
+    text-align: left;
+  }
+
+  .mobileWeekDays {
+    padding: 0 10px;
+  }
+
+  .mobileDateButton {
+    flex-wrap: wrap;
+  }
 }
