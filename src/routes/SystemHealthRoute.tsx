@@ -41,7 +41,7 @@ export function SystemHealthRoute() {
     <section>
       <header className="page-header">
         <div>
-          <p className="page-eyebrow">System</p>
+          <p className="page-eyebrow">Settings &amp; Data</p>
           <h1 className="page-title">System Health</h1>
           <p className="page-subtitle">
             These checks query application code and IndexedDB directly. They do not inspect visible

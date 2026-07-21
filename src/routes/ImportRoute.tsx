@@ -5,7 +5,7 @@ import { PagePlaceholder } from '@/shared/ui/PagePlaceholder';
 export function ImportRoute() {
   return (
     <PagePlaceholder
-      eyebrow="System"
+      eyebrow="Settings & Data"
       title="Import Center"
       description="Scan a legacy backup locally before deciding whether to migrate supported records."
     >
