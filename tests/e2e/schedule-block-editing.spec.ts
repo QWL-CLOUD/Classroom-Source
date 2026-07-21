@@ -105,11 +105,9 @@ test('Schedule Block editing synchronizes Week and supports persistent Undo and 
   await expect(page.getByText('Synthetic dismissal', { exact: true })).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Undo' }).click();
-  await expect(
-    page
-      .getByRole('article', { name: /Monday, July 13, 2026/ })
-      .getByText('Synthetic dismissal', { exact: true }),
-  ).toBeVisible();
+  const mondayCalendarDay = page.getByRole('article', { name: /Monday, July 13, 2026/ });
+  await mondayCalendarDay.getByText(/recurring schedule blocks?/).click();
+  await expect(mondayCalendarDay.getByText('Synthetic dismissal', { exact: true })).toBeVisible();
 });
 
 test('Schedule Block editor validates recurrence and creates Friday-to-Sunday child blocks', async ({
@@ -167,11 +165,9 @@ test('Schedule Block editor validates recurrence and creates Friday-to-Sunday ch
     'Saturday, July 18, 2026',
     'Sunday, July 19, 2026',
   ]) {
-    await expect(
-      page
-        .getByRole('article', { name: new RegExp(dayLabel) })
-        .getByText('Synthetic weekend studio'),
-    ).toBeVisible();
+    const calendarDay = page.getByRole('article', { name: new RegExp(dayLabel) });
+    await calendarDay.getByText(/recurring schedule blocks?/).click();
+    await expect(calendarDay.getByText('Synthetic weekend studio')).toBeVisible();
   }
 
   await page.goto('./#/today?date=2026-07-18');

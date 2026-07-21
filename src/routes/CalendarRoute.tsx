@@ -1,5 +1,5 @@
 import { CalendarDays, CalendarPlus, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 
 import type { CalendarDayItem, CalendarDayReadModel } from '@/features/calendar/calendarReadModel';
 import {
@@ -8,6 +8,11 @@ import {
   getCalendarMonthRange,
   shiftCalendarMonth,
 } from '@/features/calendar/calendarReadModel';
+import {
+  buildCalendarWeekPresentation,
+  splitCalendarDayItems,
+  type CalendarWeekPresentation,
+} from '@/features/calendar/calendarPresentation';
 import {
   buildScheduleBlockHierarchyMetadata,
   type ScheduleBlockHierarchyMetadata,
@@ -23,10 +28,14 @@ import { useDateSearchParam } from '@/shared/dates/useDateSearchParam';
 import styles from './CalendarRoute.module.css';
 
 const compactCalendarQuery = '(max-width: 900px)';
+const desktopDatedItemLimit = 2;
+const mobileDatedHighlightLimit = 3;
 
 function getItemTypeLabel(item: CalendarDayItem): string {
   if (item.sourceType === 'session-occurrence') return 'Session';
   if (item.sourceType === 'calendar-event') return 'Event';
+  if (item.scheduleExceptionAction === 'modify') return 'Schedule change';
+  if (item.scheduleExceptionAction === 'add') return 'Added schedule';
   if (item.kind === 'container') return 'Schedule group';
   if (item.kind === 'routine') return 'Routine';
   if (item.kind === 'transition') return 'Transition';
@@ -40,6 +49,7 @@ function getItemClassName(item: CalendarDayItem): string {
     classes.push(
       item.sourceType === 'calendar-event' ? styles.calendarEvent : styles.scheduleBlock,
     );
+  if (item.scheduleExceptionAction) classes.push(styles.scheduleAdjustment);
   if (item.kind === 'container') classes.push(styles.containerItem);
   if (item.spanPosition !== 'single') classes.push(styles.spanningItem);
   return classes.join(' ');
@@ -122,45 +132,88 @@ function CalendarItemCard({
   );
 }
 
-function getDayCounts(items: readonly CalendarDayItem[]): {
-  schedule: number;
-  events: number;
-  sessions: number;
-} {
-  return items.reduce(
-    (counts, item) => {
-      if (item.sourceType === 'schedule-block') counts.schedule += 1;
-      else if (item.sourceType === 'calendar-event') counts.events += 1;
-      else counts.sessions += 1;
-      return counts;
-    },
-    { schedule: 0, events: 0, sessions: 0 },
+function CalendarItemList({
+  items,
+  date,
+  scheduleHierarchy,
+  className = '',
+  ariaLabel,
+}: {
+  items: readonly CalendarDayItem[];
+  date: string;
+  scheduleHierarchy: ReadonlyMap<string, ScheduleBlockHierarchyMetadata>;
+  className?: string;
+  ariaLabel: string;
+}) {
+  return (
+    <ul className={`${styles.itemList} ${className}`} aria-label={ariaLabel}>
+      {items.map((item) => (
+        <CalendarItemCard
+          key={item.occurrenceId}
+          item={item}
+          date={date}
+          hierarchy={
+            item.sourceType === 'schedule-block'
+              ? scheduleHierarchy.get(item.sourceRecordId)
+              : undefined
+          }
+        />
+      ))}
+    </ul>
   );
 }
 
-function selectDayHighlights(items: readonly CalendarDayItem[]): CalendarDayItem[] {
-  const dated = items.filter((item) => item.sourceType !== 'schedule-block');
-  const recurring = items.filter((item) => item.sourceType === 'schedule-block');
-  return [...dated, ...recurring].slice(0, 3);
+function CalendarItemCounts({
+  day,
+  scheduleCount,
+  eventCount,
+  sessionCount,
+}: {
+  day: CalendarDayReadModel;
+  scheduleCount: number;
+  eventCount: number;
+  sessionCount: number;
+}) {
+  return (
+    <div className={styles.mobileCounts} aria-label={`Item counts for ${day.label}`}>
+      {eventCount > 0 ? <span>{eventCount} events</span> : null}
+      {sessionCount > 0 ? <span>{sessionCount} sessions</span> : null}
+      {scheduleCount > 0 ? <span>{scheduleCount} schedule</span> : null}
+    </div>
+  );
 }
 
 function MobileCalendarDay({
   day,
+  selected,
   scheduleHierarchy,
+  onSelectDate,
 }: {
   day: CalendarDayReadModel;
+  selected: boolean;
   scheduleHierarchy: ReadonlyMap<string, ScheduleBlockHierarchyMetadata>;
+  onSelectDate: (date: string) => void;
 }) {
-  const counts = getDayCounts(day.items);
-  const highlights = selectDayHighlights(day.items);
+  const sections = splitCalendarDayItems(day.items, mobileDatedHighlightLimit);
 
   return (
-    <li className={`${styles.mobileDay} ${day.isToday ? styles.today : ''}`}>
+    <li
+      className={`${styles.mobileDay} ${day.isToday ? styles.today : ''} ${
+        selected ? styles.selectedDay : ''
+      }`}
+      data-date={day.date}
+    >
       <article
         aria-label={`${day.label}, ${day.items.length} item${day.items.length === 1 ? '' : 's'}`}
       >
         <header className={styles.mobileDayHeader}>
-          <div>
+          <button
+            className={styles.mobileDateButton}
+            type="button"
+            aria-label={`Select ${day.label}`}
+            aria-pressed={selected}
+            onClick={() => onSelectDate(day.date)}
+          >
             <span className={styles.mobileWeekday}>{day.weekdayLabel}</span>
             <time
               className={styles.mobileDateLabel}
@@ -170,7 +223,8 @@ function MobileCalendarDay({
               {day.dayNumber}
             </time>
             {day.isToday ? <span className={styles.todayLabel}>Today</span> : null}
-          </div>
+            {selected ? <span className={styles.selectedLabel}>Selected</span> : null}
+          </button>
           <a
             className={styles.dayAddButton}
             href={buildPlanningEntryHref({ date: day.date, returnTo: 'calendar' })}
@@ -182,40 +236,59 @@ function MobileCalendarDay({
         </header>
 
         {day.items.length === 0 ? (
-          <p className={styles.mobileNoItems}>No items</p>
+          <p className={styles.mobileNoItems}>No events, sessions, or schedule</p>
         ) : (
           <>
-            <div className={styles.mobileCounts} aria-label={`Item counts for ${day.label}`}>
-              {counts.events > 0 ? <span>{counts.events} events</span> : null}
-              {counts.sessions > 0 ? <span>{counts.sessions} sessions</span> : null}
-              {counts.schedule > 0 ? <span>{counts.schedule} schedule</span> : null}
-            </div>
-            <ul className={styles.mobileHighlights} aria-label={`Highlights for ${day.label}`}>
-              {highlights.map((item) => (
-                <li key={item.occurrenceId}>
-                  <span>{getItemTypeLabel(item)}</span>
-                  <strong>{item.title}</strong>
-                  <time>{item.timeLabel}</time>
-                </li>
-              ))}
-            </ul>
-            <details className={styles.dayDetails}>
-              <summary>View all {day.items.length} and manage</summary>
-              <ul className={`${styles.itemList} ${styles.mobileItemList}`}>
-                {day.items.map((item) => (
-                  <CalendarItemCard
-                    key={item.occurrenceId}
-                    item={item}
-                    date={day.date}
-                    hierarchy={
-                      item.sourceType === 'schedule-block'
-                        ? scheduleHierarchy.get(item.sourceRecordId)
-                        : undefined
-                    }
-                  />
+            <CalendarItemCounts
+              day={day}
+              eventCount={sections.counts.events}
+              sessionCount={sections.counts.sessions}
+              scheduleCount={sections.counts.schedule}
+            />
+
+            {sections.highlightedDatedItems.length > 0 ? (
+              <ul className={styles.mobileHighlights} aria-label={`Highlights for ${day.label}`}>
+                {sections.highlightedDatedItems.map((item) => (
+                  <li key={item.occurrenceId}>
+                    <span>{getItemTypeLabel(item)}</span>
+                    <strong>{item.title}</strong>
+                    <time>{item.timeLabel}</time>
+                  </li>
                 ))}
               </ul>
-            </details>
+            ) : null}
+
+            {sections.datedItems.length > 0 ? (
+              <details className={styles.dayDetails}>
+                <summary>
+                  Manage {sections.datedItems.length} dated item
+                  {sections.datedItems.length === 1 ? '' : 's'}
+                </summary>
+                <CalendarItemList
+                  items={sections.datedItems}
+                  date={day.date}
+                  scheduleHierarchy={scheduleHierarchy}
+                  className={styles.mobileItemList}
+                  ariaLabel={`Dated items for ${day.label}`}
+                />
+              </details>
+            ) : null}
+
+            {sections.scheduleItems.length > 0 ? (
+              <details className={`${styles.dayDetails} ${styles.scheduleDetails}`}>
+                <summary>
+                  Show {sections.scheduleItems.length} recurring schedule block
+                  {sections.scheduleItems.length === 1 ? '' : 's'}
+                </summary>
+                <CalendarItemList
+                  items={sections.scheduleItems}
+                  date={day.date}
+                  scheduleHierarchy={scheduleHierarchy}
+                  className={styles.mobileItemList}
+                  ariaLabel={`Recurring schedule for ${day.label}`}
+                />
+              </details>
+            ) : null}
           </>
         )}
 
@@ -230,9 +303,171 @@ function MobileCalendarDay({
   );
 }
 
+function MobileCalendarWeek({
+  week,
+  expanded,
+  targetRef,
+  selectedDate,
+  scheduleHierarchy,
+  onToggle,
+  onSelectDate,
+}: {
+  week: CalendarWeekPresentation;
+  expanded: boolean;
+  targetRef?: RefObject<HTMLDetailsElement | null>;
+  selectedDate: string;
+  scheduleHierarchy: ReadonlyMap<string, ScheduleBlockHierarchyMetadata>;
+  onToggle: (weekId: string, open: boolean) => void;
+  onSelectDate: (date: string) => void;
+}) {
+  const datedCount = week.counts.events + week.counts.sessions;
+
+  return (
+    <li className={styles.mobileWeek}>
+      <details
+        ref={targetRef}
+        className={styles.mobileWeekDetails}
+        open={expanded}
+        data-week={week.id}
+        onToggle={(event) => onToggle(week.id, event.currentTarget.open)}
+      >
+        <summary>
+          <span className={styles.mobileWeekIdentity}>
+            <strong>{week.label}</strong>
+            <span>
+              {week.containsToday ? 'Current week' : null}
+              {week.containsToday && week.containsSelectedDate ? ' · ' : null}
+              {week.containsSelectedDate ? 'Selected week' : null}
+            </span>
+          </span>
+          <span className={styles.mobileWeekCounts}>
+            {datedCount > 0 ? `${datedCount} dated` : 'No dated items'}
+            {week.counts.schedule > 0 ? ` · ${week.counts.schedule} schedule` : ''}
+          </span>
+        </summary>
+        <ol className={styles.mobileWeekDays}>
+          {week.days.map((day) => (
+            <MobileCalendarDay
+              key={day.date}
+              day={day}
+              selected={day.date === selectedDate}
+              scheduleHierarchy={scheduleHierarchy}
+              onSelectDate={onSelectDate}
+            />
+          ))}
+        </ol>
+      </details>
+    </li>
+  );
+}
+
+function DesktopCalendarDay({
+  day,
+  selected,
+  scheduleHierarchy,
+  onSelectDate,
+}: {
+  day: CalendarDayReadModel;
+  selected: boolean;
+  scheduleHierarchy: ReadonlyMap<string, ScheduleBlockHierarchyMetadata>;
+  onSelectDate: (date: string) => void;
+}) {
+  const sections = splitCalendarDayItems(day.items, desktopDatedItemLimit);
+
+  return (
+    <li
+      className={`${styles.day} ${
+        day.inCurrentMonth ? styles.currentMonthDay : styles.adjacentMonthDay
+      } ${day.isToday ? styles.today : ''} ${selected ? styles.selectedDay : ''}`}
+      data-date={day.date}
+    >
+      <article
+        aria-label={`${day.label}, ${day.items.length} item${day.items.length === 1 ? '' : 's'}`}
+      >
+        <header className={styles.dayHeader}>
+          <button
+            className={styles.dayNumberButton}
+            type="button"
+            aria-label={`Select ${day.label}`}
+            aria-pressed={selected}
+            onClick={() => onSelectDate(day.date)}
+          >
+            <time
+              className={styles.dayNumber}
+              dateTime={day.date}
+              aria-current={day.isToday ? 'date' : undefined}
+            >
+              {day.dayNumber}
+            </time>
+          </button>
+          <span className={styles.dayStatus}>
+            {day.isToday ? (
+              <span className={styles.todayLabel}>Today</span>
+            ) : selected ? (
+              <span className={styles.selectedLabel}>Selected</span>
+            ) : null}
+          </span>
+          <a
+            className={styles.dayAddButton}
+            href={buildPlanningEntryHref({ date: day.date, returnTo: 'calendar' })}
+            aria-label={`Add lesson plan to ${day.label}`}
+          >
+            <CalendarPlus aria-hidden="true" size={14} />
+            <span>Plan</span>
+          </a>
+        </header>
+
+        {sections.highlightedDatedItems.length > 0 ? (
+          <CalendarItemList
+            items={sections.highlightedDatedItems}
+            date={day.date}
+            scheduleHierarchy={scheduleHierarchy}
+            ariaLabel={`Dated highlights for ${day.label}`}
+          />
+        ) : null}
+
+        {sections.hiddenDatedItems.length > 0 ? (
+          <details className={styles.compactDetails}>
+            <summary>
+              + {sections.hiddenDatedItems.length} more dated item
+              {sections.hiddenDatedItems.length === 1 ? '' : 's'}
+            </summary>
+            <CalendarItemList
+              items={sections.hiddenDatedItems}
+              date={day.date}
+              scheduleHierarchy={scheduleHierarchy}
+              className={styles.compactDetailsList}
+              ariaLabel={`More dated items for ${day.label}`}
+            />
+          </details>
+        ) : null}
+
+        {sections.scheduleItems.length > 0 ? (
+          <details className={`${styles.compactDetails} ${styles.scheduleDetails}`}>
+            <summary>
+              {sections.scheduleItems.length} recurring schedule block
+              {sections.scheduleItems.length === 1 ? '' : 's'}
+            </summary>
+            <CalendarItemList
+              items={sections.scheduleItems}
+              date={day.date}
+              scheduleHierarchy={scheduleHierarchy}
+              className={styles.compactDetailsList}
+              ariaLabel={`Recurring schedule for ${day.label}`}
+            />
+          </details>
+        ) : null}
+
+        {day.items.length === 0 ? <p className={styles.noItems}>No items</p> : null}
+      </article>
+    </li>
+  );
+}
+
 export function CalendarRoute() {
   const { date, setDate } = useDateSearchParam();
   const compactCalendar = useCompactCalendar();
+  const currentDate = todayLocalDate();
   const monthRange = useMemo(() => getCalendarMonthRange(date), [date]);
   const state = useWorkspaceReadModel({
     startDate: monthRange.gridStartDate,
@@ -261,20 +496,68 @@ export function CalendarRoute() {
             date,
             state.data.scheduleBlocks,
             state.data.calendarEvents,
-            todayLocalDate(),
+            currentDate,
             scheduleExceptions ?? [],
             planningState.data.lessonPlans,
             planningState.data.sessionOccurrences,
           )
         : null,
-    [date, planningState, scheduleExceptions, state],
+    [currentDate, date, planningState, scheduleExceptions, state],
   );
 
   const previousMonthDate = shiftCalendarMonth(date, -1);
   const nextMonthDate = shiftCalendarMonth(date, 1);
   const previousMonthLabel = getCalendarMonthRange(previousMonthDate).label;
   const nextMonthLabel = getCalendarMonthRange(nextMonthDate).label;
-  const currentMonthDays = calendar?.days.filter((day) => day.inCurrentMonth) ?? [];
+  const currentMonthDays = useMemo(
+    () => calendar?.days.filter((day) => day.inCurrentMonth) ?? [],
+    [calendar],
+  );
+  const mobileWeeks = useMemo(
+    () => buildCalendarWeekPresentation(currentMonthDays, date, currentDate),
+    [currentDate, currentMonthDays, date],
+  );
+  const targetWeekId =
+    mobileWeeks.find((week) => week.containsSelectedDate)?.id ??
+    mobileWeeks.find((week) => week.containsToday)?.id ??
+    mobileWeeks[0]?.id;
+  const calendarMonthLabel = calendar?.range.label;
+  const [expandedWeekIds, setExpandedWeekIds] = useState<ReadonlySet<string>>(new Set());
+  const targetWeekRef = useRef<HTMLDetailsElement>(null);
+  const scrolledTargetWeekRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!targetWeekId) return;
+    setExpandedWeekIds(new Set([targetWeekId]));
+  }, [monthRange.label, targetWeekId]);
+
+  useLayoutEffect(() => {
+    if (
+      !compactCalendar ||
+      !targetWeekId ||
+      !calendarMonthLabel ||
+      !expandedWeekIds.has(targetWeekId) ||
+      scrolledTargetWeekRef.current === targetWeekId
+    ) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      targetWeekRef.current?.scrollIntoView({ block: 'start', behavior: 'auto' });
+      scrolledTargetWeekRef.current = targetWeekId;
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [calendarMonthLabel, compactCalendar, expandedWeekIds, targetWeekId]);
+
+  function toggleMobileWeek(weekId: string, open: boolean) {
+    setExpandedWeekIds((current) => {
+      const next = new Set(current);
+      if (open) next.add(weekId);
+      else next.delete(weekId);
+      return next;
+    });
+  }
 
   return (
     <section>
@@ -307,7 +590,7 @@ export function CalendarRoute() {
           >
             <ChevronLeft aria-hidden="true" size={18} /> Previous
           </button>
-          <button className="button" type="button" onClick={() => setDate(todayLocalDate())}>
+          <button className="button" type="button" onClick={() => setDate(currentDate)}>
             This month
           </button>
           <button
@@ -344,7 +627,7 @@ export function CalendarRoute() {
           <span className={`${styles.legendMarker} ${styles.sessionMarker}`} aria-hidden="true" />
           Learner session
         </div>
-        <p>All-day items appear first. Weeks run Monday through Sunday.</p>
+        <p>Events and sessions stay visible. Recurring schedule remains available in summaries.</p>
       </section>
 
       {state.status === 'loading' || planningState.status === 'loading' ? (
@@ -391,11 +674,16 @@ export function CalendarRoute() {
               aria-label={`${calendar.range.label} calendar`}
             >
               <ol className={styles.mobileMonthList}>
-                {currentMonthDays.map((day) => (
-                  <MobileCalendarDay
-                    key={day.date}
-                    day={day}
+                {mobileWeeks.map((week) => (
+                  <MobileCalendarWeek
+                    key={week.id}
+                    week={week}
+                    expanded={expandedWeekIds.has(week.id)}
+                    targetRef={week.id === targetWeekId ? targetWeekRef : undefined}
+                    selectedDate={date}
                     scheduleHierarchy={scheduleHierarchy}
+                    onToggle={toggleMobileWeek}
+                    onSelectDate={setDate}
                   />
                 ))}
               </ol>
@@ -413,54 +701,13 @@ export function CalendarRoute() {
 
               <ol className={styles.monthGrid}>
                 {calendar.days.map((day) => (
-                  <li
+                  <DesktopCalendarDay
                     key={day.date}
-                    className={`${styles.day} ${
-                      day.inCurrentMonth ? styles.currentMonthDay : styles.adjacentMonthDay
-                    } ${day.isToday ? styles.today : ''}`}
-                  >
-                    <article
-                      aria-label={`${day.label}, ${day.items.length} item${day.items.length === 1 ? '' : 's'}`}
-                    >
-                      <header className={styles.dayHeader}>
-                        <time
-                          className={styles.dayNumber}
-                          dateTime={day.date}
-                          aria-current={day.isToday ? 'date' : undefined}
-                        >
-                          {day.dayNumber}
-                        </time>
-                        {day.isToday ? <span className={styles.todayLabel}>Today</span> : null}
-                        <a
-                          className={styles.dayAddButton}
-                          href={buildPlanningEntryHref({ date: day.date, returnTo: 'calendar' })}
-                          aria-label={`Add lesson plan to ${day.label}`}
-                        >
-                          <CalendarPlus aria-hidden="true" size={14} />
-                          <span>Plan</span>
-                        </a>
-                      </header>
-
-                      {day.items.length > 0 ? (
-                        <ul className={styles.itemList} aria-label={`Items for ${day.label}`}>
-                          {day.items.map((item) => (
-                            <CalendarItemCard
-                              key={item.occurrenceId}
-                              item={item}
-                              date={day.date}
-                              hierarchy={
-                                item.sourceType === 'schedule-block'
-                                  ? scheduleHierarchy.get(item.sourceRecordId)
-                                  : undefined
-                              }
-                            />
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className={styles.noItems}>No items</p>
-                      )}
-                    </article>
-                  </li>
+                    day={day}
+                    selected={day.date === date}
+                    scheduleHierarchy={scheduleHierarchy}
+                    onSelectDate={setDate}
+                  />
                 ))}
               </ol>
             </section>

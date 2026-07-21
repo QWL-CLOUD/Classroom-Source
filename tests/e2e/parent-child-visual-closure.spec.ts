@@ -187,6 +187,8 @@ test('Week, Today, and Calendar preserve hierarchy cues without shifting the Tod
   ).toEqual([]);
 
   await page.goto('./#/calendar?date=2026-07-13');
+  const calendarDay = page.getByRole('article', { name: /Monday, July 13, 2026/ });
+  await calendarDay.getByText(/recurring schedule blocks?/).click();
   const calendarParent = page.locator(
     '[data-calendar-item="schedule-block:visual-parent:2026-07-13"]',
   );
