@@ -11,7 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ZodError } from 'zod';
 
@@ -105,6 +105,7 @@ function SessionEditorForm({
           plan,
         );
   });
+  const latestValuesRef = useRef(values);
   const [saving, setSaving] = useState(false);
   const [bumpLoading, setBumpLoading] = useState(false);
   const [bumpPreview, setBumpPreview] = useState<SeriesBumpPreview | null>(null);
@@ -133,9 +134,17 @@ function SessionEditorForm({
   }, [scheduleExceptions, selectedBlock, values.date]);
   const resolvedOccurrence = occurrenceResolution.occurrence;
 
+  function applyValues(
+    update: SessionEditorValues | ((current: SessionEditorValues) => SessionEditorValues),
+  ): void {
+    const nextValues = typeof update === 'function' ? update(latestValuesRef.current) : update;
+    latestValuesRef.current = nextValues;
+    setValues(nextValues);
+  }
+
   useEffect(() => {
     if (!resolvedOccurrence) return;
-    setValues((current) => ({
+    applyValues((current) => ({
       ...current,
       startTime: minuteToTime(resolvedOccurrence.block.startMinute),
       endTime: minuteToTime(resolvedOccurrence.block.endMinute),
@@ -165,21 +174,30 @@ function SessionEditorForm({
     key: K,
     value: SessionEditorValues[K],
   ): void {
-    setValues((current) => ({ ...current, [key]: value }));
+    applyValues((current) => ({ ...current, [key]: value }));
     setError(null);
     setBumpPreview(null);
     setUnscheduleArmed(false);
   }
 
-  function updateContent(content: LessonContentEditorValues): void {
-    setValues((current) => ({ ...current, ...content }));
+  function updateContent(
+    updateContentValues: (current: LessonContentEditorValues) => LessonContentEditorValues,
+  ): void {
+    applyValues((current) => {
+      const content = updateContentValues({
+        learningTarget: current.learningTarget,
+        notes: current.notes,
+        lessonFlow: current.lessonFlow,
+      });
+      return { ...current, ...content };
+    });
     setError(null);
     setBumpPreview(null);
     setUnscheduleArmed(false);
   }
 
   function customizeContent(): void {
-    setValues((current) => ({
+    applyValues((current) => ({
       ...current,
       contentMode: 'custom',
       ...createLessonContentEditorValues(inheritedContent),
@@ -188,7 +206,7 @@ function SessionEditorForm({
   }
 
   function restoreInheritedContent(): void {
-    setValues((current) => ({
+    applyValues((current) => ({
       ...current,
       contentMode: 'inherit',
       ...createLessonContentEditorValues(inheritedContent),
@@ -201,9 +219,10 @@ function SessionEditorForm({
     setSaving(true);
     setError(null);
     try {
+      const currentValues = latestValuesRef.current;
       const saved = session
-        ? await service.updateSession(session.id, values)
-        : await service.schedulePlan(selectedPlan.id, values);
+        ? await service.updateSession(session.id, currentValues)
+        : await service.schedulePlan(selectedPlan.id, currentValues);
       window.location.hash = returnHref({
         date: saved.date,
         sessionId: saved.id,

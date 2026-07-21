@@ -1,13 +1,10 @@
 import { ArrowDown, ArrowUp, ChevronDown, Copy, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 import type { LessonContent, LessonFlowPhase } from '@/domain/models/entities';
+import { moveLessonFlowStep } from '@/features/planning/lessonFlowEditorOperations';
 import {
-  duplicateLessonFlowStep,
-  insertLessonFlowStep,
-  moveLessonFlowStep,
-} from '@/features/planning/lessonFlowEditorOperations';
-import {
+  createLessonFlowStepEditorValues,
   lessonFlowDurationMinutes,
   lessonFlowPhaseLabels,
   type LessonContentEditorValues,
@@ -16,9 +13,13 @@ import {
 
 import styles from './LessonFlowEditor.module.css';
 
+export type LessonContentEditorUpdater = (
+  current: LessonContentEditorValues,
+) => LessonContentEditorValues;
+
 interface LessonFlowEditorProps {
   values: LessonContentEditorValues;
-  onChange: (values: LessonContentEditorValues) => void;
+  onChange: (update: LessonContentEditorUpdater) => void;
   disabled?: boolean;
   idPrefix: string;
   headingLevel?: 2 | 3;
@@ -45,8 +46,6 @@ export function LessonFlowEditor({
 }: LessonFlowEditorProps) {
   const [pendingFocusStepId, setPendingFocusStepId] = useState<string | null>(null);
   const titleInputRefs = useRef(new Map<string, HTMLInputElement>());
-  const latestValuesRef = useRef(values);
-  latestValuesRef.current = values;
   const parsedDurations = values.lessonFlow.map((step) => ({
     ...step,
     durationMinutes: step.durationMinutes ? Number(step.durationMinutes) : undefined,
@@ -54,41 +53,64 @@ export function LessonFlowEditor({
   const totalMinutes = lessonFlowDurationMinutes(parsedDurations);
   const Heading = headingLevel === 2 ? 'h2' : 'h3';
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!pendingFocusStepId) return;
     const input = titleInputRefs.current.get(pendingFocusStepId);
     if (!input) return;
 
-    const focusFrame = requestAnimationFrame(() => {
-      input.focus({ preventScroll: true });
-      input.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      setPendingFocusStepId(null);
-    });
-    return () => cancelAnimationFrame(focusFrame);
+    // Focus before paint so a delayed animation-frame callback cannot steal
+    // focus after the user or an automation client has moved to the next field.
+    input.focus({ preventScroll: true });
+    input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setPendingFocusStepId(null);
   }, [pendingFocusStepId, values.lessonFlow]);
 
   function updateContent<K extends keyof LessonContentEditorValues>(
     key: K,
     value: LessonContentEditorValues[K],
   ): void {
-    const nextValues = { ...latestValuesRef.current, [key]: value };
-    latestValuesRef.current = nextValues;
-    onChange(nextValues);
+    onChange((current) => ({ ...current, [key]: value }));
   }
 
-  function applyLessonFlow(lessonFlow: LessonFlowStepEditorValues[], focusStepId?: string): void {
-    if (focusStepId) setPendingFocusStepId(focusStepId);
-    updateContent('lessonFlow', lessonFlow);
+  function updateLessonFlow(
+    update: (steps: readonly LessonFlowStepEditorValues[]) => LessonFlowStepEditorValues[],
+  ): void {
+    onChange((current) => ({
+      ...current,
+      lessonFlow: update(current.lessonFlow),
+    }));
   }
 
   function addStep(index: number, phase?: LessonFlowPhase): void {
-    const result = insertLessonFlowStep(latestValuesRef.current.lessonFlow, index, phase);
-    applyLessonFlow(result.steps, result.insertedStepId);
+    const step = createLessonFlowStepEditorValues(phase);
+    setPendingFocusStepId(step.id);
+    updateLessonFlow((steps) => {
+      const insertionIndex = Math.max(0, Math.min(index, steps.length));
+      const next = [...steps];
+      next.splice(insertionIndex, 0, step);
+      return next;
+    });
   }
 
   function duplicateStep(index: number): void {
-    const result = duplicateLessonFlowStep(latestValuesRef.current.lessonFlow, index);
-    applyLessonFlow(result.steps, result.insertedStepId);
+    const duplicateId = createLessonFlowStepEditorValues().id;
+    setPendingFocusStepId(duplicateId);
+    updateLessonFlow((steps) => {
+      const source = steps[index];
+      if (!source) {
+        const next = [...steps];
+        next.push({ ...createLessonFlowStepEditorValues(), id: duplicateId });
+        return next;
+      }
+      const duplicate = {
+        ...source,
+        id: duplicateId,
+        title: source.title.trim() ? `${source.title} copy` : '',
+      };
+      const next = [...steps];
+      next.splice(index + 1, 0, duplicate);
+      return next;
+    });
   }
 
   return (
@@ -189,9 +211,7 @@ export function LessonFlowEditor({
                           disabled={disabled || index === 0}
                           onClick={(event) => {
                             closeStepMenu(event.currentTarget);
-                            applyLessonFlow(
-                              moveLessonFlowStep(latestValuesRef.current.lessonFlow, index, -1),
-                            );
+                            updateLessonFlow((steps) => moveLessonFlowStep(steps, index, -1));
                           }}
                         >
                           <ArrowUp aria-hidden="true" size={15} /> Move earlier
@@ -201,9 +221,7 @@ export function LessonFlowEditor({
                           disabled={disabled || index === values.lessonFlow.length - 1}
                           onClick={(event) => {
                             closeStepMenu(event.currentTarget);
-                            applyLessonFlow(
-                              moveLessonFlowStep(latestValuesRef.current.lessonFlow, index, 1),
-                            );
+                            updateLessonFlow((steps) => moveLessonFlowStep(steps, index, 1));
                           }}
                         >
                           <ArrowDown aria-hidden="true" size={15} /> Move later
@@ -214,10 +232,8 @@ export function LessonFlowEditor({
                           disabled={disabled}
                           onClick={(event) => {
                             closeStepMenu(event.currentTarget);
-                            applyLessonFlow(
-                              latestValuesRef.current.lessonFlow.filter(
-                                (_, stepIndex) => stepIndex !== index,
-                              ),
+                            updateLessonFlow((steps) =>
+                              steps.filter((_, stepIndex) => stepIndex !== index),
                             );
                           }}
                         >
@@ -239,9 +255,8 @@ export function LessonFlowEditor({
                         disabled={disabled}
                         value={step.title}
                         onChange={(event) =>
-                          updateContent(
-                            'lessonFlow',
-                            updateStep(latestValuesRef.current.lessonFlow, index, {
+                          updateLessonFlow((steps) =>
+                            updateStep(steps, index, {
                               title: event.target.value,
                             }),
                           )
@@ -256,9 +271,8 @@ export function LessonFlowEditor({
                         disabled={disabled}
                         value={step.phase}
                         onChange={(event) =>
-                          updateContent(
-                            'lessonFlow',
-                            updateStep(latestValuesRef.current.lessonFlow, index, {
+                          updateLessonFlow((steps) =>
+                            updateStep(steps, index, {
                               phase: event.target.value as LessonFlowPhase,
                             }),
                           )
@@ -280,9 +294,8 @@ export function LessonFlowEditor({
                         disabled={disabled}
                         value={step.durationMinutes}
                         onChange={(event) =>
-                          updateContent(
-                            'lessonFlow',
-                            updateStep(latestValuesRef.current.lessonFlow, index, {
+                          updateLessonFlow((steps) =>
+                            updateStep(steps, index, {
                               durationMinutes: event.target.value,
                             }),
                           )
@@ -298,9 +311,8 @@ export function LessonFlowEditor({
                         disabled={disabled}
                         value={step.details}
                         onChange={(event) =>
-                          updateContent(
-                            'lessonFlow',
-                            updateStep(latestValuesRef.current.lessonFlow, index, {
+                          updateLessonFlow((steps) =>
+                            updateStep(steps, index, {
                               details: event.target.value,
                             }),
                           )
@@ -316,9 +328,8 @@ export function LessonFlowEditor({
                         disabled={disabled}
                         value={step.teacherNotes}
                         onChange={(event) =>
-                          updateContent(
-                            'lessonFlow',
-                            updateStep(latestValuesRef.current.lessonFlow, index, {
+                          updateLessonFlow((steps) =>
+                            updateStep(steps, index, {
                               teacherNotes: event.target.value,
                             }),
                           )
@@ -334,7 +345,7 @@ export function LessonFlowEditor({
             className={styles.addStepButton}
             type="button"
             disabled={disabled}
-            onClick={() => addStep(latestValuesRef.current.lessonFlow.length)}
+            onClick={() => addStep(values.lessonFlow.length)}
           >
             <Plus aria-hidden="true" size={17} /> Add step
           </button>

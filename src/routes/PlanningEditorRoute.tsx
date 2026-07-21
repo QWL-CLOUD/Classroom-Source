@@ -42,7 +42,6 @@ import {
 import {
   createLessonPlanEditorValues,
   toLessonPlanEditorValues,
-  type LessonContentEditorValues,
   type LessonPlanEditorValues,
 } from '@/features/planning/planningEditorModel';
 import { resolveScheduleOccurrence } from '@/features/scheduleExceptions/scheduleOccurrenceResolver';
@@ -125,7 +124,9 @@ function PlanningEditorForm({
         ),
   );
   const latestValuesRef = useRef(values);
-  latestValuesRef.current = values;
+  // Every form mutation must go through applyValues(), which updates this ref
+  // synchronously before React renders. Assigning from `values` during render
+  // can let an older concurrent render replace a newer draft just before Save.
   const [saving, setSaving] = useState(false);
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -185,7 +186,10 @@ function PlanningEditorForm({
     ? currentSeriesPlans.findIndex((candidate) => candidate.id === plan.id)
     : -1;
 
-  function applyValues(nextValues: LessonPlanEditorValues): void {
+  function applyValues(
+    update: LessonPlanEditorValues | ((current: LessonPlanEditorValues) => LessonPlanEditorValues),
+  ): void {
+    const nextValues = typeof update === 'function' ? update(latestValuesRef.current) : update;
     latestValuesRef.current = nextValues;
     setValues(nextValues);
     setError(null);
@@ -196,7 +200,7 @@ function PlanningEditorForm({
     key: K,
     value: LessonPlanEditorValues[K],
   ): void {
-    applyValues({ ...latestValuesRef.current, [key]: value });
+    applyValues((current) => ({ ...current, [key]: value }));
   }
 
   function updateSeriesChoice(value: string): void {
@@ -464,8 +468,15 @@ function PlanningEditorForm({
           lessonFlow: values.lessonFlow,
         }}
         disabled={saving}
-        onChange={(content: LessonContentEditorValues) => {
-          applyValues({ ...latestValuesRef.current, ...content });
+        onChange={(updateContent) => {
+          applyValues((current) => {
+            const content = updateContent({
+              learningTarget: current.learningTarget,
+              notes: current.notes,
+              lessonFlow: current.lessonFlow,
+            });
+            return { ...current, ...content };
+          });
         }}
       />
 
