@@ -103,6 +103,7 @@ test('Today prioritizes the schedule and uses one date-aware Add menu', async ({
 test('Week names the day action and mobile Calendar stays compact until expanded', async ({
   page,
 }) => {
+  await page.clock.setFixedTime(new Date('2026-07-20T16:00:00.000Z'));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('./#/week?date=2026-07-20&view=everything');
   await seedWorkspaceUx(page);
