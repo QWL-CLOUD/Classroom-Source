@@ -1,17 +1,36 @@
-.headerControls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: center;
-  justify-content: flex-end;
+.heroHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px 28px;
+  align-items: end;
+  margin-bottom: 28px;
+}
+
+.heroCopy {
+  min-width: 0;
+}
+
+.heroTitle {
+  font-size: clamp(40px, 4.5vw, 54px);
+  line-height: 0.98;
+}
+
+.heroAction {
+  justify-self: end;
 }
 
 .dateToolbar {
+  grid-column: 1 / -1;
+  width: fit-content;
+  max-width: 100%;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-  justify-content: flex-end;
+  padding: 6px;
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  background: var(--surface-soft);
 }
 
 .datePicker input {
@@ -455,8 +474,17 @@
 }
 
 @media (max-width: 680px) {
-  .headerControls,
+  .heroHeader {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .heroAction {
+    justify-self: start;
+  }
+
   .dateToolbar {
+    grid-column: 1;
     width: 100%;
     justify-content: flex-start;
   }

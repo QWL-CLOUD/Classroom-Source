@@ -185,45 +185,50 @@ export function TodayRoute() {
 
   return (
     <section>
-      <header className="page-header">
-        <div>
+      <header className={styles.heroHeader}>
+        <div className={styles.heroCopy}>
           <p className="page-eyebrow">Today workspace</p>
-          <h1 className="page-title">{getGreeting()}, Alyssa.</h1>
-          <p className="page-subtitle">Previewing {formatLongDate(date)}</p>
+          <h1 className={`page-title ${styles.heroTitle}`}>{getGreeting()}, Alyssa.</h1>
+          <p className="page-subtitle">
+            {date === currentDate
+              ? `Today · ${formatLongDate(date)}`
+              : `Viewing ${formatLongDate(date)}`}
+          </p>
         </div>
 
-        <div className={styles.headerControls}>
-          <div className={styles.dateToolbar} aria-label="Today date navigation">
-            <button
-              className="button button-icon"
-              type="button"
-              aria-label={`Previous day, ${formatLongDate(previousDate)}`}
-              onClick={() => setDate(previousDate)}
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <button className="button" type="button" onClick={() => setDate(currentDate)}>
-              Today
-            </button>
-            <button
-              className="button button-icon"
-              type="button"
-              aria-label={`Next day, ${formatLongDate(nextDate)}`}
-              onClick={() => setDate(nextDate)}
-            >
-              <ChevronRight size={18} />
-            </button>
-            <label className={styles.datePicker}>
-              <span className="sr-only">Selected date</span>
-              <input
-                className="input"
-                type="date"
-                value={date}
-                onChange={(event: ChangeEvent<HTMLInputElement>) => setDate(event.target.value)}
-              />
-            </label>
-          </div>
+        <div className={styles.heroAction}>
           <WorkspaceAddMenu date={date} returnTo="today" includeWorkspaceItems />
+        </div>
+
+        <div className={styles.dateToolbar} aria-label="Today date navigation">
+          <button
+            className="button button-icon"
+            type="button"
+            aria-label={`Previous day, ${formatLongDate(previousDate)}`}
+            onClick={() => setDate(previousDate)}
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <button className="button" type="button" onClick={() => setDate(currentDate)}>
+            Today
+          </button>
+          <button
+            className="button button-icon"
+            type="button"
+            aria-label={`Next day, ${formatLongDate(nextDate)}`}
+            onClick={() => setDate(nextDate)}
+          >
+            <ChevronRight size={18} />
+          </button>
+          <label className={styles.datePicker}>
+            <span className="sr-only">Selected date</span>
+            <input
+              className="input"
+              type="date"
+              value={date}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => setDate(event.target.value)}
+            />
+          </label>
         </div>
       </header>
 

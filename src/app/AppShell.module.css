@@ -226,10 +226,19 @@
 }
 
 .historyControls button {
-  width: 42px;
+  min-width: 76px;
   height: 42px;
+  grid-auto-flow: column;
+  gap: 7px;
+  padding: 0 12px;
   color: var(--text-muted);
   background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.historyLabel {
+  white-space: nowrap;
 }
 
 .historyControls button + button {
@@ -357,12 +366,20 @@
   }
 }
 
-@media (max-width: 430px) {
+@media (max-width: 560px) {
   .historyControls button {
     width: 38px;
+    min-width: 38px;
     height: 38px;
+    padding: 0;
   }
 
+  .historyLabel {
+    display: none;
+  }
+}
+
+@media (max-width: 430px) {
   .topbarIdentity strong {
     font-size: 15px;
   }
