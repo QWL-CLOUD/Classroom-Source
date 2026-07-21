@@ -685,10 +685,7 @@ export function TaskList({ selectedDate, compact = false, defaultScheduledDate }
       ) : data.model.total === 0 ? (
         <section className={styles.emptyState}>
           <h2>No tasks yet</h2>
-          <p>Create the first task when you are ready. Scheduled tasks will appear on Today.</p>
-          <button className="button button-primary" type="button" onClick={() => setCreating(true)}>
-            <Plus size={17} aria-hidden="true" /> New task
-          </button>
+          <p>Use New task above when you are ready. Scheduled tasks will appear on Today.</p>
         </section>
       ) : (
         <div className={styles.sections} aria-label="Task lifecycle sections">
