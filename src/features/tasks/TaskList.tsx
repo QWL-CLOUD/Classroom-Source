@@ -14,6 +14,9 @@ import { useLiveQuery } from 'dexie-react-hooks';
 
 import { classroomDb } from '@/data/db/ClassroomDatabase';
 import type { LearnerContext, Task, TaskStatus } from '@/domain/models/entities';
+import { CategoryAssignmentFields } from '@/features/categories/CategoryAssignmentFields';
+import type { CategorySelectionMap } from '@/features/categories/categoryAssignmentSelection';
+import { useCategorySelectionDraft } from '@/features/categories/useCategorySelectionDraft';
 import { ReminderPanel } from '@/features/reminders/ReminderPanel';
 import { formatShortDate } from '@/shared/dates/localDate';
 import { EditorActionMenu } from '@/shared/ui/EditorActionMenu';
@@ -34,7 +37,7 @@ interface TaskEditorProps {
   defaultScheduledDate?: string;
   submitLabel: string;
   busy: boolean;
-  onSubmit: (values: TaskEditorValues) => Promise<void>;
+  onSubmit: (values: TaskEditorValues, categorySelections: CategorySelectionMap) => Promise<void>;
   onCancel?: () => void;
 }
 
@@ -99,6 +102,7 @@ function TaskEditor({
     buildInitialEditorState(initialTask, defaultScheduledDate),
   );
   const [error, setError] = useState<string | null>(null);
+  const categoryDraft = useCategorySelectionDraft('task', initialTask?.id);
 
   const activeContexts = contexts.filter((context) => context.status === 'active');
   const currentArchivedContext = initialTask?.contextId
@@ -111,15 +115,18 @@ function TaskEditor({
     event.preventDefault();
     setError(null);
     try {
-      await onSubmit({
-        title: values.title,
-        notes: values.notes,
-        scheduledDate: values.scheduledDate,
-        scheduledMinute: timeToMinute(values.scheduledTime),
-        dueDate: values.dueDate,
-        dueMinute: timeToMinute(values.dueTime),
-        contextId: values.contextId,
-      });
+      await onSubmit(
+        {
+          title: values.title,
+          notes: values.notes,
+          scheduledDate: values.scheduledDate,
+          scheduledMinute: timeToMinute(values.scheduledTime),
+          dueDate: values.dueDate,
+          dueMinute: timeToMinute(values.dueTime),
+          contextId: values.contextId,
+        },
+        categoryDraft.selections,
+      );
       if (!initialTask) setValues(buildInitialEditorState(undefined, defaultScheduledDate));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Task could not be saved.');
@@ -249,6 +256,13 @@ function TaskEditor({
         />
       </label>
 
+      <CategoryAssignmentFields
+        snapshot={categoryDraft.snapshot}
+        selectedSets={categoryDraft.selectedSets}
+        disabled={busy}
+        onToggle={categoryDraft.toggle}
+      />
+
       {error ? (
         <p className={styles.error} role="alert">
           {error}
@@ -318,8 +332,8 @@ function TaskCard({
           submitLabel="Save task"
           busy={busy}
           onCancel={() => setEditing(false)}
-          onSubmit={async (values) => {
-            await onRun(() => taskMutationService.update(task.id, values));
+          onSubmit={async (values, categorySelections) => {
+            await onRun(() => taskMutationService.update(task.id, values, categorySelections));
             setEditing(false);
           }}
         />
@@ -666,8 +680,8 @@ export function TaskList({ selectedDate, compact = false, defaultScheduledDate }
             submitLabel="Create task"
             busy={busy}
             onCancel={closeCreatePanel}
-            onSubmit={async (values) => {
-              await run(() => taskMutationService.create(values));
+            onSubmit={async (values, categorySelections) => {
+              await run(() => taskMutationService.create(values, categorySelections));
               closeCreatePanel();
             }}
           />

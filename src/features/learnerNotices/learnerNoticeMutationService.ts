@@ -11,6 +11,15 @@ import {
   type LearnerNoticeStatus,
   type Task,
 } from '@/domain/models/entities';
+import {
+  buildCategoryAssignmentChangePlan,
+  listCategoryAssignmentsForDeletion,
+  type CategorySelectionMap,
+} from '@/features/categories/categoryAssignmentSelection';
+import {
+  deleteCategoryAssignmentOperation,
+  putCategoryAssignmentOperation,
+} from '@/features/categories/categoryCommands';
 import { clearSupportedRedoBranch } from '@/features/editing/editCommandRegistry';
 import { notifyEditHistoryChanged } from '@/features/editing/editHistorySignal';
 
@@ -118,14 +127,21 @@ export class LearnerNoticeMutationService {
     this.order = dependencies.order ?? (() => Date.now());
   }
 
-  async create(values: CreateLearnerNoticeValues): Promise<LearnerNoticeCreateResult> {
+  async create(
+    values: CreateLearnerNoticeValues,
+    categorySelections?: CategorySelectionMap,
+  ): Promise<LearnerNoticeCreateResult> {
     const parsed = createLearnerNoticeValuesSchema.parse(values);
     const result = await this.db.transaction(
       'rw',
-      this.db.learnerNotices,
-      this.db.learnerContexts,
-      this.db.tasks,
-      this.db.changeLog,
+      [
+        this.db.learnerNotices,
+        this.db.learnerContexts,
+        this.db.tasks,
+        this.db.categoryValues,
+        this.db.categoryAssignments,
+        this.db.changeLog,
+      ],
       async (): Promise<CommitResult<LearnerNoticeCreateResult>> => {
         const context = await this.requireSelectableContext(parsed.contextId);
         const now = this.now();
@@ -155,12 +171,36 @@ export class LearnerNoticeMutationService {
               updatedAt: now,
             })
           : undefined;
-        const forward = [putLearnerNoticeOperation(notice)];
-        const inverse: LearnerNoticeOperation[] = [deleteLearnerNoticeOperation(notice.id)];
-        if (followUpTask) {
-          forward.push(putFollowUpTaskOperation(followUpTask));
-          inverse.unshift(deleteFollowUpTaskOperation(followUpTask.id));
-        }
+        const noticeCategoryPlan = await buildCategoryAssignmentChangePlan(
+          this.db,
+          'learner-notice',
+          notice.id,
+          {
+            selections: categorySelections,
+            useDefaultsForMissingFamilies: true,
+            createId: this.createId,
+            now,
+          },
+        );
+        const taskCategoryPlan = followUpTask
+          ? await buildCategoryAssignmentChangePlan(this.db, 'task', followUpTask.id, {
+              useDefaultsForMissingFamilies: true,
+              createId: this.createId,
+              now,
+            })
+          : { forward: [], inverse: [] };
+        const forward: LearnerNoticeOperation[] = [
+          putLearnerNoticeOperation(notice),
+          ...(followUpTask ? [putFollowUpTaskOperation(followUpTask)] : []),
+          ...noticeCategoryPlan.forward,
+          ...taskCategoryPlan.forward,
+        ];
+        const inverse: LearnerNoticeOperation[] = [
+          ...taskCategoryPlan.inverse,
+          ...noticeCategoryPlan.inverse,
+          ...(followUpTask ? [deleteFollowUpTaskOperation(followUpTask.id)] : []),
+          deleteLearnerNoticeOperation(notice.id),
+        ];
         const commands: LearnerNoticeCommandPair = {
           forward: createLearnerNoticeCommand(forward),
           inverse: createLearnerNoticeCommand(inverse),
@@ -182,13 +222,23 @@ export class LearnerNoticeMutationService {
     return result.value;
   }
 
-  async update(id: string, values: LearnerNoticeEditorValues): Promise<LearnerNotice> {
+  async update(
+    id: string,
+    values: LearnerNoticeEditorValues,
+    categorySelections?: CategorySelectionMap,
+  ): Promise<LearnerNotice> {
     const parsed = learnerNoticeEditorValuesSchema.parse(values);
-    return this.replace(id, 'learner-notice.update', 'Edit learner notice', (existing, now) => ({
-      ...existing,
-      ...parsed,
-      updatedAt: now,
-    }));
+    return this.replace(
+      id,
+      'learner-notice.update',
+      'Edit learner notice',
+      (existing, now) => ({
+        ...existing,
+        ...parsed,
+        updatedAt: now,
+      }),
+      categorySelections,
+    );
   }
 
   async resolve(id: string): Promise<LearnerNotice> {
@@ -219,15 +269,27 @@ export class LearnerNoticeMutationService {
       this.db.learnerNotices,
       this.db.reminders,
       this.db.tasks,
+      this.db.categoryAssignments,
       this.db.changeLog,
       async () => {
         const existing = await this.requireNotice(id);
         const impact = await this.readDeleteImpact(existing);
         if (!impact.canDelete) throw new Error(learnerNoticeDeleteBlockingMessage(impact));
         const now = this.now();
+        const categoryAssignments = await listCategoryAssignmentsForDeletion(
+          this.db,
+          'learner-notice',
+          existing.id,
+        );
         const commands: LearnerNoticeCommandPair = {
-          forward: createLearnerNoticeCommand([deleteLearnerNoticeOperation(existing.id)]),
-          inverse: createLearnerNoticeCommand([putLearnerNoticeOperation(existing)]),
+          forward: createLearnerNoticeCommand([
+            ...categoryAssignments.map((item) => deleteCategoryAssignmentOperation(item.id)),
+            deleteLearnerNoticeOperation(existing.id),
+          ]),
+          inverse: createLearnerNoticeCommand([
+            putLearnerNoticeOperation(existing),
+            ...categoryAssignments.map(putCategoryAssignmentOperation),
+          ]),
         };
         const nextLog = this.createChangeLog(
           'learner-notice.delete',
@@ -250,18 +312,38 @@ export class LearnerNoticeMutationService {
     commandType: string,
     label: string,
     update: (existing: LearnerNotice, now: string) => LearnerNotice,
+    categorySelections?: CategorySelectionMap,
   ): Promise<LearnerNotice> {
     const result = await this.db.transaction(
       'rw',
       this.db.learnerNotices,
+      this.db.categoryValues,
+      this.db.categoryAssignments,
       this.db.changeLog,
       async (): Promise<CommitResult<LearnerNotice>> => {
         const existing = await this.requireNotice(id);
         const now = this.now();
         const updated = learnerNoticeSchema.parse(update(existing, now));
+        const categoryPlan = await buildCategoryAssignmentChangePlan(
+          this.db,
+          'learner-notice',
+          updated.id,
+          {
+            selections: categorySelections,
+            useDefaultsForMissingFamilies: false,
+            createId: this.createId,
+            now,
+          },
+        );
         const commands: LearnerNoticeCommandPair = {
-          forward: createLearnerNoticeCommand([putLearnerNoticeOperation(updated)]),
-          inverse: createLearnerNoticeCommand([putLearnerNoticeOperation(existing)]),
+          forward: createLearnerNoticeCommand([
+            putLearnerNoticeOperation(updated),
+            ...categoryPlan.forward,
+          ]),
+          inverse: createLearnerNoticeCommand([
+            ...categoryPlan.inverse,
+            putLearnerNoticeOperation(existing),
+          ]),
         };
         const log = this.createChangeLog(commandType, `${label} “${updated.title}”`, commands, now);
         await clearSupportedRedoBranch(this.db);
@@ -344,10 +426,13 @@ export class LearnerNoticeMutationService {
       if (operation.table === 'learnerNotices') {
         if (operation.action === 'put') await this.db.learnerNotices.put(operation.record);
         else await this.db.learnerNotices.delete(operation.id);
+      } else if (operation.table === 'tasks') {
+        if (operation.action === 'put') await this.db.tasks.put(operation.record);
+        else await this.db.tasks.delete(operation.id);
       } else if (operation.action === 'put') {
-        await this.db.tasks.put(operation.record);
+        await this.db.categoryAssignments.put(operation.record);
       } else {
-        await this.db.tasks.delete(operation.id);
+        await this.db.categoryAssignments.delete(operation.id);
       }
     }
   }

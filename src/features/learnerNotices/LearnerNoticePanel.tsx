@@ -13,6 +13,9 @@ import { useLiveQuery } from 'dexie-react-hooks';
 
 import { classroomDb } from '@/data/db/ClassroomDatabase';
 import type { LearnerContext, LearnerNotice, LearnerNoticeKind } from '@/domain/models/entities';
+import { CategoryAssignmentFields } from '@/features/categories/CategoryAssignmentFields';
+import type { CategorySelectionMap } from '@/features/categories/categoryAssignmentSelection';
+import { useCategorySelectionDraft } from '@/features/categories/useCategorySelectionDraft';
 import { ReminderPanel } from '@/features/reminders/ReminderPanel';
 import { formatShortDate, todayLocalDate } from '@/shared/dates/localDate';
 
@@ -51,6 +54,7 @@ interface NoticeFormProps {
       createFollowUpTask?: boolean;
       followUpScheduledDate?: string;
     },
+    categorySelections: CategorySelectionMap,
   ) => Promise<void>;
 }
 
@@ -80,23 +84,27 @@ function NoticeForm({
     initialFormState(initial, defaultDate),
   );
   const [error, setError] = useState<string | null>(null);
+  const categoryDraft = useCategorySelectionDraft('learner-notice', initial?.id);
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     setError(null);
     try {
-      await onSubmit({
-        contextId,
-        kind: values.kind,
-        title: values.title,
-        details: values.details,
-        noticeDate: values.kind === 'date-specific-notice' ? values.noticeDate : undefined,
-        createFollowUpTask: allowFollowUp ? values.createFollowUpTask : false,
-        followUpScheduledDate:
-          allowFollowUp && values.createFollowUpTask
-            ? values.followUpScheduledDate || undefined
-            : undefined,
-      });
+      await onSubmit(
+        {
+          contextId,
+          kind: values.kind,
+          title: values.title,
+          details: values.details,
+          noticeDate: values.kind === 'date-specific-notice' ? values.noticeDate : undefined,
+          createFollowUpTask: allowFollowUp ? values.createFollowUpTask : false,
+          followUpScheduledDate:
+            allowFollowUp && values.createFollowUpTask
+              ? values.followUpScheduledDate || undefined
+              : undefined,
+        },
+        categoryDraft.selections,
+      );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Learner notice could not be saved.');
     }
@@ -193,6 +201,12 @@ function NoticeForm({
           ) : null}
         </div>
       ) : null}
+      <CategoryAssignmentFields
+        snapshot={categoryDraft.snapshot}
+        selectedSets={categoryDraft.selectedSets}
+        disabled={busy}
+        onToggle={categoryDraft.toggle}
+      />
       {error ? (
         <p className={styles.error} role="alert">
           {error}
@@ -253,9 +267,9 @@ function NoticeCard({
             busy={false}
             allowFollowUp={false}
             onCancel={() => setEditing(false)}
-            onSubmit={async (values) => {
+            onSubmit={async (values, categorySelections) => {
               const saved = await onBusy(() =>
-                learnerNoticeMutationService.update(notice.id, values),
+                learnerNoticeMutationService.update(notice.id, values, categorySelections),
               );
               if (saved) setEditing(false);
             }}
@@ -443,8 +457,10 @@ export function LearnerNoticePanel({ context }: { context: LearnerContext }) {
           busy={busy}
           allowFollowUp
           onCancel={() => setCreating(false)}
-          onSubmit={async (values) => {
-            const saved = await run(() => learnerNoticeMutationService.create(values));
+          onSubmit={async (values, categorySelections) => {
+            const saved = await run(() =>
+              learnerNoticeMutationService.create(values, categorySelections),
+            );
             if (saved) setCreating(false);
           }}
         />

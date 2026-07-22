@@ -22,17 +22,22 @@ const deleteCategoryValueOperationSchema = z.object({
   id: z.string().min(1),
 });
 
-const putCategoryAssignmentOperationSchema = z.object({
+export const putCategoryAssignmentOperationSchema = z.object({
   table: z.literal('categoryAssignments'),
   action: z.literal('put'),
   record: categoryAssignmentSchema,
 });
 
-const deleteCategoryAssignmentOperationSchema = z.object({
+export const deleteCategoryAssignmentOperationSchema = z.object({
   table: z.literal('categoryAssignments'),
   action: z.literal('delete'),
   id: z.string().min(1),
 });
+
+export const categoryAssignmentOperationSchema = z.union([
+  putCategoryAssignmentOperationSchema,
+  deleteCategoryAssignmentOperationSchema,
+]);
 
 export const categoryOperationSchema = z.union([
   putCategoryValueOperationSchema,
@@ -45,6 +50,7 @@ export const categoryCommandSchema = z.object({
   operations: z.array(categoryOperationSchema).min(1),
 });
 
+export type CategoryAssignmentOperation = z.infer<typeof categoryAssignmentOperationSchema>;
 export type CategoryOperation = z.infer<typeof categoryOperationSchema>;
 export type CategoryCommand = z.infer<typeof categoryCommandSchema>;
 
@@ -61,12 +67,22 @@ export function deleteCategoryValueOperation(id: string): CategoryOperation {
   return categoryOperationSchema.parse({ table: 'categoryValues', action: 'delete', id });
 }
 
-export function putCategoryAssignmentOperation(record: CategoryAssignment): CategoryOperation {
-  return categoryOperationSchema.parse({ table: 'categoryAssignments', action: 'put', record });
+export function putCategoryAssignmentOperation(
+  record: CategoryAssignment,
+): CategoryAssignmentOperation {
+  return categoryAssignmentOperationSchema.parse({
+    table: 'categoryAssignments',
+    action: 'put',
+    record,
+  });
 }
 
-export function deleteCategoryAssignmentOperation(id: string): CategoryOperation {
-  return categoryOperationSchema.parse({ table: 'categoryAssignments', action: 'delete', id });
+export function deleteCategoryAssignmentOperation(id: string): CategoryAssignmentOperation {
+  return categoryAssignmentOperationSchema.parse({
+    table: 'categoryAssignments',
+    action: 'delete',
+    id,
+  });
 }
 
 export function createCategoryCommand(operations: readonly CategoryOperation[]): CategoryCommand {

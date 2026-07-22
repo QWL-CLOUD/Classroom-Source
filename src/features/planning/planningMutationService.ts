@@ -13,6 +13,15 @@ import {
   type ScheduleException,
   type SessionOccurrence,
 } from '@/domain/models/entities';
+import {
+  buildCategoryAssignmentChangePlan,
+  listCategoryAssignmentsForDeletion,
+  type CategorySelectionMap,
+} from '@/features/categories/categoryAssignmentSelection';
+import {
+  deleteCategoryAssignmentOperation,
+  putCategoryAssignmentOperation,
+} from '@/features/categories/categoryCommands';
 import { clearSupportedRedoBranch } from '@/features/editing/editCommandRegistry';
 import { notifyEditHistoryChanged } from '@/features/editing/editHistorySignal';
 import { resolveScheduleOccurrence } from '@/features/scheduleExceptions/scheduleOccurrenceResolver';
@@ -90,15 +99,23 @@ export class PlanningMutationService {
     this.now = dependencies.now ?? (() => new Date().toISOString());
   }
 
-  async createPlan(contextId: string, values: LessonPlanEditorValues): Promise<LessonPlan> {
+  async createPlan(
+    contextId: string,
+    values: LessonPlanEditorValues,
+    categorySelections?: CategorySelectionMap,
+  ): Promise<LessonPlan> {
     const parsed = parseLessonPlanEditorValues(values);
     const result = await this.db.transaction(
       'rw',
-      this.db.learnerContexts,
-      this.db.lessonSeries,
-      this.db.lessonPlans,
-      this.db.sessionOccurrences,
-      this.db.changeLog,
+      [
+        this.db.learnerContexts,
+        this.db.lessonSeries,
+        this.db.lessonPlans,
+        this.db.sessionOccurrences,
+        this.db.categoryValues,
+        this.db.categoryAssignments,
+        this.db.changeLog,
+      ],
       async (): Promise<CommitResult<LessonPlan>> => {
         const contextValue = await this.db.learnerContexts.get(contextId);
         if (!contextValue) throw new Error('Learner context no longer exists.');
@@ -136,12 +153,25 @@ export class PlanningMutationService {
           createdAt: timestamp,
           updatedAt: timestamp,
         });
+        const categoryPlan = await buildCategoryAssignmentChangePlan(
+          this.db,
+          'lesson-plan',
+          record.id,
+          {
+            selections: categorySelections,
+            useDefaultsForMissingFamilies: true,
+            createId: this.createId,
+            now: timestamp,
+          },
+        );
         const forwardOperations: PlanningOperation[] = [
           ...(assignment.createdSeries ? [putLessonSeriesOperation(assignment.createdSeries)] : []),
           ...normalizedSeriesPlans.map(putLessonPlanOperation),
           putLessonPlanOperation(record),
+          ...categoryPlan.forward,
         ];
         const inverseOperations: PlanningOperation[] = [
+          ...categoryPlan.inverse,
           deleteLessonPlanOperation(record.id),
           ...existingSeriesPlans.map(putLessonPlanOperation),
           ...(assignment.createdSeries
@@ -172,6 +202,7 @@ export class PlanningMutationService {
     contextId: string,
     values: LessonPlanEditorValues,
     input: ScheduleOccurrencePlanningTarget,
+    categorySelections?: CategorySelectionMap,
   ): Promise<CreatePlanForScheduleOccurrenceResult> {
     const parsed = parseLessonPlanEditorValues(values);
     const target = scheduleOccurrencePlanningTargetSchema.parse(input);
@@ -184,6 +215,8 @@ export class PlanningMutationService {
         this.db.sessionOccurrences,
         this.db.scheduleBlocks,
         this.db.scheduleExceptions,
+        this.db.categoryValues,
+        this.db.categoryAssignments,
         this.db.changeLog,
       ],
       async (): Promise<
@@ -285,6 +318,17 @@ export class PlanningMutationService {
           endMinute: occurrence.block.endMinute,
           deliveryState: 'scheduled',
         });
+        const categoryPlan = await buildCategoryAssignmentChangePlan(
+          this.db,
+          'lesson-plan',
+          plan.id,
+          {
+            selections: categorySelections,
+            useDefaultsForMissingFamilies: true,
+            createId: this.createId,
+            now: timestamp,
+          },
+        );
         const commands: PlanningCommandPair = {
           forward: createPlanningCommand([
             ...(assignment.createdSeries
@@ -293,8 +337,10 @@ export class PlanningMutationService {
             ...normalizedSeriesPlans.map(putLessonPlanOperation),
             putLessonPlanOperation(plan),
             putSessionOperation(session),
+            ...categoryPlan.forward,
           ]),
           inverse: createPlanningCommand([
+            ...categoryPlan.inverse,
             deleteSessionOperation(session.id),
             deleteLessonPlanOperation(plan.id),
             ...existingSeriesPlans.map(putLessonPlanOperation),
@@ -320,14 +366,22 @@ export class PlanningMutationService {
     return result.value;
   }
 
-  async updatePlan(id: string, values: LessonPlanEditorValues): Promise<LessonPlan> {
+  async updatePlan(
+    id: string,
+    values: LessonPlanEditorValues,
+    categorySelections?: CategorySelectionMap,
+  ): Promise<LessonPlan> {
     const parsed = parseLessonPlanEditorValues(values);
     const result = await this.db.transaction(
       'rw',
-      this.db.lessonSeries,
-      this.db.lessonPlans,
-      this.db.sessionOccurrences,
-      this.db.changeLog,
+      [
+        this.db.lessonSeries,
+        this.db.lessonPlans,
+        this.db.sessionOccurrences,
+        this.db.categoryValues,
+        this.db.categoryAssignments,
+        this.db.changeLog,
+      ],
       async (): Promise<CommitResult<LessonPlan>> => {
         const existing = await this.requirePlan(id);
         const timestamp = this.now();
@@ -399,14 +453,27 @@ export class PlanningMutationService {
         });
         const forwardPlans = uniquePlans([...afterPeers, updated]);
         const inversePlans = uniquePlans([...beforePeers, existing]);
+        const categoryPlan = await buildCategoryAssignmentChangePlan(
+          this.db,
+          'lesson-plan',
+          updated.id,
+          {
+            selections: categorySelections,
+            useDefaultsForMissingFamilies: false,
+            createId: this.createId,
+            now: timestamp,
+          },
+        );
         const commands: PlanningCommandPair = {
           forward: createPlanningCommand([
             ...(assignment.createdSeries
               ? [putLessonSeriesOperation(assignment.createdSeries)]
               : []),
             ...forwardPlans.map(putLessonPlanOperation),
+            ...categoryPlan.forward,
           ]),
           inverse: createPlanningCommand([
+            ...categoryPlan.inverse,
             ...inversePlans.map(putLessonPlanOperation),
             ...(assignment.createdSeries
               ? [deleteLessonSeriesOperation(assignment.createdSeries.id)]
@@ -435,6 +502,7 @@ export class PlanningMutationService {
       'rw',
       this.db.lessonPlans,
       this.db.sessionOccurrences,
+      this.db.categoryAssignments,
       this.db.changeLog,
       async () => {
         const existing = await this.requirePlan(id);
@@ -455,14 +523,21 @@ export class PlanningMutationService {
             updatedAt: plan.sequence === index ? plan.updatedAt : timestamp,
           }),
         );
+        const categoryAssignments = await listCategoryAssignmentsForDeletion(
+          this.db,
+          'lesson-plan',
+          existing.id,
+        );
         const commands: PlanningCommandPair = {
           forward: createPlanningCommand([
+            ...categoryAssignments.map((item) => deleteCategoryAssignmentOperation(item.id)),
             ...sessions.map((session) => deleteSessionOperation(session.id)),
             deleteLessonPlanOperation(id),
             ...normalizedPeers.map(putLessonPlanOperation),
           ]),
           inverse: createPlanningCommand([
             putLessonPlanOperation(existing),
+            ...categoryAssignments.map(putCategoryAssignmentOperation),
             ...sessions.map(putSessionOperation),
             ...peers.map(putLessonPlanOperation),
           ]),
@@ -1139,10 +1214,13 @@ export class PlanningMutationService {
       } else if (operation.table === 'lessonPlans') {
         if (operation.action === 'put') await this.db.lessonPlans.put(operation.record);
         else await this.db.lessonPlans.delete(operation.id);
+      } else if (operation.table === 'sessionOccurrences') {
+        if (operation.action === 'put') await this.db.sessionOccurrences.put(operation.record);
+        else await this.db.sessionOccurrences.delete(operation.id);
       } else if (operation.action === 'put') {
-        await this.db.sessionOccurrences.put(operation.record);
+        await this.db.categoryAssignments.put(operation.record);
       } else {
-        await this.db.sessionOccurrences.delete(operation.id);
+        await this.db.categoryAssignments.delete(operation.id);
       }
     }
   }

@@ -31,6 +31,8 @@ import {
   type SessionOccurrence,
 } from '@/domain/models/entities';
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
+import { CategoryAssignmentFields } from '@/features/categories/CategoryAssignmentFields';
+import { useCategorySelectionDraft } from '@/features/categories/useCategorySelectionDraft';
 import { LessonFlowEditor } from '@/features/planning/LessonFlowEditor';
 import { formatLessonSeriesPositionLabel } from '@/features/planning/lessonSeriesPresentation';
 import {
@@ -130,6 +132,7 @@ function PlanningEditorForm({
   const [saving, setSaving] = useState(false);
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const categoryDraft = useCategorySelectionDraft('lesson-plan', plan?.id);
   const activeSession = sessions.find(
     (session) => session.deliveryState === 'scheduled' || session.deliveryState === 'completed',
   );
@@ -262,6 +265,7 @@ function PlanningEditorForm({
             scheduleBlockId: planningOccurrence.block.id,
             date: planningOccurrence.date,
           },
+          categoryDraft.selections,
         );
         if (!result.created) {
           const params = new URLSearchParams({
@@ -285,8 +289,8 @@ function PlanningEditorForm({
       }
 
       const saved = plan
-        ? await service.updatePlan(plan.id, currentValues)
-        : await service.createPlan(selectedContext.id, currentValues);
+        ? await service.updatePlan(plan.id, currentValues, categoryDraft.selections)
+        : await service.createPlan(selectedContext.id, currentValues, categoryDraft.selections);
       if (scheduleAfterSave) {
         window.location.hash = buildSessionEditorHref({
           planId: saved.id,
@@ -459,6 +463,13 @@ function PlanningEditorForm({
           />
         </label>
       </div>
+
+      <CategoryAssignmentFields
+        snapshot={categoryDraft.snapshot}
+        selectedSets={categoryDraft.selectedSets}
+        disabled={saving}
+        onToggle={categoryDraft.toggle}
+      />
 
       <LessonFlowEditor
         idPrefix="planning-item"

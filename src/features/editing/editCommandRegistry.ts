@@ -191,10 +191,13 @@ export async function applySupportedEditCommand(
       if (operation.table === 'learnerNotices') {
         if (operation.action === 'put') await db.learnerNotices.put(operation.record);
         else await db.learnerNotices.delete(operation.id);
+      } else if (operation.table === 'tasks') {
+        if (operation.action === 'put') await db.tasks.put(operation.record);
+        else await db.tasks.delete(operation.id);
       } else if (operation.action === 'put') {
-        await db.tasks.put(operation.record);
+        await db.categoryAssignments.put(operation.record);
       } else {
-        await db.tasks.delete(operation.id);
+        await db.categoryAssignments.delete(operation.id);
       }
     }
     return;
@@ -202,8 +205,14 @@ export async function applySupportedEditCommand(
 
   if (parsed.entity === 'task') {
     for (const operation of parsed.command.operations) {
-      if (operation.action === 'put') await db.tasks.put(operation.record);
-      else await db.tasks.delete(operation.id);
+      if (operation.table === 'tasks') {
+        if (operation.action === 'put') await db.tasks.put(operation.record);
+        else await db.tasks.delete(operation.id);
+      } else if (operation.action === 'put') {
+        await db.categoryAssignments.put(operation.record);
+      } else {
+        await db.categoryAssignments.delete(operation.id);
+      }
     }
     return;
   }
@@ -232,10 +241,13 @@ export async function applySupportedEditCommand(
       } else if (operation.table === 'lessonPlans') {
         if (operation.action === 'put') await db.lessonPlans.put(operation.record);
         else await db.lessonPlans.delete(operation.id);
+      } else if (operation.table === 'sessionOccurrences') {
+        if (operation.action === 'put') await db.sessionOccurrences.put(operation.record);
+        else await db.sessionOccurrences.delete(operation.id);
       } else if (operation.action === 'put') {
-        await db.sessionOccurrences.put(operation.record);
+        await db.categoryAssignments.put(operation.record);
       } else {
-        await db.sessionOccurrences.delete(operation.id);
+        await db.categoryAssignments.delete(operation.id);
       }
     }
     return;
