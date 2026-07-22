@@ -19,15 +19,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-  type KeyboardEvent,
-  type ReactNode,
-} from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ZodError } from 'zod';
 
@@ -52,6 +44,7 @@ import {
 import { useLearnersReadModel } from '@/features/learners/useLearnersReadModel';
 import { useSchoolYears } from '@/features/schoolYears/useSchoolYears';
 import { parseLocalDate, todayLocalDate } from '@/shared/dates/localDate';
+import { useDismissibleDetailsMenu } from '@/shared/ui/useDismissibleDetailsMenu';
 
 import styles from './LearnersRoute.module.css';
 
@@ -522,19 +515,11 @@ function LearnerAddMenu({
   onSelect: (kind: LearnerContext['kind']) => void;
   label?: string;
 }) {
-  const menuRef = useRef<HTMLDetailsElement | null>(null);
-  const summaryRef = useRef<HTMLElement | null>(null);
-
-  function closeOnEscape(event: KeyboardEvent<HTMLDetailsElement>): void {
-    if (event.key !== 'Escape' || !menuRef.current?.open) return;
-    event.preventDefault();
-    menuRef.current.open = false;
-    summaryRef.current?.focus();
-  }
+  const menu = useDismissibleDetailsMenu({ preferredPlacement: 'auto' });
 
   function select(kind: LearnerContext['kind']): void {
     if (disabled) return;
-    if (menuRef.current) menuRef.current.open = false;
+    menu.close();
     onSelect(kind);
   }
 
@@ -547,12 +532,26 @@ function LearnerAddMenu({
   }
 
   return (
-    <details ref={menuRef} className={styles.addMenu} onKeyDown={closeOnEscape}>
-      <summary ref={summaryRef} className="button button-primary" aria-label="Add learner context">
+    <details
+      ref={menu.rootRef}
+      className={styles.addMenu}
+      onToggle={menu.onToggle}
+      onKeyDown={menu.onKeyDown}
+    >
+      <summary
+        ref={menu.summaryRef}
+        className="button button-primary"
+        aria-label="Add learner context"
+      >
         <Plus aria-hidden="true" size={17} /> {label}
         <ChevronDown aria-hidden="true" size={15} />
       </summary>
-      <div className={styles.addMenuPanel} role="group" aria-label="Add learner context options">
+      <div
+        ref={menu.panelRef}
+        className={styles.addMenuPanel}
+        role="group"
+        aria-label="Add learner context options"
+      >
         <button type="button" onClick={() => select('individual')}>
           <UserRound aria-hidden="true" size={17} />
           <span>
@@ -586,43 +585,76 @@ function LearnerContextMoreMenu({
   onSupport: () => void;
   onDetails: () => void;
 }) {
-  const menuRef = useRef<HTMLDetailsElement | null>(null);
-  const summaryRef = useRef<HTMLElement | null>(null);
+  const menu = useDismissibleDetailsMenu({ preferredPlacement: 'auto' });
 
-  function close(): void {
-    if (menuRef.current) menuRef.current.open = false;
-  }
-
-  function closeOnEscape(event: KeyboardEvent<HTMLDetailsElement>): void {
-    if (event.key !== 'Escape' || !menuRef.current?.open) return;
-    event.preventDefault();
-    close();
-    summaryRef.current?.focus();
+  function run(action: () => void): void {
+    menu.close();
+    action();
   }
 
   return (
-    <details ref={menuRef} className={styles.contextMoreMenu} onKeyDown={closeOnEscape}>
-      <summary ref={summaryRef} className="button">
+    <details
+      ref={menu.rootRef}
+      className={styles.contextMoreMenu}
+      onToggle={menu.onToggle}
+      onKeyDown={menu.onKeyDown}
+    >
+      <summary ref={menu.summaryRef} className="button">
         <MoreHorizontal aria-hidden="true" size={16} /> More
         <ChevronDown aria-hidden="true" size={14} />
       </summary>
-      <div role="group" aria-label="More learner actions">
-        <button
-          type="button"
-          onClick={() => {
-            close();
-            onSupport();
-          }}
-        >
+      <div ref={menu.panelRef} role="group" aria-label="More learner actions">
+        <button type="button" onClick={() => run(onSupport)}>
           Open support &amp; notices
         </button>
-        <button
-          type="button"
-          onClick={() => {
-            close();
-            onDetails();
-          }}
-        >
+        <button type="button" onClick={() => run(onDetails)}>
+          Manage details &amp; lifecycle
+        </button>
+      </div>
+    </details>
+  );
+}
+
+function LearnerDirectoryMoreMenu({
+  context,
+  onPlanning,
+  onSupport,
+  onDetails,
+}: {
+  context: LearnerContext;
+  onPlanning: () => void;
+  onSupport: () => void;
+  onDetails: () => void;
+}) {
+  const menu = useDismissibleDetailsMenu({ preferredPlacement: 'auto' });
+
+  function run(action: () => void): void {
+    menu.close();
+    action();
+  }
+
+  return (
+    <details
+      ref={menu.rootRef}
+      className={styles.directoryMoreMenu}
+      onToggle={menu.onToggle}
+      onKeyDown={menu.onKeyDown}
+    >
+      <summary
+        ref={menu.summaryRef}
+        aria-label={`More actions for ${context.name}`}
+        title={`More actions for ${context.name}`}
+      >
+        <MoreHorizontal aria-hidden="true" size={18} />
+      </summary>
+      <div ref={menu.panelRef} role="group" aria-label={`Actions for ${context.name}`}>
+        <button type="button" onClick={() => run(onPlanning)}>
+          Open planning
+        </button>
+        <button type="button" onClick={() => run(onSupport)}>
+          Open support &amp; notices
+        </button>
+        <button type="button" onClick={() => run(onDetails)}>
           Manage details &amp; lifecycle
         </button>
       </div>
@@ -1036,6 +1068,15 @@ export function LearnersRoute() {
     setSearchParams(nextParams);
   }
 
+  function openContextWorkspace(context: LearnerContext, view: LearnerWorkspaceView): void {
+    setEditRequest(0);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('context', context.id);
+    nextParams.set('status', context.status);
+    nextParams.set('workspace', view);
+    setSearchParams(nextParams);
+  }
+
   function selectContextStatus(status: LearnerContext['status']): void {
     setEditRequest(0);
     const nextParams = new URLSearchParams(searchParams);
@@ -1345,7 +1386,7 @@ export function LearnersRoute() {
                         {group.contexts.map((context) => {
                           const selected = context.id === model.selectedContext?.id;
                           return (
-                            <li key={context.id}>
+                            <li key={context.id} className={styles.contextListItem}>
                               <button
                                 className={`${styles.contextButton} ${
                                   selected ? styles.selectedContext : ''
@@ -1371,8 +1412,13 @@ export function LearnersRoute() {
                                         : ''}
                                   </small>
                                 </span>
-                                <MoreHorizontal aria-hidden="true" size={16} />
                               </button>
+                              <LearnerDirectoryMoreMenu
+                                context={context}
+                                onPlanning={() => openContextWorkspace(context, 'planning')}
+                                onSupport={() => openContextWorkspace(context, 'support')}
+                                onDetails={() => openContextWorkspace(context, 'details')}
+                              />
                             </li>
                           );
                         })}

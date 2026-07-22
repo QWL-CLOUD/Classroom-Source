@@ -1,7 +1,11 @@
 .root {
   position: relative;
-  z-index: 12;
+  z-index: 1;
   flex: 0 0 auto;
+}
+
+.root[open] {
+  z-index: 24;
 }
 
 .summary {
@@ -27,15 +31,24 @@
 
 .menu {
   position: absolute;
+  box-sizing: border-box;
   top: calc(100% + 8px);
   width: min(280px, calc(100vw - 32px));
+  max-height: var(--details-menu-max-height, min(420px, calc(100dvh - 32px)));
   display: grid;
   gap: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--surface-card);
   box-shadow: 0 18px 46px rgb(40 58 62 / 22%);
+}
+
+.root[data-menu-placement='top'] .menu {
+  top: auto;
+  bottom: calc(100% + 8px);
 }
 
 .alignEnd .menu {
