@@ -82,6 +82,26 @@ test('Learners provides a searchable directory, creation flow, and tabbed select
   await expect(directory.getByRole('button', { name: 'Open Anna Wang individual' })).toHaveCount(0);
   await directory.getByRole('button', { name: 'All' }).click();
 
+  const directoryMore = directory.getByLabel('More actions for Anna Wang');
+  const directoryActions = page.getByRole('group', { name: 'Actions for Anna Wang' });
+
+  await page.getByLabel('Add learner context', { exact: true }).click();
+  await directoryMore.click();
+  await expect(addMenu).toBeHidden();
+  await expect(directoryActions).toBeVisible();
+
+  await directoryMore.press('Escape');
+  await expect(directoryActions).toBeHidden();
+  await expect(directoryMore).toBeFocused();
+
+  await directoryMore.click();
+  await directoryActions.getByRole('button', { name: 'Open support & notices' }).click();
+  await expect(page.getByRole('tab', { name: 'Support & Notices', selected: true })).toBeVisible();
+
+  await directoryMore.click();
+  await directoryActions.getByRole('button', { name: 'Manage details & lifecycle' }).click();
+  await expect(page.getByRole('tab', { name: 'Details', selected: true })).toBeVisible();
+
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('region', { name: 'Learner contexts' })).toBeHidden();
   await expect(page.getByRole('region', { name: 'Selected learner context' })).toContainText(

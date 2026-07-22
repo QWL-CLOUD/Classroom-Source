@@ -4,7 +4,7 @@ import {
   buildPlanningEntryHref,
   type PlanningReturnTarget,
 } from '@/features/planning/planningNavigation';
-
+import { useDismissibleDetailsMenu } from './useDismissibleDetailsMenu';
 import styles from './WorkspaceAddMenu.module.css';
 
 interface WorkspaceAddMenuProps {
@@ -24,20 +24,28 @@ export function WorkspaceAddMenu({
   includeWorkspaceItems = false,
   align = 'end',
 }: WorkspaceAddMenuProps) {
+  const menu = useDismissibleDetailsMenu<HTMLElement>({
+    preferredPlacement: 'auto',
+  });
+
   return (
     <details
+      ref={menu.rootRef}
       className={`${styles.root} ${compact ? styles.compact : ''} ${
         align === 'start' ? styles.alignStart : styles.alignEnd
       }`}
+      onToggle={menu.onToggle}
+      onKeyDown={menu.onKeyDown}
     >
       <summary
+        ref={menu.summaryRef}
         className={`button ${compact ? styles.compactSummary : 'button-primary'} ${styles.summary}`}
         aria-label={`${label} to ${date}`}
       >
         <Plus aria-hidden="true" size={compact ? 16 : 18} />
         <span>{label}</span>
       </summary>
-      <nav className={styles.menu} aria-label={`Add items for ${date}`}>
+      <nav ref={menu.panelRef} className={styles.menu} aria-label={`Add items for ${date}`}>
         <a href={buildPlanningEntryHref({ date, returnTo })}>
           <CalendarPlus aria-hidden="true" size={17} />
           <span>

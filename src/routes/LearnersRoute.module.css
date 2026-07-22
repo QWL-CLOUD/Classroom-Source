@@ -1564,3 +1564,132 @@
     width: 100%;
   }
 }
+
+/* Global Floating Controls & Menus Repair */
+.contextListItem {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.contextListItem .contextButton {
+  min-width: 0;
+}
+
+.addMenu,
+.contextMoreMenu,
+.directoryMoreMenu {
+  position: relative;
+  z-index: 1;
+}
+
+.addMenu[open],
+.contextMoreMenu[open],
+.directoryMoreMenu[open] {
+  z-index: 24;
+}
+
+.addMenuPanel,
+.contextMoreMenu > div,
+.directoryMoreMenu > div {
+  box-sizing: border-box;
+  max-height: var(--details-menu-max-height, min(420px, calc(100dvh - 32px)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.addMenu[data-menu-placement='top'] .addMenuPanel {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+
+.contextMoreMenu[data-menu-placement='bottom'] > div {
+  top: calc(100% + 8px);
+  bottom: auto;
+}
+
+.directoryMoreMenu {
+  align-self: center;
+}
+
+.directoryMoreMenu > summary {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+  list-style: none;
+}
+
+.directoryMoreMenu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.directoryMoreMenu > summary:hover,
+.directoryMoreMenu > summary:focus-visible,
+.directoryMoreMenu[open] > summary {
+  color: var(--heading);
+  border-color: var(--border);
+  background: var(--surface-soft);
+}
+
+.directoryMoreMenu > div {
+  position: absolute;
+  z-index: 1;
+  top: calc(100% + 6px);
+  right: 0;
+  width: min(250px, calc(100vw - 32px));
+  display: grid;
+  gap: 5px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface-card);
+  box-shadow: 0 18px 46px rgb(40 58 62 / 22%);
+}
+
+.directoryMoreMenu[data-menu-placement='top'] > div {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.directoryMoreMenu > div button {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--heading);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  text-align: left;
+}
+
+.directoryMoreMenu > div button:hover,
+.directoryMoreMenu > div button:focus-visible {
+  background: var(--surface-soft);
+}
+
+.contextPanel,
+.contextGroups,
+.contextList {
+  overflow: visible;
+}
+
+@media (max-width: 680px) {
+  .directoryMoreMenu > div {
+    right: 0;
+    width: min(250px, calc(100vw - 28px));
+  }
+}

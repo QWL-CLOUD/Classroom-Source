@@ -246,6 +246,7 @@
 .topbar {
   position: sticky;
   z-index: 20;
+  isolation: isolate;
   top: 0;
   min-height: 72px;
   display: flex;
@@ -253,8 +254,9 @@
   align-items: center;
   justify-content: space-between;
   padding: 12px clamp(18px, 3vw, 34px);
-  background: rgb(244 246 244 / 94%);
+  background: var(--surface-app);
   border-bottom: 1px solid var(--border-soft);
+  box-shadow: 0 1px 0 rgb(40 58 62 / 4%);
   backdrop-filter: blur(18px);
 }
 
