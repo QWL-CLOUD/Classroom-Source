@@ -5,17 +5,29 @@ import {
   CalendarDays,
   CalendarPlus,
   CheckCircle2,
+  ChevronDown,
   Clock3,
   Layers3,
+  MoreHorizontal,
   Pencil,
+  Plus,
   RotateCcw,
   Save,
+  Search,
   Trash2,
   UserRound,
   Users,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ZodError } from 'zod';
 
@@ -378,12 +390,254 @@ function LessonSeriesCard({ item }: { item: LearnerLessonSeriesItem }) {
   );
 }
 
+function LearnerContextCreatePanel({
+  kind,
+  schoolYearId,
+  schoolYearLabel,
+  onCreated,
+  onCancel,
+}: {
+  kind: LearnerContext['kind'];
+  schoolYearId: string;
+  schoolYearLabel: string;
+  onCreated: (context: LearnerContext) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState('');
+  const [preferredName, setPreferredName] = useState('');
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const nameRef = useRef<HTMLInputElement | null>(null);
+  const kindLabel = getLearnerKindLabel(kind);
+
+  useEffect(() => {
+    nameRef.current?.focus();
+  }, [kind]);
+
+  async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
+    event.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const created = await learnerContextMutationService.create({
+        kind,
+        schoolYearId,
+        name,
+        preferredName: kind === 'individual' ? preferredName : undefined,
+        notes,
+      });
+      onCreated(created);
+    } catch (cause) {
+      setError(getContextMutationError(cause));
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className={`card ${styles.createPanel}`} aria-label={`Add ${kindLabel}`}>
+      <div className={styles.createPanelHeading}>
+        <div>
+          <p className="page-eyebrow">Add new</p>
+          <h2>Add {kindLabel}</h2>
+          <p>
+            Create an active {kindLabel.toLowerCase()} in {schoolYearLabel}. You can undo the whole
+            action.
+          </p>
+        </div>
+        <button className="button" type="button" disabled={saving} onClick={onCancel}>
+          <X aria-hidden="true" size={16} /> Cancel
+        </button>
+      </div>
+
+      <form className={styles.createForm} onSubmit={(event) => void submit(event)}>
+        <label>
+          <span>Name *</span>
+          <input
+            ref={nameRef}
+            value={name}
+            onChange={(event) => {
+              setName(event.target.value);
+              setError(null);
+            }}
+            placeholder={
+              kind === 'individual'
+                ? 'e.g. Anna Wang'
+                : kind === 'group'
+                  ? 'e.g. Grade 3 Reading Group'
+                  : 'e.g. Grade 3 Class'
+            }
+          />
+        </label>
+        {kind === 'individual' ? (
+          <label>
+            <span>Preferred name</span>
+            <input
+              value={preferredName}
+              onChange={(event) => {
+                setPreferredName(event.target.value);
+                setError(null);
+              }}
+              placeholder="e.g. Anna"
+            />
+          </label>
+        ) : null}
+        <label className={styles.createNotesField}>
+          <span>Notes</span>
+          <textarea
+            rows={3}
+            value={notes}
+            onChange={(event) => {
+              setNotes(event.target.value);
+              setError(null);
+            }}
+            placeholder="Optional context notes"
+          />
+        </label>
+        {error ? (
+          <p className={styles.createError} role="alert">
+            {error}
+          </p>
+        ) : null}
+        <div className={styles.createActions}>
+          <button className="button" type="button" disabled={saving} onClick={onCancel}>
+            Cancel
+          </button>
+          <button className="button button-primary" type="submit" disabled={saving}>
+            <Plus aria-hidden="true" size={16} /> {saving ? 'Adding…' : `Add ${kindLabel}`}
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
+
+function LearnerAddMenu({
+  disabled,
+  onSelect,
+  label = 'Add',
+}: {
+  disabled: boolean;
+  onSelect: (kind: LearnerContext['kind']) => void;
+  label?: string;
+}) {
+  const menuRef = useRef<HTMLDetailsElement | null>(null);
+  const summaryRef = useRef<HTMLElement | null>(null);
+
+  function closeOnEscape(event: KeyboardEvent<HTMLDetailsElement>): void {
+    if (event.key !== 'Escape' || !menuRef.current?.open) return;
+    event.preventDefault();
+    menuRef.current.open = false;
+    summaryRef.current?.focus();
+  }
+
+  function select(kind: LearnerContext['kind']): void {
+    if (disabled) return;
+    if (menuRef.current) menuRef.current.open = false;
+    onSelect(kind);
+  }
+
+  if (disabled) {
+    return (
+      <a className="button" href="#/settings#school-years">
+        Manage school years
+      </a>
+    );
+  }
+
+  return (
+    <details ref={menuRef} className={styles.addMenu} onKeyDown={closeOnEscape}>
+      <summary ref={summaryRef} className="button button-primary" aria-label="Add learner context">
+        <Plus aria-hidden="true" size={17} /> {label}
+        <ChevronDown aria-hidden="true" size={15} />
+      </summary>
+      <div className={styles.addMenuPanel} role="group" aria-label="Add learner context options">
+        <button type="button" onClick={() => select('individual')}>
+          <UserRound aria-hidden="true" size={17} />
+          <span>
+            <strong>Add Individual</strong>
+            <small>Create a new learner</small>
+          </span>
+        </button>
+        <button type="button" onClick={() => select('group')}>
+          <Layers3 aria-hidden="true" size={17} />
+          <span>
+            <strong>Add Group</strong>
+            <small>Create a new group</small>
+          </span>
+        </button>
+        <button type="button" onClick={() => select('class')}>
+          <Users aria-hidden="true" size={17} />
+          <span>
+            <strong>Add Class</strong>
+            <small>Create a new class</small>
+          </span>
+        </button>
+      </div>
+    </details>
+  );
+}
+
+function LearnerContextMoreMenu({
+  onSupport,
+  onDetails,
+}: {
+  onSupport: () => void;
+  onDetails: () => void;
+}) {
+  const menuRef = useRef<HTMLDetailsElement | null>(null);
+  const summaryRef = useRef<HTMLElement | null>(null);
+
+  function close(): void {
+    if (menuRef.current) menuRef.current.open = false;
+  }
+
+  function closeOnEscape(event: KeyboardEvent<HTMLDetailsElement>): void {
+    if (event.key !== 'Escape' || !menuRef.current?.open) return;
+    event.preventDefault();
+    close();
+    summaryRef.current?.focus();
+  }
+
+  return (
+    <details ref={menuRef} className={styles.contextMoreMenu} onKeyDown={closeOnEscape}>
+      <summary ref={summaryRef} className="button">
+        <MoreHorizontal aria-hidden="true" size={16} /> More
+        <ChevronDown aria-hidden="true" size={14} />
+      </summary>
+      <div role="group" aria-label="More learner actions">
+        <button
+          type="button"
+          onClick={() => {
+            close();
+            onSupport();
+          }}
+        >
+          Open support &amp; notices
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            close();
+            onDetails();
+          }}
+        >
+          Manage details &amp; lifecycle
+        </button>
+      </div>
+    </details>
+  );
+}
+
 function LearnerContextLifecycleCard({
   context,
+  editRequest,
   onStatusChanged,
   onDeleted,
 }: {
   context: LearnerContext;
+  editRequest: number;
   onStatusChanged: (status: LearnerContext['status']) => void;
   onDeleted: () => void;
 }) {
@@ -394,6 +648,7 @@ function LearnerContextLifecycleCard({
     notes: context.notes ?? '',
   }));
   const [saving, setSaving] = useState(false);
+  const handledEditRequest = useRef(0);
   const [deleteImpact, setDeleteImpact] = useState<LearnerContextDeleteImpact | null>(null);
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -402,6 +657,31 @@ function LearnerContextLifecycleCard({
     setDeleteImpact(null);
     setDeleteArmed(false);
   }
+
+  function openEditor(): void {
+    setEditing(true);
+    setValues({
+      name: context.name,
+      preferredName: context.preferredName ?? '',
+      notes: context.notes ?? '',
+    });
+    setError(null);
+    resetDeleteState();
+  }
+
+  useEffect(() => {
+    if (editRequest <= handledEditRequest.current) return;
+    handledEditRequest.current = editRequest;
+    setEditing(true);
+    setValues({
+      name: context.name,
+      preferredName: context.preferredName ?? '',
+      notes: context.notes ?? '',
+    });
+    setError(null);
+    setDeleteImpact(null);
+    setDeleteArmed(false);
+  }, [context.name, context.notes, context.preferredName, editRequest]);
 
   async function saveDetails(): Promise<void> {
     if (saving) return;
@@ -473,22 +753,13 @@ function LearnerContextLifecycleCard({
   return (
     <section className={`card ${styles.contextSummary}`} aria-label={`${context.name} details`}>
       <div className={styles.contextSummaryHeader}>
-        <div className={styles.contextIdentity}>
-          <span className={styles.contextIconLarge}>{contextKindIcon(context.kind)}</span>
-          <div>
-            <div className={styles.contextTitleRow}>
-              <p className="page-eyebrow">{getLearnerKindLabel(context.kind)} planning</p>
-              <span
-                className={`${styles.contextStatusBadge} ${
-                  context.status === 'archived' ? styles.archivedBadge : ''
-                }`}
-              >
-                {context.status === 'archived' ? 'Archived' : 'Active'}
-              </span>
-            </div>
-            <h2>{context.name}</h2>
-            {context.preferredName ? <p>Preferred name: {context.preferredName}</p> : null}
-          </div>
+        <div>
+          <p className="page-eyebrow">Details</p>
+          <h2>Context details</h2>
+          <p className={styles.detailsIntro}>
+            Update identity and notes, or manage the context lifecycle without changing teaching
+            history.
+          </p>
         </div>
         <div className={styles.contextActions}>
           <button
@@ -496,14 +767,12 @@ function LearnerContextLifecycleCard({
             type="button"
             disabled={saving}
             onClick={() => {
-              setEditing((current) => !current);
-              setValues({
-                name: context.name,
-                preferredName: context.preferredName ?? '',
-                notes: context.notes ?? '',
-              });
-              setError(null);
-              resetDeleteState();
+              if (editing) {
+                setEditing(false);
+                setError(null);
+              } else {
+                openEditor();
+              }
             }}
           >
             {editing ? <X aria-hidden="true" size={16} /> : <Pencil aria-hidden="true" size={16} />}
@@ -539,6 +808,23 @@ function LearnerContextLifecycleCard({
           </button>
         </div>
       </div>
+
+      <dl className={styles.contextFacts}>
+        <div>
+          <dt>Type</dt>
+          <dd>{getLearnerKindLabel(context.kind)}</dd>
+        </div>
+        <div>
+          <dt>Status</dt>
+          <dd>{context.status === 'active' ? 'Active' : 'Archived'}</dd>
+        </div>
+        {context.preferredName ? (
+          <div>
+            <dt>Preferred name</dt>
+            <dd>{context.preferredName}</dd>
+          </div>
+        ) : null}
+      </dl>
 
       {editing ? (
         <div className={styles.contextEditForm}>
@@ -587,7 +873,9 @@ function LearnerContextLifecycleCard({
         </div>
       ) : context.notes ? (
         <p className={styles.contextNotes}>{context.notes}</p>
-      ) : null}
+      ) : (
+        <p className={styles.contextNotesEmpty}>No notes have been added.</p>
+      )}
 
       {context.status === 'archived' ? (
         <div className={styles.archivedNotice} role="status">
@@ -655,6 +943,21 @@ function emptyPlanningMessage(view: LearnerPlanningView): string {
   return 'No unscheduled lesson plans for this learner context.';
 }
 
+type LearnerWorkspaceView = 'planning' | 'support' | 'details';
+type LearnerDirectoryKind = 'all' | LearnerContext['kind'];
+
+function isWorkspaceView(value: string | null): value is LearnerWorkspaceView {
+  return value === 'planning' || value === 'support' || value === 'details';
+}
+
+function contextMatchesQuery(context: LearnerContext, query: string): boolean {
+  const normalized = query.trim().toLocaleLowerCase('en');
+  if (!normalized) return true;
+  return [context.name, context.preferredName, context.notes]
+    .filter((value): value is string => Boolean(value))
+    .some((value) => value.toLocaleLowerCase('en').includes(normalized));
+}
+
 export function LearnersRoute() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedContextId = searchParams.get('context') ?? undefined;
@@ -666,6 +969,12 @@ export function LearnersRoute() {
   const planningView: LearnerPlanningView = isPlanningView(rawPlanningView)
     ? rawPlanningView
     : 'upcoming';
+  const rawWorkspaceView = searchParams.get('workspace');
+  const workspaceView: LearnerWorkspaceView = isWorkspaceView(rawWorkspaceView)
+    ? rawWorkspaceView
+    : searchParams.has('support')
+      ? 'support'
+      : 'planning';
   const rawDate = searchParams.get('date');
   const anchorDate = parseLocalDate(rawDate) ? rawDate! : todayLocalDate();
   const requestedSchoolYearId = searchParams.get('schoolYear') ?? undefined;
@@ -675,6 +984,10 @@ export function LearnersRoute() {
     preferredContextStatus,
     requestedSchoolYearId,
   );
+  const [directoryQuery, setDirectoryQuery] = useState('');
+  const [directoryKind, setDirectoryKind] = useState<LearnerDirectoryKind>('all');
+  const [createKind, setCreateKind] = useState<LearnerContext['kind'] | null>(null);
+  const [editRequest, setEditRequest] = useState(0);
   const selectedRequestedContext =
     state.status === 'ready' && state.data.selectedContext?.id === requestedContextId
       ? state.data.selectedContext
@@ -689,6 +1002,7 @@ export function LearnersRoute() {
     nextParams.set('status', selectedRequestedContext.status);
     setSearchParams(nextParams, { replace: true });
   }, [rawContextStatus, searchParams, selectedRequestedContext, setSearchParams]);
+
   const model = useMemo(
     () =>
       state.status === 'ready'
@@ -704,14 +1018,18 @@ export function LearnersRoute() {
   }
 
   function selectSchoolYear(schoolYearId: string): void {
+    setEditRequest(0);
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set('schoolYear', schoolYearId);
     nextParams.delete('context');
     nextParams.set('status', 'active');
+    nextParams.set('workspace', 'planning');
+    setCreateKind(null);
     setSearchParams(nextParams);
   }
 
   function selectContext(context: LearnerContext): void {
+    setEditRequest(0);
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set('context', context.id);
     nextParams.set('status', context.status);
@@ -719,6 +1037,7 @@ export function LearnersRoute() {
   }
 
   function selectContextStatus(status: LearnerContext['status']): void {
+    setEditRequest(0);
     const nextParams = new URLSearchParams(searchParams);
     const nextContext =
       state.status === 'ready'
@@ -728,6 +1047,10 @@ export function LearnersRoute() {
     if (nextContext) nextParams.set('context', nextContext.id);
     else nextParams.delete('context');
     setSearchParams(nextParams);
+  }
+
+  function selectWorkspace(view: LearnerWorkspaceView): void {
+    updateSearchParam('workspace', view);
   }
 
   function keepSelectedContextInStatus(status: LearnerContext['status']): void {
@@ -742,7 +1065,24 @@ export function LearnersRoute() {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete('context');
     nextParams.set('status', contextStatus);
+    nextParams.set('workspace', 'planning');
     setSearchParams(nextParams);
+  }
+
+  function handleCreated(context: LearnerContext): void {
+    setCreateKind(null);
+    setDirectoryKind(context.kind);
+    setDirectoryQuery('');
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('context', context.id);
+    nextParams.set('status', 'active');
+    nextParams.set('workspace', 'planning');
+    setSearchParams(nextParams);
+  }
+
+  function editSelectedContext(): void {
+    selectWorkspace('details');
+    setEditRequest((current) => current + 1);
   }
 
   const planningItems = model
@@ -755,15 +1095,30 @@ export function LearnersRoute() {
           : []
     : [];
 
+  const selectedSchoolYear = state.status === 'ready' ? state.data.activeSchoolYear : null;
+  const canCreate = Boolean(selectedSchoolYear && selectedSchoolYear.lifecycleState !== 'archived');
+  const filteredContextGroups = model
+    ? model.contextGroups
+        .filter((group) => directoryKind === 'all' || group.kind === directoryKind)
+        .map((group) => ({
+          ...group,
+          contexts: group.contexts.filter((context) =>
+            contextMatchesQuery(context, directoryQuery),
+          ),
+        }))
+    : [];
+  const filteredContextCount = filteredContextGroups.reduce(
+    (total, group) => total + group.contexts.length,
+    0,
+  );
+
   return (
-    <section>
-      <header className="page-header">
+    <section className={styles.learnersPage}>
+      <header className={styles.pageHeader}>
         <div>
           <p className="page-eyebrow">Workspace</p>
-          <h1 className="page-title">Learners</h1>
-          <p className="page-subtitle">
-            Open a Class, Group, or Individual to review planning, support, and context settings.
-          </p>
+          <h1>Learners</h1>
+          <p>Find a Class, Group, or Individual, then work in Planning, Support, or Details.</p>
         </div>
         <div className={styles.headerTools}>
           {schoolYearsState.status === 'ready' && schoolYearsState.data.items.length > 0 ? (
@@ -786,21 +1141,21 @@ export function LearnersRoute() {
                 ))}
               </select>
             </label>
-          ) : (
-            <a className="button" href="#/settings#school-years">
-              Manage school years
-            </a>
-          )}
-          {model ? (
-            <div className={styles.summary} aria-label="Learner context counts">
-              <span>{model.contextCounts.class} Active Classes</span>
-              <span>{model.contextCounts.group} Active Groups</span>
-              <span>{model.contextCounts.individual} Active Individuals</span>
-              <span>{model.contextStatusCounts.archived} Archived</span>
-            </div>
           ) : null}
+          <LearnerAddMenu disabled={!canCreate} onSelect={setCreateKind} />
         </div>
       </header>
+
+      {createKind && selectedSchoolYear ? (
+        <LearnerContextCreatePanel
+          key={`${createKind}:${selectedSchoolYear.id}`}
+          kind={createKind}
+          schoolYearId={selectedSchoolYear.id}
+          schoolYearLabel={selectedSchoolYear.label}
+          onCreated={handleCreated}
+          onCancel={() => setCreateKind(null)}
+        />
+      ) : null}
 
       {state.status === 'loading' ? (
         <div className={`card ${styles.statePanel}`} role="status">
@@ -820,318 +1175,481 @@ export function LearnersRoute() {
       ) : null}
 
       {state.status === 'ready' && model ? (
-        state.data.contexts.length > 0 ? (
-          <>
+        <>
+          {model.selectedContext ? (
             <div
               className={styles.mobileContextSummary}
               role="region"
               aria-label="Selected learner context"
             >
-              {model.selectedContext ? (
-                <div className={styles.mobileSelectedContext}>
-                  <span className={styles.contextIconLarge}>
-                    {contextKindIcon(model.selectedContext.kind)}
-                  </span>
-                  <span>
-                    <strong>{model.selectedContext.name}</strong>
-                    <small>
-                      {getLearnerKindLabel(model.selectedContext.kind)} ·{' '}
-                      {model.selectedContext.status === 'active' ? 'Active' : 'Archived'}
-                    </small>
-                  </span>
-                </div>
-              ) : null}
-              <details className={styles.mobileContextPicker}>
-                <summary className="button">Change learner</summary>
-                <div className={styles.mobilePickerPanel}>
-                  <div className={styles.lifecycleTabs} role="group" aria-label="Context lifecycle">
-                    <button
-                      className={contextStatus === 'active' ? styles.activeLifecycleTab : ''}
-                      type="button"
-                      aria-pressed={contextStatus === 'active'}
-                      onClick={() => selectContextStatus('active')}
+              <div className={styles.mobileSelectedContext}>
+                <span className={styles.contextIconLarge}>
+                  {contextKindIcon(model.selectedContext.kind)}
+                </span>
+                <span>
+                  <strong>{model.selectedContext.name}</strong>
+                  <small>
+                    {getLearnerKindLabel(model.selectedContext.kind)} ·{' '}
+                    {model.selectedContext.status === 'active' ? 'Active' : 'Archived'}
+                  </small>
+                </span>
+              </div>
+              <div className={styles.mobileSelectedActions}>
+                <details className={styles.mobileContextPicker}>
+                  <summary className="button">Change learner</summary>
+                  <div className={styles.mobilePickerPanel}>
+                    <div
+                      className={styles.lifecycleTabs}
+                      role="group"
+                      aria-label="Context lifecycle"
                     >
-                      Active <span>{model.contextStatusCounts.active}</span>
-                    </button>
-                    <button
-                      className={contextStatus === 'archived' ? styles.activeLifecycleTab : ''}
-                      type="button"
-                      aria-pressed={contextStatus === 'archived'}
-                      onClick={() => selectContextStatus('archived')}
-                    >
-                      Archived <span>{model.contextStatusCounts.archived}</span>
-                    </button>
+                      <button
+                        className={contextStatus === 'active' ? styles.activeLifecycleTab : ''}
+                        type="button"
+                        aria-pressed={contextStatus === 'active'}
+                        onClick={() => selectContextStatus('active')}
+                      >
+                        Active <span>{model.contextStatusCounts.active}</span>
+                      </button>
+                      <button
+                        className={contextStatus === 'archived' ? styles.activeLifecycleTab : ''}
+                        type="button"
+                        aria-pressed={contextStatus === 'archived'}
+                        onClick={() => selectContextStatus('archived')}
+                      >
+                        Archived <span>{model.contextStatusCounts.archived}</span>
+                      </button>
+                    </div>
+                    <label className={styles.mobileContextSelect}>
+                      <span>Class, Group, or Individual</span>
+                      <select
+                        value={model.selectedContext.id}
+                        onChange={(event) => {
+                          const context = state.data.contexts.find(
+                            (candidate) => candidate.id === event.target.value,
+                          );
+                          if (context) selectContext(context);
+                        }}
+                      >
+                        {model.contextGroups.flatMap((group) =>
+                          group.contexts.map((context) => (
+                            <option key={context.id} value={context.id}>
+                              {context.name} · {group.label.replace(/s$/, '')}
+                            </option>
+                          )),
+                        )}
+                      </select>
+                    </label>
                   </div>
-                  <label className={styles.mobileContextSelect}>
-                    <span>Class, Group, or Individual</span>
-                    <select
-                      value={model.selectedContext?.id ?? ''}
-                      onChange={(event) => {
-                        const context = state.data.contexts.find(
-                          (candidate) => candidate.id === event.target.value,
-                        );
-                        if (context) selectContext(context);
-                      }}
-                    >
-                      {model.contextGroups.flatMap((group) =>
-                        group.contexts.map((context) => (
-                          <option key={context.id} value={context.id}>
-                            {context.name} · {group.label.replace(/s$/, '')}
-                          </option>
-                        )),
-                      )}
-                    </select>
-                  </label>
-                </div>
-              </details>
+                </details>
+                {model.selectedContext.status === 'active' ? (
+                  <a
+                    className="button button-primary"
+                    href={`#/planning/edit?context=${encodeURIComponent(model.selectedContext.id)}`}
+                  >
+                    <CalendarPlus aria-hidden="true" size={16} /> New plan
+                  </a>
+                ) : null}
+              </div>
             </div>
+          ) : null}
 
-            <div className={styles.layout}>
-              <section
-                className={`card ${styles.contextPanel}`}
-                role="region"
-                aria-label="Learner contexts"
-              >
-                <div className={styles.contextPanelHeader}>
-                  <div>
-                    <p className="page-eyebrow">
-                      {contextStatus === 'active' ? 'Active contexts' : 'Archived contexts'}
-                    </p>
-                    <h2>{model.activeSchoolYearLabel}</h2>
-                  </div>
-                  <span>{model.contextStatusCounts[contextStatus]}</span>
+          <div className={styles.layout}>
+            <section
+              className={`card ${styles.contextPanel}`}
+              role="region"
+              aria-label="Learner contexts"
+            >
+              <div className={styles.directoryHeader}>
+                <div>
+                  <p className="page-eyebrow">Learners directory</p>
+                  <h2>{model.activeSchoolYearLabel}</h2>
                 </div>
+                <span>{model.contextStatusCounts[contextStatus]}</span>
+              </div>
 
-                <div className={styles.lifecycleTabs} role="group" aria-label="Context lifecycle">
-                  <button
-                    className={contextStatus === 'active' ? styles.activeLifecycleTab : ''}
-                    type="button"
-                    aria-pressed={contextStatus === 'active'}
-                    onClick={() => selectContextStatus('active')}
-                  >
-                    Active <span>{model.contextStatusCounts.active}</span>
-                  </button>
-                  <button
-                    className={contextStatus === 'archived' ? styles.activeLifecycleTab : ''}
-                    type="button"
-                    aria-pressed={contextStatus === 'archived'}
-                    onClick={() => selectContextStatus('archived')}
-                  >
-                    Archived <span>{model.contextStatusCounts.archived}</span>
-                  </button>
-                </div>
+              <label className={styles.directorySearch}>
+                <Search aria-hidden="true" size={17} />
+                <span className={styles.visuallyHidden}>Search learners</span>
+                <input
+                  type="search"
+                  value={directoryQuery}
+                  placeholder="Search learners…"
+                  onChange={(event) => setDirectoryQuery(event.target.value)}
+                />
+              </label>
 
-                <div className={styles.contextGroups}>
-                  {model.contextGroups.map((group) => (
-                    <section
-                      key={`${contextStatus}-${group.kind}`}
-                      aria-labelledby={`learner-${contextStatus}-${group.kind}-heading`}
-                    >
-                      <div className={styles.groupHeading}>
-                        <h3 id={`learner-${contextStatus}-${group.kind}-heading`}>{group.label}</h3>
+              <div className={styles.kindFilters} role="group" aria-label="Learner type">
+                {(
+                  [
+                    ['all', 'All'],
+                    ['individual', 'Individuals'],
+                    ['group', 'Groups'],
+                    ['class', 'Classes'],
+                  ] as const
+                ).map(([kind, label]) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    aria-pressed={directoryKind === kind}
+                    className={directoryKind === kind ? styles.activeKindFilter : ''}
+                    onClick={() => setDirectoryKind(kind)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className={styles.lifecycleTabs} role="group" aria-label="Context lifecycle">
+                <button
+                  className={contextStatus === 'active' ? styles.activeLifecycleTab : ''}
+                  type="button"
+                  aria-pressed={contextStatus === 'active'}
+                  onClick={() => selectContextStatus('active')}
+                >
+                  Active <span>{model.contextStatusCounts.active}</span>
+                </button>
+                <button
+                  className={contextStatus === 'archived' ? styles.activeLifecycleTab : ''}
+                  type="button"
+                  aria-pressed={contextStatus === 'archived'}
+                  onClick={() => selectContextStatus('archived')}
+                >
+                  Archived <span>{model.contextStatusCounts.archived}</span>
+                </button>
+              </div>
+
+              <div className={styles.contextGroups}>
+                {filteredContextGroups.map((group) => (
+                  <section
+                    key={`${contextStatus}-${group.kind}`}
+                    aria-labelledby={`learner-${contextStatus}-${group.kind}-heading`}
+                  >
+                    <div className={styles.groupHeading}>
+                      <h3 id={`learner-${contextStatus}-${group.kind}-heading`}>{group.label}</h3>
+                      <div>
                         <span>{group.contexts.length}</span>
+                        {contextStatus === 'active' && canCreate ? (
+                          <button
+                            type="button"
+                            aria-label={`Add ${getLearnerKindLabel(group.kind)}`}
+                            onClick={() => setCreateKind(group.kind)}
+                          >
+                            <Plus aria-hidden="true" size={15} /> Add
+                          </button>
+                        ) : null}
                       </div>
-                      {group.contexts.length > 0 ? (
-                        <ul className={styles.contextList}>
-                          {group.contexts.map((context) => {
-                            const selected = context.id === model.selectedContext?.id;
-                            return (
-                              <li key={context.id}>
-                                <button
-                                  className={`${styles.contextButton} ${
-                                    selected ? styles.selectedContext : ''
-                                  }`}
-                                  type="button"
-                                  aria-pressed={selected}
-                                  aria-label={`Open ${context.name} ${getLearnerKindLabel(
-                                    context.kind,
-                                  ).toLowerCase()}`}
-                                  onClick={() => selectContext(context)}
-                                >
-                                  <span className={styles.contextIcon}>
-                                    {contextKindIcon(context.kind)}
-                                  </span>
-                                  <span>
-                                    <strong>{context.name}</strong>
-                                    <small>
-                                      {getLearnerKindLabel(context.kind)}
-                                      {context.status === 'archived' ? ' · Archived' : ''}
-                                    </small>
-                                  </span>
-                                </button>
-                              </li>
-                            );
-                          })}
-                        </ul>
+                    </div>
+                    {group.contexts.length > 0 ? (
+                      <ul className={styles.contextList}>
+                        {group.contexts.map((context) => {
+                          const selected = context.id === model.selectedContext?.id;
+                          return (
+                            <li key={context.id}>
+                              <button
+                                className={`${styles.contextButton} ${
+                                  selected ? styles.selectedContext : ''
+                                }`}
+                                type="button"
+                                aria-pressed={selected}
+                                aria-label={`Open ${context.name} ${getLearnerKindLabel(
+                                  context.kind,
+                                ).toLowerCase()}`}
+                                onClick={() => selectContext(context)}
+                              >
+                                <span className={styles.contextIcon}>
+                                  {contextKindIcon(context.kind)}
+                                </span>
+                                <span>
+                                  <strong>{context.name}</strong>
+                                  <small>
+                                    {getLearnerKindLabel(context.kind)}
+                                    {context.preferredName
+                                      ? ` · ${context.preferredName}`
+                                      : context.status === 'archived'
+                                        ? ' · Archived'
+                                        : ''}
+                                  </small>
+                                </span>
+                                <MoreHorizontal aria-hidden="true" size={16} />
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <p className={styles.emptyGroup}>
+                        No matching {contextStatus} {group.label.toLowerCase()}.
+                      </p>
+                    )}
+                  </section>
+                ))}
+                {filteredContextCount === 0 ? (
+                  <p className={styles.directoryEmpty} role="status">
+                    No learner contexts match these filters.
+                  </p>
+                ) : null}
+              </div>
+            </section>
+
+            {model.selectedContext ? (
+              <section
+                className={styles.planningPanel}
+                role="region"
+                aria-label={`Planning for ${model.selectedContext.name}`}
+              >
+                <section className={`card ${styles.selectedContextHeader}`}>
+                  <div className={styles.contextIdentity}>
+                    <span className={styles.contextIconLarge}>
+                      {contextKindIcon(model.selectedContext.kind)}
+                    </span>
+                    <div>
+                      <div className={styles.contextTitleRow}>
+                        <h2>{model.selectedContext.name}</h2>
+                        <span
+                          className={`${styles.contextStatusBadge} ${
+                            model.selectedContext.status === 'archived' ? styles.archivedBadge : ''
+                          }`}
+                        >
+                          {model.selectedContext.status === 'archived' ? 'Archived' : 'Active'}
+                        </span>
+                      </div>
+                      <p>
+                        {getLearnerKindLabel(model.selectedContext.kind)}
+                        {model.selectedContext.preferredName
+                          ? ` · Preferred name: ${model.selectedContext.preferredName}`
+                          : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className={styles.selectedContextActions}>
+                    {model.selectedContext.status === 'active' ? (
+                      <a
+                        className="button button-primary"
+                        href={`#/planning/edit?context=${encodeURIComponent(model.selectedContext.id)}`}
+                      >
+                        <CalendarPlus aria-hidden="true" size={16} /> New plan
+                      </a>
+                    ) : null}
+                    <button className="button" type="button" onClick={editSelectedContext}>
+                      <Pencil aria-hidden="true" size={16} /> Edit
+                    </button>
+                    <LearnerContextMoreMenu
+                      onSupport={() => selectWorkspace('support')}
+                      onDetails={() => selectWorkspace('details')}
+                    />
+                  </div>
+                </section>
+
+                <div className={styles.workspaceTabs} role="tablist" aria-label="Learner workspace">
+                  {(
+                    [
+                      ['planning', 'Planning'],
+                      ['support', 'Support & Notices'],
+                      ['details', 'Details'],
+                    ] as const
+                  ).map(([view, label]) => (
+                    <button
+                      key={view}
+                      id={`learner-workspace-tab-${view}`}
+                      type="button"
+                      role="tab"
+                      aria-selected={workspaceView === view}
+                      aria-controls={`learner-workspace-panel-${view}`}
+                      className={workspaceView === view ? styles.activeWorkspaceTab : ''}
+                      onClick={() => selectWorkspace(view)}
+                    >
+                      {view === 'planning' ? (
+                        <CalendarDays aria-hidden="true" size={17} />
+                      ) : view === 'support' ? (
+                        <BookOpen aria-hidden="true" size={17} />
                       ) : (
-                        <p className={styles.emptyGroup}>
-                          No {contextStatus} {group.label.toLowerCase()}.
-                        </p>
+                        <Pencil aria-hidden="true" size={17} />
                       )}
-                    </section>
+                      {label}
+                    </button>
                   ))}
                 </div>
-              </section>
 
-              {model.selectedContext ? (
                 <section
-                  className={styles.planningPanel}
-                  role="region"
-                  aria-label={`Planning for ${model.selectedContext.name}`}
+                  id="learner-workspace-panel-planning"
+                  hidden={workspaceView !== 'planning'}
+                  className={`card ${styles.planningWorkspace}`}
+                  role="tabpanel"
+                  aria-labelledby="learner-workspace-tab-planning"
                 >
-                  <section className={`card ${styles.planningWorkspace}`}>
-                    <div className={styles.planningHeader}>
-                      <div>
-                        <p className="page-eyebrow">Planning</p>
-                        <h2>{planningViewLabels[planningView]}</h2>
-                      </div>
-                      <div className={styles.planningActions}>
-                        {planningView === 'upcoming' ? (
-                          <div className={styles.dateControls}>
-                            <label>
-                              <span>From</span>
-                              <input
-                                className="input"
-                                type="date"
-                                value={anchorDate}
-                                onChange={(event) => updateSearchParam('date', event.target.value)}
-                              />
-                            </label>
-                            <button
-                              className="button"
-                              type="button"
-                              onClick={() => updateSearchParam('date', todayLocalDate())}
-                            >
-                              Today
-                            </button>
-                          </div>
-                        ) : null}
-                        {model.selectedContext.status === 'active' ? (
-                          <a
-                            className="button button-primary"
-                            href={`#/planning/edit?context=${encodeURIComponent(model.selectedContext.id)}`}
-                          >
-                            <CalendarPlus aria-hidden="true" size={16} /> New plan
-                          </a>
-                        ) : (
-                          <span className={styles.archivedPlanRestriction}>
-                            Restore this context to add a Plan.
-                          </span>
-                        )}
-                      </div>
+                  <div className={styles.planningHeader}>
+                    <div>
+                      <p className="page-eyebrow">Planning</p>
+                      <h2>{planningViewLabels[planningView]}</h2>
                     </div>
-
-                    <div className={styles.tabs} role="tablist" aria-label="Learner planning views">
-                      {(Object.keys(planningViewLabels) as LearnerPlanningView[]).map((view) => {
-                        const count =
-                          view === 'upcoming'
-                            ? model.upcomingItems.length
-                            : view === 'unscheduled'
-                              ? model.unscheduledItems.length
-                              : view === 'completed'
-                                ? model.completedItems.length
-                                : model.seriesItems.length;
-                        return (
+                    <div className={styles.planningActions}>
+                      {planningView === 'upcoming' ? (
+                        <div className={styles.dateControls}>
+                          <label>
+                            <span>From</span>
+                            <input
+                              className="input"
+                              type="date"
+                              value={anchorDate}
+                              onChange={(event) => updateSearchParam('date', event.target.value)}
+                            />
+                          </label>
                           <button
-                            key={view}
-                            id={`learner-planning-tab-${view}`}
-                            className={planningView === view ? styles.activeTab : ''}
+                            className="button"
                             type="button"
-                            role="tab"
-                            aria-selected={planningView === view}
-                            aria-controls="learner-planning-panel"
-                            onClick={() => updateSearchParam('planning', view)}
+                            onClick={() => updateSearchParam('date', todayLocalDate())}
                           >
-                            {planningViewLabels[view]} <span>{count}</span>
+                            Today
                           </button>
-                        );
-                      })}
-                    </div>
-
-                    <div
-                      id="learner-planning-panel"
-                      className={styles.tabPanel}
-                      role="tabpanel"
-                      aria-labelledby={`learner-planning-tab-${planningView}`}
-                    >
-                      {planningView === 'series' && model.seriesItems.length > 0 ? (
-                        <ul
-                          className={styles.planningList}
-                          aria-label={`Lesson series for ${model.selectedContext.name}`}
-                        >
-                          {model.seriesItems.map((item) => (
-                            <LessonSeriesCard key={item.id} item={item} />
-                          ))}
-                        </ul>
-                      ) : planningItems.length > 0 ? (
-                        <ul
-                          className={styles.planningList}
-                          aria-label={`${planningViewLabels[planningView]} planning for ${model.selectedContext.name}`}
-                        >
-                          {planningItems.map((item) => (
-                            <PlanningItemCard key={`${item.sourceType}:${item.id}`} item={item} />
-                          ))}
-                        </ul>
-                      ) : (
-                        <div className={styles.emptyPlanning} role="status">
-                          {planningView === 'completed' ? (
-                            <CheckCircle2 aria-hidden="true" size={28} />
-                          ) : planningView === 'series' ? (
-                            <Layers3 aria-hidden="true" size={28} />
-                          ) : planningView === 'upcoming' ? (
-                            <CalendarDays aria-hidden="true" size={28} />
-                          ) : (
-                            <BookOpen aria-hidden="true" size={28} />
-                          )}
-                          <div>
-                            <h3>{emptyPlanningMessage(planningView)}</h3>
-                            <p>
-                              Planning records will appear here when they are connected to this
-                              context.
-                            </p>
-                          </div>
                         </div>
-                      )}
+                      ) : null}
+                      {model.selectedContext.status === 'archived' ? (
+                        <span className={styles.archivedPlanRestriction}>
+                          Restore this context to add a Plan.
+                        </span>
+                      ) : null}
                     </div>
-                  </section>
+                  </div>
 
+                  <div className={styles.tabs} role="tablist" aria-label="Learner planning views">
+                    {(Object.keys(planningViewLabels) as LearnerPlanningView[]).map((view) => {
+                      const count =
+                        view === 'upcoming'
+                          ? model.upcomingItems.length
+                          : view === 'unscheduled'
+                            ? model.unscheduledItems.length
+                            : view === 'completed'
+                              ? model.completedItems.length
+                              : model.seriesItems.length;
+                      return (
+                        <button
+                          key={view}
+                          id={`learner-planning-tab-${view}`}
+                          className={planningView === view ? styles.activeTab : ''}
+                          type="button"
+                          role="tab"
+                          aria-selected={planningView === view}
+                          aria-controls="learner-planning-panel"
+                          onClick={() => updateSearchParam('planning', view)}
+                        >
+                          {planningViewLabels[view]} <span>{count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div
+                    id="learner-planning-panel"
+                    className={styles.tabPanel}
+                    role="tabpanel"
+                    aria-labelledby={`learner-planning-tab-${planningView}`}
+                  >
+                    {planningView === 'series' && model.seriesItems.length > 0 ? (
+                      <ul
+                        className={styles.planningList}
+                        aria-label={`Lesson series for ${model.selectedContext.name}`}
+                      >
+                        {model.seriesItems.map((item) => (
+                          <LessonSeriesCard key={item.id} item={item} />
+                        ))}
+                      </ul>
+                    ) : planningItems.length > 0 ? (
+                      <ul
+                        className={styles.planningList}
+                        aria-label={`${planningViewLabels[planningView]} planning for ${model.selectedContext.name}`}
+                      >
+                        {planningItems.map((item) => (
+                          <PlanningItemCard key={`${item.sourceType}:${item.id}`} item={item} />
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className={styles.emptyPlanning} role="status">
+                        {planningView === 'completed' ? (
+                          <CheckCircle2 aria-hidden="true" size={28} />
+                        ) : planningView === 'series' ? (
+                          <Layers3 aria-hidden="true" size={28} />
+                        ) : planningView === 'upcoming' ? (
+                          <CalendarDays aria-hidden="true" size={28} />
+                        ) : (
+                          <BookOpen aria-hidden="true" size={28} />
+                        )}
+                        <div>
+                          <h3>{emptyPlanningMessage(planningView)}</h3>
+                          <p>
+                            Planning records will appear here when they are connected to this
+                            context.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </section>
+
+                <div
+                  id="learner-workspace-panel-support"
+                  hidden={workspaceView !== 'support'}
+                  role="tabpanel"
+                  aria-labelledby="learner-workspace-tab-support"
+                >
                   <LearnerNoticePanel context={model.selectedContext} />
+                </div>
 
+                <div
+                  id="learner-workspace-panel-details"
+                  hidden={workspaceView !== 'details'}
+                  role="tabpanel"
+                  aria-labelledby="learner-workspace-tab-details"
+                >
                   <LearnerContextLifecycleCard
                     key={model.selectedContext.id}
                     context={model.selectedContext}
+                    editRequest={editRequest}
                     onStatusChanged={keepSelectedContextInStatus}
                     onDeleted={clearDeletedContext}
                   />
-                </section>
-              ) : (
-                <div className={`card ${styles.emptyLearners}`} role="status">
-                  <Archive aria-hidden="true" size={30} />
-                  <div>
-                    <h2>No {contextStatus} learner contexts</h2>
-                    <p>
-                      {contextStatus === 'active'
-                        ? 'Restore an archived context or import an active Class, Group, or Individual.'
-                        : 'Archived Classes, Groups, and Individuals will remain available here with their history.'}
-                    </p>
-                  </div>
                 </div>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className={`card ${styles.emptyLearners}`} role="status">
-            <Users aria-hidden="true" size={30} />
-            <div>
-              <h2>No {contextStatus} learner contexts</h2>
-              <p>
-                {contextStatus === 'active'
-                  ? 'Migrated Classes, Groups, and Individuals will appear here when an active school year contains learner contexts.'
-                  : 'Archived Classes, Groups, and Individuals will remain available here with their history.'}
-              </p>
-            </div>
+              </section>
+            ) : (
+              <div className={`card ${styles.emptyLearners}`}>
+                <Users aria-hidden="true" size={30} />
+                <div>
+                  <h2>No {contextStatus} learner contexts</h2>
+                  <p>
+                    {contextStatus === 'active'
+                      ? 'Add an Individual, Group, or Class to begin planning and support work.'
+                      : 'Archived Classes, Groups, and Individuals remain available with their history.'}
+                  </p>
+                  {contextStatus === 'active' && canCreate ? (
+                    <div className={styles.emptyAddActions}>
+                      <button
+                        className="button"
+                        type="button"
+                        onClick={() => setCreateKind('individual')}
+                      >
+                        <UserRound aria-hidden="true" size={16} /> Add Individual
+                      </button>
+                      <button
+                        className="button"
+                        type="button"
+                        onClick={() => setCreateKind('group')}
+                      >
+                        <Layers3 aria-hidden="true" size={16} /> Add Group
+                      </button>
+                      <button
+                        className="button"
+                        type="button"
+                        onClick={() => setCreateKind('class')}
+                      >
+                        <Users aria-hidden="true" size={16} /> Add Class
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            )}
           </div>
-        )
+        </>
       ) : null}
     </section>
   );

@@ -32,7 +32,13 @@ export const learnerContextProfileValuesSchema = z.object({
   notes: optionalTrimmedString(5000),
 });
 
+export const learnerContextCreateValuesSchema = learnerContextProfileValuesSchema.extend({
+  kind: z.enum(['class', 'group', 'individual']),
+  schoolYearId: z.string().min(1, 'Choose a school year.'),
+});
+
 export type LearnerContextProfileValues = z.input<typeof learnerContextProfileValuesSchema>;
+export type LearnerContextCreateValues = z.input<typeof learnerContextCreateValuesSchema>;
 
 export interface LearnerContextDeleteImpact {
   contextId: string;
@@ -91,6 +97,66 @@ export class LearnerContextMutationService {
   ) {
     this.createId = dependencies.createId ?? (() => globalThis.crypto.randomUUID());
     this.now = dependencies.now ?? (() => new Date().toISOString());
+  }
+
+  async create(values: LearnerContextCreateValues): Promise<LearnerContext> {
+    const input = learnerContextCreateValuesSchema.parse(values);
+    const result = await this.db.transaction(
+      'rw',
+      this.db.schoolYears,
+      this.db.learnerContexts,
+      this.db.changeLog,
+      async (): Promise<CommitResult<LearnerContext>> => {
+        const schoolYear = await this.db.schoolYears.get(input.schoolYearId);
+        if (!schoolYear) throw new Error('The selected school year no longer exists.');
+        if (schoolYear.lifecycleState === 'archived') {
+          throw new Error('Restore this school year before adding learner contexts.');
+        }
+
+        const normalizedName = input.name.toLocaleLowerCase('en');
+        const duplicate = await this.db.learnerContexts
+          .where('schoolYearId')
+          .equals(input.schoolYearId)
+          .filter(
+            (context) =>
+              context.kind === input.kind &&
+              context.name.trim().toLocaleLowerCase('en') === normalizedName,
+          )
+          .first();
+        if (duplicate) {
+          throw new Error(
+            `${this.kindLabel(input.kind)} “${input.name}” already exists in ${schoolYear.label}.`,
+          );
+        }
+
+        const created = learnerContextSchema.parse({
+          id: this.createId(),
+          kind: input.kind,
+          name: input.name,
+          preferredName: input.kind === 'individual' ? input.preferredName : undefined,
+          schoolYearId: input.schoolYearId,
+          status: 'active',
+          notes: input.notes,
+        });
+        const commands: LearnerContextCommandPair = {
+          forward: createLearnerContextCommand([putLearnerContextOperation(created)]),
+          inverse: createLearnerContextCommand([deleteLearnerContextOperation(created.id)]),
+        };
+        const log = this.createChangeLog(
+          'learner-context.create',
+          `Add ${this.kindLabel(created.kind)} “${created.name}”`,
+          commands,
+        );
+
+        await clearSupportedRedoBranch(this.db);
+        await this.applyOperations(commands.forward.operations);
+        await this.db.changeLog.put(log);
+        return { value: created, log };
+      },
+    );
+
+    this.notifyNewChange(result.log);
+    return result.value;
   }
 
   async update(id: string, values: LearnerContextProfileValues): Promise<LearnerContext> {
