@@ -98,6 +98,7 @@ test('Learner lifecycle preserves history, blocks linked deletion, and safely de
   await expect(contexts.getByRole('button', { name: /Active 2/ })).toBeVisible();
   await expect(contexts.getByRole('button', { name: /Archived 1/ })).toBeVisible();
 
+  await page.getByRole('tab', { name: 'Details' }).click();
   const details = page.getByRole('region', { name: 'Lifecycle Grade 3 details' });
   await details.getByRole('button', { name: 'Edit details' }).click();
   await details.getByLabel('Name', { exact: true }).fill('Renamed Lifecycle Grade 3');
@@ -106,10 +107,8 @@ test('Learner lifecycle preserves history, blocks linked deletion, and safely de
   await details.getByRole('button', { name: 'Save details' }).click();
 
   const renamedDetails = page.getByRole('region', { name: 'Renamed Lifecycle Grade 3 details' });
-  await expect(
-    renamedDetails.getByRole('heading', { name: 'Renamed Lifecycle Grade 3' }),
-  ).toBeVisible();
-  await expect(renamedDetails.getByText('Preferred name: Lifecycle Class')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Renamed Lifecycle Grade 3' })).toBeVisible();
+  await expect(renamedDetails.getByText('Lifecycle Class', { exact: true })).toBeVisible();
   await expect(renamedDetails.getByText('Updated lifecycle notes.')).toBeVisible();
   await expect(
     contexts.getByRole('button', { name: 'Open Renamed Lifecycle Grade 3 class' }),
@@ -127,10 +126,12 @@ test('Learner lifecycle preserves history, blocks linked deletion, and safely de
   await expect(
     page.getByRole('region', { name: 'Planning for Renamed Lifecycle Grade 3' }),
   ).toBeVisible();
+  await page.getByRole('tab', { name: 'Planning' }).click();
   await expect(page.getByText('Restore this context to add a Plan.')).toBeVisible();
   await page.getByRole('tab', { name: /Completed/ }).click();
   await expect(page.getByText('Preserved teaching history')).toBeVisible();
 
+  await page.getByRole('tab', { name: 'Details' }).click();
   await page
     .getByRole('region', { name: 'Renamed Lifecycle Grade 3 details' })
     .getByRole('button', { name: 'Restore' })

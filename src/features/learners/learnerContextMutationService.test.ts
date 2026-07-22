@@ -38,6 +38,93 @@ function createService(ids: string[]): LearnerContextMutationService {
 }
 
 describe('LearnerContextMutationService', () => {
+  it('creates an active learner context in the selected school year and supports Undo/Redo', async () => {
+    await database.schoolYears.put({
+      id: 'school-year-current',
+      label: '2026–2027',
+      startsOn: '2026-07-01',
+      endsOn: '2027-06-30',
+      active: true,
+      lifecycleState: 'active',
+    });
+    const service = createService(['created-context', 'create-log']);
+    const history = new EditHistoryService(database, {
+      now: () => '2026-07-18T21:00:00.000Z',
+    });
+
+    const created = await service.create({
+      kind: 'individual',
+      schoolYearId: 'school-year-current',
+      name: '  Anna Wang  ',
+      preferredName: '  Anna  ',
+      notes: '  Reading support  ',
+    });
+
+    expect(created).toEqual({
+      id: 'created-context',
+      kind: 'individual',
+      name: 'Anna Wang',
+      preferredName: 'Anna',
+      schoolYearId: 'school-year-current',
+      status: 'active',
+      notes: 'Reading support',
+    });
+    expect(await database.changeLog.get('create-log')).toMatchObject({
+      commandType: 'learner-context.create',
+      label: 'Add Individual “Anna Wang”',
+    });
+
+    await history.undo();
+    expect(await database.learnerContexts.get(created.id)).toBeUndefined();
+    await history.redo();
+    expect(await database.learnerContexts.get(created.id)).toEqual(created);
+  });
+
+  it('prevents duplicate names within the same kind and rejects archived school years', async () => {
+    await database.schoolYears.bulkPut([
+      {
+        id: 'school-year-current',
+        label: '2026–2027',
+        startsOn: '2026-07-01',
+        endsOn: '2027-06-30',
+        active: true,
+        lifecycleState: 'active',
+      },
+      {
+        id: 'school-year-archived',
+        label: '2025–2026',
+        startsOn: '2025-07-01',
+        endsOn: '2026-06-30',
+        active: false,
+        lifecycleState: 'archived',
+        archivedAt: '2026-07-01T00:00:00.000Z',
+      },
+    ]);
+    await database.learnerContexts.put({
+      id: 'duplicate-individual',
+      kind: 'individual',
+      name: 'Anna Wang',
+      schoolYearId: 'school-year-current',
+      status: 'archived',
+    });
+    const service = createService(['unused-context', 'unused-log']);
+
+    await expect(
+      service.create({
+        kind: 'individual',
+        schoolYearId: 'school-year-current',
+        name: ' anna wang ',
+      }),
+    ).rejects.toThrow('already exists');
+    await expect(
+      service.create({
+        kind: 'group',
+        schoolYearId: 'school-year-archived',
+        name: 'Archived group',
+      }),
+    ).rejects.toThrow('Restore this school year');
+    expect(await database.changeLog.count()).toBe(0);
+  });
   it('edits profile fields without changing the stable ID or historical links and supports Undo/Redo', async () => {
     await database.lessonPlans.put({
       id: 'linked-plan',
