@@ -3,6 +3,7 @@ import { Navigate, createHashRouter } from 'react-router-dom';
 import { AppShell } from '@/app/AppShell';
 import { AgendaRoute } from '@/routes/AgendaRoute';
 import { CalendarRoute } from '@/routes/CalendarRoute';
+import { CategoriesRoute } from '@/routes/CategoriesRoute';
 import { CalendarEventEditorRoute } from '@/routes/CalendarEventEditorRoute';
 import { ExportRoute } from '@/routes/ExportRoute';
 import { ImportRoute } from '@/routes/ImportRoute';
@@ -42,6 +43,7 @@ export const router = createHashRouter([
       { path: 'planning/edit', element: <PlanningEditorRoute /> },
       { path: 'planning/session', element: <SessionEditorRoute /> },
       { path: 'library', element: <LibraryRoute /> },
+      { path: 'categories', element: <CategoriesRoute /> },
       { path: 'insights', element: <InsightsRoute /> },
       { path: 'import', element: <ImportRoute /> },
       { path: 'migration', element: <MigrationRoute /> },

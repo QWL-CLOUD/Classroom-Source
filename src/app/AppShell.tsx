@@ -14,6 +14,7 @@ import {
   Redo2,
   Settings,
   Sparkles,
+  Tags,
   Undo2,
   Users,
   X,
@@ -50,7 +51,10 @@ const collapsibleNavigationGroups: Array<{
   {
     id: 'resources',
     label: 'Resources',
-    links: [{ to: '/library', label: 'Library', icon: Library, status: 'planned' }],
+    links: [
+      { to: '/library', label: 'Library', icon: Library, status: 'planned' },
+      { to: '/categories', label: 'Categories & Labels', icon: Tags },
+    ],
   },
   {
     id: 'reflect',
@@ -88,6 +92,9 @@ function getRoutePresentation(pathname: string): { title: string; layout: Conten
   if (pathname.startsWith('/tasks')) return { title: 'Tasks', layout: 'standard' };
   if (pathname.startsWith('/learners')) return { title: 'Learners', layout: 'standard' };
   if (pathname.startsWith('/library')) return { title: 'Library', layout: 'standard' };
+  if (pathname.startsWith('/categories')) {
+    return { title: 'Categories & Labels', layout: 'standard' };
+  }
   if (pathname.startsWith('/insights')) {
     return { title: 'Teaching Insights', layout: 'standard' };
   }
