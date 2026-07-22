@@ -12,18 +12,24 @@ import { loadLearnersReadSnapshot } from './learnersReadService';
 export function useLearnersReadModel(
   requestedContextId?: string,
   preferredStatus: LearnerContext['status'] = 'active',
+  requestedSchoolYearId?: string,
   repository: ClassroomRepository = classroomRepository,
 ): WorkspaceReadState<LearnersReadSnapshot> {
   const state = useLiveQuery(async (): Promise<WorkspaceReadState<LearnersReadSnapshot>> => {
     try {
       return {
         status: 'ready',
-        data: await loadLearnersReadSnapshot(repository, requestedContextId, preferredStatus),
+        data: await loadLearnersReadSnapshot(
+          repository,
+          requestedContextId,
+          preferredStatus,
+          requestedSchoolYearId,
+        ),
       };
     } catch (error) {
       return { status: 'error', message: toReadErrorMessage(error) };
     }
-  }, [repository, requestedContextId, preferredStatus]);
+  }, [repository, requestedContextId, preferredStatus, requestedSchoolYearId]);
 
   return state ?? { status: 'loading' };
 }

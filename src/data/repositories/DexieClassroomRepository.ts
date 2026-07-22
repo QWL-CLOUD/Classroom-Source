@@ -111,6 +111,13 @@ export class DexieClassroomRepository implements ClassroomRepository {
   }
 
   async getActiveSchoolYear(): Promise<SchoolYear | null> {
+    const schoolYears = await this.listSchoolYears();
+    return (
+      schoolYears.filter((schoolYear) => schoolYear.active).sort(compareSchoolYears)[0] ?? null
+    );
+  }
+
+  async listSchoolYears(): Promise<SchoolYear[]> {
     const schoolYears = (await this.db.schoolYears.toArray()).map((value) =>
       schoolYearSchema.parse(value),
     );
@@ -119,9 +126,7 @@ export class DexieClassroomRepository implements ClassroomRepository {
       assertLocalDateRange(schoolYear.startsOn, schoolYear.endsOn);
     }
 
-    return (
-      schoolYears.filter((schoolYear) => schoolYear.active).sort(compareSchoolYears)[0] ?? null
-    );
+    return schoolYears.sort(compareSchoolYears);
   }
 
   async listScheduleBlocks(): Promise<ScheduleBlock[]> {

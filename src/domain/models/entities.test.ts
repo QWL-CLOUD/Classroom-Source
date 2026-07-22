@@ -4,6 +4,7 @@ import {
   lessonPlanSchema,
   reminderSchema,
   scheduleBlockSchema,
+  schoolYearSchema,
   sessionOccurrenceSchema,
   taskSchema,
 } from './entities';
@@ -117,5 +118,27 @@ describe('domain schemas', () => {
       sourceId: 'task-1',
       status: 'active',
     });
+  });
+  it('keeps existing school years compatible while preventing archived active records', () => {
+    expect(
+      schoolYearSchema.parse({
+        id: 'school-year-existing',
+        label: '2026–2027',
+        startsOn: '2026-07-01',
+        endsOn: '2027-06-30',
+        active: true,
+      }),
+    ).toMatchObject({ active: true });
+
+    expect(() =>
+      schoolYearSchema.parse({
+        id: 'school-year-invalid',
+        label: 'Archived active year',
+        startsOn: '2026-07-01',
+        endsOn: '2027-06-30',
+        active: true,
+        lifecycleState: 'archived',
+      }),
+    ).toThrow('archived school year');
   });
 });

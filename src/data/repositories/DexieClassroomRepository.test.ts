@@ -59,6 +59,11 @@ describe('DexieClassroomRepository read models', () => {
     await expect(repository.getWorkspaceDataSummary()).resolves.toMatchObject({
       activeSchoolYearCount: 2,
     });
+    await expect(repository.listSchoolYears()).resolves.toEqual([
+      expect.objectContaining({ id: 'school-year-inactive' }),
+      expect.objectContaining({ id: 'school-year-current' }),
+      expect.objectContaining({ id: 'school-year-old' }),
+    ]);
   });
 
   it('returns overlapping calendar events in stable order', async () => {

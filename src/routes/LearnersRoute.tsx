@@ -38,6 +38,7 @@ import {
   getLearnerKindLabel,
 } from '@/features/learners/learnerReadModel';
 import { useLearnersReadModel } from '@/features/learners/useLearnersReadModel';
+import { useSchoolYears } from '@/features/schoolYears/useSchoolYears';
 import { parseLocalDate, todayLocalDate } from '@/shared/dates/localDate';
 
 import styles from './LearnersRoute.module.css';
@@ -667,7 +668,13 @@ export function LearnersRoute() {
     : 'upcoming';
   const rawDate = searchParams.get('date');
   const anchorDate = parseLocalDate(rawDate) ? rawDate! : todayLocalDate();
-  const state = useLearnersReadModel(requestedContextId, preferredContextStatus);
+  const requestedSchoolYearId = searchParams.get('schoolYear') ?? undefined;
+  const schoolYearsState = useSchoolYears();
+  const state = useLearnersReadModel(
+    requestedContextId,
+    preferredContextStatus,
+    requestedSchoolYearId,
+  );
   const selectedRequestedContext =
     state.status === 'ready' && state.data.selectedContext?.id === requestedContextId
       ? state.data.selectedContext
@@ -693,6 +700,14 @@ export function LearnersRoute() {
   function updateSearchParam(name: string, value: string): void {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set(name, value);
+    setSearchParams(nextParams);
+  }
+
+  function selectSchoolYear(schoolYearId: string): void {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('schoolYear', schoolYearId);
+    nextParams.delete('context');
+    nextParams.set('status', 'active');
     setSearchParams(nextParams);
   }
 
@@ -750,14 +765,41 @@ export function LearnersRoute() {
             Open a Class, Group, or Individual to review planning, support, and context settings.
           </p>
         </div>
-        {model ? (
-          <div className={styles.summary} aria-label="Learner context counts">
-            <span>{model.contextCounts.class} Active Classes</span>
-            <span>{model.contextCounts.group} Active Groups</span>
-            <span>{model.contextCounts.individual} Active Individuals</span>
-            <span>{model.contextStatusCounts.archived} Archived</span>
-          </div>
-        ) : null}
+        <div className={styles.headerTools}>
+          {schoolYearsState.status === 'ready' && schoolYearsState.data.items.length > 0 ? (
+            <label className={styles.schoolYearPicker}>
+              <span>School year</span>
+              <select
+                value={
+                  state.status === 'ready'
+                    ? (state.data.activeSchoolYear?.id ?? requestedSchoolYearId ?? '')
+                    : (requestedSchoolYearId ?? '')
+                }
+                onChange={(event) => selectSchoolYear(event.target.value)}
+              >
+                {schoolYearsState.data.items.map(({ schoolYear }) => (
+                  <option key={schoolYear.id} value={schoolYear.id}>
+                    {schoolYear.label}
+                    {schoolYear.active ? ' · Active' : ''}
+                    {schoolYear.lifecycleState === 'archived' ? ' · Archived' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <a className="button" href="#/settings#school-years">
+              Manage school years
+            </a>
+          )}
+          {model ? (
+            <div className={styles.summary} aria-label="Learner context counts">
+              <span>{model.contextCounts.class} Active Classes</span>
+              <span>{model.contextCounts.group} Active Groups</span>
+              <span>{model.contextCounts.individual} Active Individuals</span>
+              <span>{model.contextStatusCounts.archived} Archived</span>
+            </div>
+          ) : null}
+        </div>
       </header>
 
       {state.status === 'loading' ? (

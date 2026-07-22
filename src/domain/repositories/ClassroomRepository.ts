@@ -25,6 +25,7 @@ export interface ClassroomRepository {
   putTask(task: Task): Promise<void>;
   deleteTask(id: string): Promise<void>;
   getActiveSchoolYear(): Promise<SchoolYear | null>;
+  listSchoolYears(): Promise<SchoolYear[]>;
   listScheduleBlocks(): Promise<ScheduleBlock[]>;
   listScheduleBlocksForRange(range: LocalDateRange): Promise<ScheduleBlock[]>;
   listCalendarEventsForRange(range: LocalDateRange): Promise<CalendarEvent[]>;

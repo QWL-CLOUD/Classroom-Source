@@ -6,13 +6,32 @@ const timestampSchema = z.iso.datetime();
 const localDateSchema = z.string().regex(LOCAL_DATE_PATTERN);
 const minuteSchema = z.number().int().min(0).max(1439);
 
-export const schoolYearSchema = z.object({
-  id: idSchema,
-  label: z.string().min(1),
-  startsOn: localDateSchema,
-  endsOn: localDateSchema,
-  active: z.boolean(),
-});
+export const schoolYearSchema = z
+  .object({
+    id: idSchema,
+    label: z.string().trim().min(1).max(120),
+    startsOn: localDateSchema,
+    endsOn: localDateSchema,
+    active: z.boolean(),
+    lifecycleState: z.enum(['active', 'archived']).optional(),
+    archivedAt: timestampSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.startsOn > value.endsOn) {
+      context.addIssue({
+        code: 'custom',
+        message: 'The school year end date must be on or after the start date.',
+        path: ['endsOn'],
+      });
+    }
+    if (value.lifecycleState === 'archived' && value.active) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An archived school year cannot be active.',
+        path: ['active'],
+      });
+    }
+  });
 
 export const learnerContextSchema = z.object({
   id: idSchema,
