@@ -1,4 +1,9 @@
 import type { ClassroomDatabase } from '@/data/db/ClassroomDatabase';
+import {
+  CATEGORY_COMMAND_PREFIX,
+  parseCategoryCommand,
+  type CategoryCommand,
+} from '@/features/categories/categoryCommands';
 import { changeLogSchema, type ChangeLog } from '@/domain/models/entities';
 import {
   LEARNER_NOTICE_COMMAND_PREFIX,
@@ -48,6 +53,7 @@ import {
 } from './scheduleBlockCommands';
 
 export type SupportedEditCommand =
+  | { entity: 'category'; command: CategoryCommand }
   | { entity: 'calendar-event'; command: CalendarEventCommand }
   | { entity: 'schedule-block'; command: ScheduleBlockCommand }
   | { entity: 'schedule-exception'; command: ScheduleExceptionCommand }
@@ -60,6 +66,7 @@ export type SupportedEditCommand =
 
 export function isSupportedEditChangeLog(log: ChangeLog): boolean {
   return (
+    log.commandType.startsWith(CATEGORY_COMMAND_PREFIX) ||
     log.commandType.startsWith(CALENDAR_EVENT_COMMAND_PREFIX) ||
     log.commandType.startsWith(SCHEDULE_BLOCK_COMMAND_PREFIX) ||
     log.commandType.startsWith(SCHEDULE_EXCEPTION_COMMAND_PREFIX) ||
@@ -73,6 +80,12 @@ export function isSupportedEditChangeLog(log: ChangeLog): boolean {
 }
 
 export function parseSupportedEditCommand(commandType: string, json: string): SupportedEditCommand {
+  if (commandType.startsWith(CATEGORY_COMMAND_PREFIX)) {
+    return {
+      entity: 'category',
+      command: parseCategoryCommand(json),
+    };
+  }
   if (commandType.startsWith(CALENDAR_EVENT_COMMAND_PREFIX)) {
     return {
       entity: 'calendar-event',
@@ -134,6 +147,19 @@ export async function applySupportedEditCommand(
   db: ClassroomDatabase,
   parsed: SupportedEditCommand,
 ): Promise<void> {
+  if (parsed.entity === 'category') {
+    for (const operation of parsed.command.operations) {
+      if (operation.table === 'categoryValues') {
+        if (operation.action === 'put') await db.categoryValues.put(operation.record);
+        else await db.categoryValues.delete(operation.id);
+      } else if (operation.action === 'put') {
+        await db.categoryAssignments.put(operation.record);
+      } else {
+        await db.categoryAssignments.delete(operation.id);
+      }
+    }
+    return;
+  }
   if (parsed.entity === 'calendar-event') {
     if (parsed.command.action === 'put') await db.calendarEvents.put(parsed.command.record);
     else await db.calendarEvents.delete(parsed.command.id);

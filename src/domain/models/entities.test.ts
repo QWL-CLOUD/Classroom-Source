@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  categoryValueSchema,
   learnerNoticeSchema,
   lessonPlanSchema,
   reminderSchema,
@@ -119,6 +120,31 @@ describe('domain schemas', () => {
       status: 'active',
     });
   });
+  it('requires category lifecycle metadata to remain internally consistent', () => {
+    const active = categoryValueSchema.parse({
+      id: 'purpose-reading',
+      familyId: 'purpose-tag',
+      name: 'Reading',
+      normalizedName: 'reading',
+      aliases: ['Literacy'],
+      normalizedAliases: ['literacy'],
+      sortOrder: 0,
+      isDefault: false,
+      lifecycleState: 'active',
+      createdAt: '2026-07-21T12:00:00.000Z',
+      updatedAt: '2026-07-21T12:00:00.000Z',
+    });
+    expect(active.familyId).toBe('purpose-tag');
+    expect(() =>
+      categoryValueSchema.parse({
+        ...active,
+        lifecycleState: 'merged',
+        mergedIntoId: undefined,
+        mergedAt: undefined,
+      }),
+    ).toThrow('requires its replacement');
+  });
+
   it('keeps existing school years compatible while preventing archived active records', () => {
     expect(
       schoolYearSchema.parse({
