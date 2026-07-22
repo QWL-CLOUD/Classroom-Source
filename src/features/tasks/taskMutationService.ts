@@ -9,6 +9,15 @@ import {
   type Task,
   type TaskStatus,
 } from '@/domain/models/entities';
+import {
+  buildCategoryAssignmentChangePlan,
+  listCategoryAssignmentsForDeletion,
+  type CategorySelectionMap,
+} from '@/features/categories/categoryAssignmentSelection';
+import {
+  deleteCategoryAssignmentOperation,
+  putCategoryAssignmentOperation,
+} from '@/features/categories/categoryCommands';
 import { clearSupportedRedoBranch } from '@/features/editing/editCommandRegistry';
 import { notifyEditHistoryChanged } from '@/features/editing/editHistorySignal';
 
@@ -124,12 +133,14 @@ export class TaskMutationService {
     this.order = dependencies.order ?? (() => Date.now());
   }
 
-  async create(values: TaskEditorValues): Promise<Task> {
+  async create(values: TaskEditorValues, categorySelections?: CategorySelectionMap): Promise<Task> {
     const parsed = taskEditorValuesSchema.parse(values);
     const result = await this.db.transaction(
       'rw',
       this.db.tasks,
       this.db.learnerContexts,
+      this.db.categoryValues,
+      this.db.categoryAssignments,
       this.db.changeLog,
       async (): Promise<CommitResult<Task>> => {
         await this.requireSelectableContext(parsed.contextId);
@@ -142,9 +153,15 @@ export class TaskMutationService {
           createdAt: now,
           updatedAt: now,
         });
+        const categoryPlan = await buildCategoryAssignmentChangePlan(this.db, 'task', task.id, {
+          selections: categorySelections,
+          useDefaultsForMissingFamilies: true,
+          createId: this.createId,
+          now,
+        });
         const commands: TaskCommandPair = {
-          forward: createTaskCommand([putTaskOperation(task)]),
-          inverse: createTaskCommand([deleteTaskOperation(task.id)]),
+          forward: createTaskCommand([putTaskOperation(task), ...categoryPlan.forward]),
+          inverse: createTaskCommand([...categoryPlan.inverse, deleteTaskOperation(task.id)]),
         };
         const log = this.createChangeLog(
           'task.create',
@@ -163,12 +180,18 @@ export class TaskMutationService {
     return result.value;
   }
 
-  async update(id: string, values: TaskEditorValues): Promise<Task> {
+  async update(
+    id: string,
+    values: TaskEditorValues,
+    categorySelections?: CategorySelectionMap,
+  ): Promise<Task> {
     const parsed = taskEditorValuesSchema.parse(values);
     const result = await this.db.transaction(
       'rw',
       this.db.tasks,
       this.db.learnerContexts,
+      this.db.categoryValues,
+      this.db.categoryAssignments,
       this.db.changeLog,
       async (): Promise<CommitResult<Task>> => {
         const existing = await this.requireTask(id);
@@ -182,9 +205,15 @@ export class TaskMutationService {
           createdAt: existing.createdAt,
           updatedAt: now,
         });
+        const categoryPlan = await buildCategoryAssignmentChangePlan(this.db, 'task', updated.id, {
+          selections: categorySelections,
+          useDefaultsForMissingFamilies: false,
+          createId: this.createId,
+          now,
+        });
         const commands: TaskCommandPair = {
-          forward: createTaskCommand([putTaskOperation(updated)]),
-          inverse: createTaskCommand([putTaskOperation(existing)]),
+          forward: createTaskCommand([putTaskOperation(updated), ...categoryPlan.forward]),
+          inverse: createTaskCommand([...categoryPlan.inverse, putTaskOperation(existing)]),
         };
         const log = this.createChangeLog(
           'task.update',
@@ -240,24 +269,41 @@ export class TaskMutationService {
   }
 
   async delete(id: string): Promise<void> {
-    const log = await this.db.transaction('rw', this.db.tasks, this.db.changeLog, async () => {
-      const existing = await this.requireTask(id);
-      const now = this.now();
-      const commands: TaskCommandPair = {
-        forward: createTaskCommand([deleteTaskOperation(existing.id)]),
-        inverse: createTaskCommand([putTaskOperation(existing)]),
-      };
-      const nextLog = this.createChangeLog(
-        'task.delete',
-        `Delete task “${existing.title}”`,
-        commands,
-        now,
-      );
-      await clearSupportedRedoBranch(this.db);
-      await this.applyOperations(commands.forward.operations);
-      await this.db.changeLog.put(nextLog);
-      return nextLog;
-    });
+    const log = await this.db.transaction(
+      'rw',
+      this.db.tasks,
+      this.db.categoryAssignments,
+      this.db.changeLog,
+      async () => {
+        const existing = await this.requireTask(id);
+        const now = this.now();
+        const categoryAssignments = await listCategoryAssignmentsForDeletion(
+          this.db,
+          'task',
+          existing.id,
+        );
+        const commands: TaskCommandPair = {
+          forward: createTaskCommand([
+            ...categoryAssignments.map((item) => deleteCategoryAssignmentOperation(item.id)),
+            deleteTaskOperation(existing.id),
+          ]),
+          inverse: createTaskCommand([
+            putTaskOperation(existing),
+            ...categoryAssignments.map(putCategoryAssignmentOperation),
+          ]),
+        };
+        const nextLog = this.createChangeLog(
+          'task.delete',
+          `Delete task “${existing.title}”`,
+          commands,
+          now,
+        );
+        await clearSupportedRedoBranch(this.db);
+        await this.applyOperations(commands.forward.operations);
+        await this.db.changeLog.put(nextLog);
+        return nextLog;
+      },
+    );
 
     this.notifyNewChange(log);
   }
@@ -312,8 +358,14 @@ export class TaskMutationService {
 
   private async applyOperations(operations: readonly TaskOperation[]): Promise<void> {
     for (const operation of operations) {
-      if (operation.action === 'put') await this.db.tasks.put(operation.record);
-      else await this.db.tasks.delete(operation.id);
+      if (operation.table === 'tasks') {
+        if (operation.action === 'put') await this.db.tasks.put(operation.record);
+        else await this.db.tasks.delete(operation.id);
+      } else if (operation.action === 'put') {
+        await this.db.categoryAssignments.put(operation.record);
+      } else {
+        await this.db.categoryAssignments.delete(operation.id);
+      }
     }
   }
 

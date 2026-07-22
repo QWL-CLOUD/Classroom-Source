@@ -7,6 +7,10 @@ import {
   type LearnerNotice,
   type Task,
 } from '@/domain/models/entities';
+import {
+  categoryAssignmentOperationSchema,
+  type CategoryAssignmentOperation,
+} from '@/features/categories/categoryCommands';
 
 export const LEARNER_NOTICE_COMMAND_PREFIX = 'learner-notice.';
 
@@ -39,13 +43,15 @@ export const learnerNoticeOperationSchema = z.union([
   deleteLearnerNoticeOperationSchema,
   putTaskOperationSchema,
   deleteTaskOperationSchema,
+  categoryAssignmentOperationSchema,
 ]);
 
 export const learnerNoticeCommandSchema = z.object({
   operations: z.array(learnerNoticeOperationSchema).min(1),
 });
 
-export type LearnerNoticeOperation = z.infer<typeof learnerNoticeOperationSchema>;
+export type LearnerNoticeOperation =
+  z.infer<typeof learnerNoticeOperationSchema> | CategoryAssignmentOperation;
 export type LearnerNoticeCommand = z.infer<typeof learnerNoticeCommandSchema>;
 
 export interface LearnerNoticeCommandPair {

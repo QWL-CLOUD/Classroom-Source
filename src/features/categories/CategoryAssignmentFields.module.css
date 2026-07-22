@@ -1,0 +1,167 @@
+.panel {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface-card);
+}
+
+.heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.heading h2,
+.heading p {
+  margin: 0;
+}
+
+.manageLink {
+  flex: 0 0 auto;
+  font-weight: 700;
+}
+
+.familyGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 14px;
+}
+
+.family {
+  min-width: 0;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.family legend {
+  padding: 0 6px;
+  font-weight: 800;
+}
+
+.family > p {
+  margin: 0 0 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.option {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  cursor: pointer;
+  scroll-margin-block: 24px 144px;
+}
+
+.option input {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  scroll-margin-block: 24px 144px;
+}
+
+.option input:disabled {
+  cursor: not-allowed;
+}
+
+.optionText {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  pointer-events: none;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-card);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.option input:checked + .optionText {
+  border-color: var(--accent-strong);
+  background: var(--planned);
+}
+
+.option input:focus-visible + .optionText {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.option[data-archived='true'] .optionText {
+  border-style: dashed;
+}
+
+.optionName {
+  overflow-wrap: anywhere;
+}
+
+.badge,
+.archivedBadge {
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.badge {
+  background: var(--planned);
+  color: var(--accent-strong);
+}
+
+.archivedBadge {
+  background: var(--surface-app);
+  color: var(--text-primary);
+}
+
+.empty {
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.help,
+.loading {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+@media (max-width: 640px) {
+  .panel {
+    padding: 16px;
+  }
+
+  .heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .manageLink {
+    align-self: flex-start;
+  }
+
+  .familyGrid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -9,6 +9,10 @@ import {
   type LessonSeries,
   type SessionOccurrence,
 } from '@/domain/models/entities';
+import {
+  categoryAssignmentOperationSchema,
+  type CategoryAssignmentOperation,
+} from '@/features/categories/categoryCommands';
 
 export const PLANNING_COMMAND_PREFIX = 'planning.';
 
@@ -55,13 +59,15 @@ export const planningOperationSchema = z.union([
   deleteLessonPlanOperationSchema,
   putSessionOperationSchema,
   deleteSessionOperationSchema,
+  categoryAssignmentOperationSchema,
 ]);
 
 export const planningCommandSchema = z.object({
   operations: z.array(planningOperationSchema).min(1),
 });
 
-export type PlanningOperation = z.infer<typeof planningOperationSchema>;
+export type PlanningOperation =
+  z.infer<typeof planningOperationSchema> | CategoryAssignmentOperation;
 export type PlanningCommand = z.infer<typeof planningCommandSchema>;
 
 export interface PlanningCommandPair {

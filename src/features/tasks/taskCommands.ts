@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
 import { taskSchema, type ChangeLog, type Task } from '@/domain/models/entities';
+import {
+  categoryAssignmentOperationSchema,
+  type CategoryAssignmentOperation,
+} from '@/features/categories/categoryCommands';
 
 export const TASK_COMMAND_PREFIX = 'task.';
 
@@ -16,13 +20,17 @@ const deleteTaskOperationSchema = z.object({
   id: z.string().min(1),
 });
 
-export const taskOperationSchema = z.union([putTaskOperationSchema, deleteTaskOperationSchema]);
+export const taskOperationSchema = z.union([
+  putTaskOperationSchema,
+  deleteTaskOperationSchema,
+  categoryAssignmentOperationSchema,
+]);
 
 export const taskCommandSchema = z.object({
   operations: z.array(taskOperationSchema).min(1),
 });
 
-export type TaskOperation = z.infer<typeof taskOperationSchema>;
+export type TaskOperation = z.infer<typeof taskOperationSchema> | CategoryAssignmentOperation;
 export type TaskCommand = z.infer<typeof taskCommandSchema>;
 
 export interface TaskCommandPair {
