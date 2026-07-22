@@ -104,3 +104,23 @@ creates a duplicate source entity.
 Task, Reminder, and Learner Notice actions from Agenda call their existing transactional mutation
 services, so global Undo/Redo continues to operate on the original record. Phase 3D-4 does not change
 the Dexie schema; the database remains at version 3.
+
+## Managed Categories & Labels foundation
+
+Phase 3E-1A upgrades Dexie to schema version 4 with `categoryValues` and
+`categoryAssignments`. The seven family definitions remain code-owned and stable; users manage values
+inside those families rather than creating parallel family stores.
+
+A `CategoryValue` owns stable identity, normalized name and aliases, active ordering, optional default
+and presentation keys, plus active/archive/merge lifecycle metadata. Rename retains the previous name
+as an alias. Archive hides a value from new selection without breaking historical display. Merge
+retains provenance, moves references, and resolves former names to the surviving stable value.
+
+A `CategoryAssignment` is a relationship to an existing source record. It does not duplicate Lesson
+Plans, Tasks, Learner Notices, future Templates, or future Library items. Usage counts are derived from
+these assignments, while incoming merged-history references are tracked separately to protect alias
+resolution. All category mutations are represented by compound category commands and are part of
+global Undo/Redo.
+
+No existing `ScheduleBlock.category` or `CalendarEvent.category` text is automatically converted.
+Schedule Parent Blocks remain Schedule records rather than managed categories.

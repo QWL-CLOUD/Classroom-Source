@@ -40,6 +40,8 @@ export class EditHistoryService {
       'rw',
       [
         this.db.calendarEvents,
+        this.db.categoryValues,
+        this.db.categoryAssignments,
         this.db.schoolYears,
         this.db.learnerContexts,
         this.db.learnerNotices,
@@ -79,6 +81,8 @@ export class EditHistoryService {
       'rw',
       [
         this.db.calendarEvents,
+        this.db.categoryValues,
+        this.db.categoryAssignments,
         this.db.schoolYears,
         this.db.learnerContexts,
         this.db.learnerNotices,

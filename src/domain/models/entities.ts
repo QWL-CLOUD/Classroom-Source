@@ -263,6 +263,147 @@ export const taskSchema = z
     path: ['dueDate'],
   });
 
+export const categoryFamilyIdSchema = z.enum([
+  'template-format',
+  'focus-tag',
+  'purpose-tag',
+  'theme-tag',
+  'resource-format',
+  'task-label',
+  'support-area',
+]);
+
+export const categoryColorKeySchema = z.enum([
+  'neutral',
+  'blue',
+  'teal',
+  'green',
+  'amber',
+  'orange',
+  'red',
+  'pink',
+  'purple',
+  'indigo',
+]);
+
+export const categoryIconKeySchema = z.enum([
+  'tag',
+  'focus',
+  'target',
+  'shapes',
+  'file',
+  'check-square',
+  'heart-handshake',
+  'book-open',
+  'star',
+  'flag',
+  'bookmark',
+  'palette',
+]);
+
+export const categoryValueLifecycleStateSchema = z.enum(['active', 'archived', 'merged']);
+
+export const categoryValueSchema = z
+  .object({
+    id: idSchema,
+    familyId: categoryFamilyIdSchema,
+    name: z.string().trim().min(1).max(120),
+    normalizedName: z.string().trim().min(1).max(120),
+    aliases: z.array(z.string().trim().min(1).max(120)).default([]),
+    normalizedAliases: z.array(z.string().trim().min(1).max(120)).default([]),
+    sortOrder: z.number().int().nonnegative(),
+    isDefault: z.boolean().default(false),
+    colorKey: categoryColorKeySchema.optional(),
+    iconKey: categoryIconKeySchema.optional(),
+    lifecycleState: categoryValueLifecycleStateSchema.default('active'),
+    mergedIntoId: idSchema.optional(),
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+    archivedAt: timestampSchema.optional(),
+    mergedAt: timestampSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.aliases.length !== value.normalizedAliases.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Category aliases and normalized aliases must have matching lengths.',
+        path: ['normalizedAliases'],
+      });
+    }
+    if (value.lifecycleState === 'active') {
+      if (value.archivedAt || value.mergedAt || value.mergedIntoId) {
+        context.addIssue({
+          code: 'custom',
+          message: 'An active category value cannot contain archive or merge metadata.',
+          path: ['lifecycleState'],
+        });
+      }
+    }
+    if (value.lifecycleState === 'archived') {
+      if (!value.archivedAt) {
+        context.addIssue({
+          code: 'custom',
+          message: 'An archived category value requires archivedAt.',
+          path: ['archivedAt'],
+        });
+      }
+      if (value.isDefault) {
+        context.addIssue({
+          code: 'custom',
+          message: 'An archived category value cannot be the family default.',
+          path: ['isDefault'],
+        });
+      }
+      if (value.mergedAt || value.mergedIntoId) {
+        context.addIssue({
+          code: 'custom',
+          message: 'An archived category value cannot contain merge metadata.',
+          path: ['lifecycleState'],
+        });
+      }
+    }
+    if (value.lifecycleState === 'merged') {
+      if (!value.mergedIntoId || !value.mergedAt) {
+        context.addIssue({
+          code: 'custom',
+          message: 'A merged category value requires its replacement and merge time.',
+          path: ['mergedIntoId'],
+        });
+      }
+      if (value.isDefault) {
+        context.addIssue({
+          code: 'custom',
+          message: 'A merged category value cannot be the family default.',
+          path: ['isDefault'],
+        });
+      }
+      if (value.archivedAt) {
+        context.addIssue({
+          code: 'custom',
+          message: 'A merged category value cannot contain archive metadata.',
+          path: ['lifecycleState'],
+        });
+      }
+    }
+  });
+
+export const categoryAssignableEntityTypeSchema = z.enum([
+  'lesson-plan',
+  'task',
+  'learner-notice',
+  'lesson-template',
+  'library-item',
+]);
+
+export const categoryAssignmentSchema = z.object({
+  id: idSchema,
+  familyId: categoryFamilyIdSchema,
+  categoryValueId: idSchema,
+  entityType: categoryAssignableEntityTypeSchema,
+  entityId: idSchema,
+  createdAt: timestampSchema,
+});
+
 export const quickCaptureSchema = z.object({
   id: idSchema,
   text: z.string().min(1),
@@ -327,6 +468,13 @@ export type ReminderStatus = z.infer<typeof reminderStatusSchema>;
 export type Reminder = z.infer<typeof reminderSchema>;
 export type TaskStatus = z.infer<typeof taskStatusSchema>;
 export type Task = z.infer<typeof taskSchema>;
+export type CategoryFamilyId = z.infer<typeof categoryFamilyIdSchema>;
+export type CategoryColorKey = z.infer<typeof categoryColorKeySchema>;
+export type CategoryIconKey = z.infer<typeof categoryIconKeySchema>;
+export type CategoryValueLifecycleState = z.infer<typeof categoryValueLifecycleStateSchema>;
+export type CategoryValue = z.infer<typeof categoryValueSchema>;
+export type CategoryAssignableEntityType = z.infer<typeof categoryAssignableEntityTypeSchema>;
+export type CategoryAssignment = z.infer<typeof categoryAssignmentSchema>;
 export type QuickCapture = z.infer<typeof quickCaptureSchema>;
 export type MigrationRun = z.infer<typeof migrationRunSchema>;
 export type QuarantineRecord = z.infer<typeof quarantineRecordSchema>;
