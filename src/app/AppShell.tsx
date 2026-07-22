@@ -19,7 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useUiStore } from '@/app/uiStore';
 import {
   navigationGroupForPath,
@@ -63,7 +63,7 @@ const collapsibleNavigationGroups: Array<{
     links: [
       { to: '/import', label: 'Import Center', icon: Import },
       { to: '/export', label: 'Export & Backup', icon: Download, status: 'planned' },
-      { to: '/settings', label: 'Settings', icon: Settings, status: 'planned' },
+      { to: '/settings', label: 'School Years', icon: Settings },
       { to: '/system-health', label: 'System Health', icon: HeartPulse },
     ],
   },
@@ -94,7 +94,7 @@ function getRoutePresentation(pathname: string): { title: string; layout: Conten
   if (pathname.startsWith('/import')) return { title: 'Import Center', layout: 'reading' };
   if (pathname.startsWith('/migration')) return { title: 'Migration', layout: 'reading' };
   if (pathname.startsWith('/export')) return { title: 'Export & Backup', layout: 'reading' };
-  if (pathname.startsWith('/settings')) return { title: 'Settings', layout: 'reading' };
+  if (pathname.startsWith('/settings')) return { title: 'School Years', layout: 'reading' };
   if (pathname.startsWith('/system-health')) {
     return { title: 'System Health', layout: 'reading' };
   }
@@ -233,14 +233,16 @@ export function AppShell() {
             </div>
             <div className={styles.brandText}>
               <div className={styles.brandName}>Classroom</div>
-              <div
-                className={styles.schoolYear}
+              <Link
+                className={`${styles.schoolYear} ${styles.schoolYearLink}`}
                 data-status={schoolYearContext.tone}
-                title={schoolYearContext.detail}
+                title={`${schoolYearContext.detail} Manage school years.`}
                 aria-live="polite"
+                to="/settings#school-years"
+                onClick={closeMobileNavigation}
               >
                 {schoolYearContext.label}
-              </div>
+              </Link>
             </div>
             <button
               ref={mobileCloseButtonRef}
@@ -334,13 +336,14 @@ export function AppShell() {
               <div>
                 <span className={styles.topbarProduct}>
                   <span className={styles.topbarProductName}>Classroom · </span>
-                  <span
-                    className={styles.topbarSchoolYear}
+                  <Link
+                    className={`${styles.topbarSchoolYear} ${styles.schoolYearLink}`}
                     data-status={schoolYearContext.tone}
-                    title={schoolYearContext.detail}
+                    title={`${schoolYearContext.detail} Manage school years.`}
+                    to="/settings#school-years"
                   >
                     {schoolYearContext.label}
-                  </span>
+                  </Link>
                 </span>
                 <strong aria-live="polite">{presentation.title}</strong>
               </div>

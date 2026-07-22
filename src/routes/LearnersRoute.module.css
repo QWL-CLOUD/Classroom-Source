@@ -910,3 +910,42 @@
     width: 100%;
   }
 }
+
+.headerTools {
+  min-width: min(100%, 420px);
+  display: grid;
+  gap: 10px;
+  justify-items: end;
+}
+
+.schoolYearPicker {
+  min-width: min(100%, 280px);
+  display: grid;
+  gap: 5px;
+  color: #4f5955;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.schoolYearPicker select {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 32px 9px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  color: var(--heading);
+  background: var(--surface);
+  font: inherit;
+}
+
+@media (max-width: 760px) {
+  .headerTools {
+    width: 100%;
+    min-width: 0;
+    justify-items: stretch;
+  }
+
+  .schoolYearPicker {
+    min-width: 0;
+  }
+}

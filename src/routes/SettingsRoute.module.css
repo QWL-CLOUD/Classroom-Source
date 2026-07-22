@@ -1,0 +1,251 @@
+.summaryGrid,
+.yearGrid,
+.editorGrid {
+  display: grid;
+  gap: 16px;
+}
+
+.summaryGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 20px;
+}
+
+.summaryCard {
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+}
+
+.summaryCard span,
+.summaryCard small,
+.sectionIntro,
+.yearDates,
+.yearMeta,
+.editorHint {
+  color: #4f5955;
+}
+
+.summaryCard strong {
+  color: var(--heading);
+  font-size: 18px;
+}
+
+.rolloverCallout {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding: 18px 20px;
+  border: 1px solid var(--border-soft);
+  border-left: 5px solid #55746a;
+  border-radius: 16px;
+  background: #f6f8f6;
+}
+
+.rolloverCallout[data-tone='upcoming'],
+.rolloverCallout[data-tone='overdue'],
+.rolloverCallout[data-tone='missing'] {
+  border-left-color: #9b4b20;
+  background: #fff8ee;
+}
+
+.rolloverCallout h2,
+.sectionHeader h2,
+.editorHeader h2,
+.yearCard h3 {
+  margin: 0;
+  color: var(--heading);
+  font-family: Georgia, serif;
+}
+
+.rolloverCallout p,
+.sectionHeader p,
+.editorHeader p {
+  margin: 5px 0 0;
+  line-height: 1.55;
+}
+
+.actions,
+.yearActions,
+.editorActions,
+.sectionHeader,
+.editorHeader,
+.yearHeader,
+.statusRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.sectionHeader,
+.editorHeader,
+.yearHeader {
+  justify-content: space-between;
+}
+
+.sectionHeader {
+  margin-bottom: 16px;
+}
+
+.editorCard,
+.listCard {
+  padding: 22px;
+}
+
+.editorCard {
+  margin-bottom: 20px;
+}
+
+.editorGrid {
+  grid-template-columns: minmax(0, 1.4fr) minmax(160px, 0.8fr) minmax(160px, 0.8fr);
+  margin-top: 18px;
+}
+
+.editorGrid label {
+  display: grid;
+  gap: 7px;
+  color: var(--heading);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.editorGrid input {
+  min-width: 0;
+}
+
+.activeChoice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 16px 0 0;
+  color: var(--text);
+}
+
+.activeChoice input {
+  margin-top: 3px;
+}
+
+.editorActions {
+  margin-top: 18px;
+}
+
+.error,
+.success {
+  margin: 14px 0 0;
+  padding: 11px 13px;
+  border-radius: 11px;
+}
+
+.error {
+  color: #7b2d20;
+  background: #fff0ec;
+}
+
+.success {
+  color: #244f42;
+  background: #eaf4ef;
+}
+
+.yearGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.yearCard {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--border-soft);
+  border-radius: 15px;
+  background: var(--surface);
+}
+
+.yearCard[data-active='true'] {
+  border-color: #6e9888;
+  box-shadow: inset 4px 0 #55746a;
+}
+
+.yearCard[data-archived='true'] {
+  background: #f4f5f4;
+}
+
+.yearHeader > div:first-child {
+  min-width: 0;
+}
+
+.yearCard h3 {
+  overflow-wrap: anywhere;
+  font-size: 20px;
+}
+
+.yearDates,
+.yearMeta {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #31594e;
+  background: #e3eee8;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.archivedBadge {
+  color: #4f5955;
+  background: #e5e8e6;
+}
+
+.usageBadge {
+  color: #5d4a2a;
+  background: #f6ead4;
+}
+
+.emptyState,
+.loadingState {
+  padding: 28px;
+  text-align: center;
+}
+
+@media (max-width: 850px) {
+  .summaryGrid,
+  .yearGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .editorGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .rolloverCallout,
+  .sectionHeader,
+  .editorHeader,
+  .yearHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .actions,
+  .yearActions,
+  .editorActions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .actions > *,
+  .yearActions > *,
+  .editorActions > * {
+    width: 100%;
+    justify-content: center;
+  }
+}

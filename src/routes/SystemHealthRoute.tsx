@@ -142,8 +142,8 @@ export function SystemHealthRoute() {
                 )}
               </div>
               {summaryState.data.activeSchoolYearCount !== 1 ? (
-                <Link className="button button-secondary" to="/import">
-                  Review Import Center
+                <Link className="button button-secondary" to="/settings#school-years">
+                  Manage school years
                 </Link>
               ) : null}
             </div>

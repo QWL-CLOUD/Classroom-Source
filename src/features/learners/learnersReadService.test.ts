@@ -11,6 +11,7 @@ function createRepository(overrides: Partial<ClassroomRepository> = {}): Classro
     putTask: vi.fn().mockResolvedValue(undefined),
     deleteTask: vi.fn().mockResolvedValue(undefined),
     getActiveSchoolYear: vi.fn().mockResolvedValue(null),
+    listSchoolYears: vi.fn().mockResolvedValue([]),
     listScheduleBlocks: vi.fn().mockResolvedValue([]),
     listScheduleBlocksForRange: vi.fn().mockResolvedValue([]),
     listCalendarEventsForRange: vi.fn().mockResolvedValue([]),
@@ -91,6 +92,7 @@ describe('loadLearnersReadSnapshot', () => {
     const listSessionOccurrences = vi.fn().mockResolvedValue([]);
     const repository = createRepository({
       getActiveSchoolYear: vi.fn().mockResolvedValue(schoolYear),
+      listSchoolYears: vi.fn().mockResolvedValue([schoolYear]),
       listLearnerContexts,
       listLessonSeries,
       listLessonPlans,
@@ -177,5 +179,41 @@ describe('loadLearnersReadSnapshot', () => {
 
     expect(preferred.selectedContext?.id).toBe('archived-context');
     expect(requested.selectedContext?.id).toBe('archived-context');
+  });
+  it('loads a requested historical school year without changing the active year', async () => {
+    const activeYear: SchoolYear = {
+      id: 'school-year-current',
+      label: '2026–2027',
+      startsOn: '2026-07-01',
+      endsOn: '2027-06-30',
+      active: true,
+    };
+    const historicalYear: SchoolYear = {
+      id: 'school-year-history',
+      label: '2025–2026',
+      startsOn: '2025-07-01',
+      endsOn: '2026-06-30',
+      active: false,
+      lifecycleState: 'archived',
+    };
+    const listLearnerContexts = vi.fn().mockResolvedValue([]);
+    const repository = createRepository({
+      getActiveSchoolYear: vi.fn().mockResolvedValue(activeYear),
+      listSchoolYears: vi.fn().mockResolvedValue([activeYear, historicalYear]),
+      listLearnerContexts,
+    });
+
+    const result = await loadLearnersReadSnapshot(
+      repository,
+      undefined,
+      'active',
+      historicalYear.id,
+    );
+
+    expect(result.activeSchoolYear?.id).toBe(historicalYear.id);
+    expect(listLearnerContexts).toHaveBeenNthCalledWith(1, {
+      schoolYearId: historicalYear.id,
+      status: 'active',
+    });
   });
 });

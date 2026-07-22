@@ -10,6 +10,7 @@ function repositoryStub(): ClassroomRepository {
     putTask: vi.fn().mockResolvedValue(undefined),
     deleteTask: vi.fn().mockResolvedValue(undefined),
     getActiveSchoolYear: vi.fn().mockResolvedValue(null),
+    listSchoolYears: vi.fn().mockResolvedValue([]),
     listScheduleBlocks: vi.fn().mockResolvedValue([]),
     listScheduleBlocksForRange: vi.fn().mockResolvedValue([]),
     listCalendarEventsForRange: vi.fn().mockResolvedValue([]),

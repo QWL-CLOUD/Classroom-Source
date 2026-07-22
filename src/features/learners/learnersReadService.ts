@@ -6,9 +6,15 @@ export async function loadLearnersReadSnapshot(
   repository: ClassroomRepository,
   requestedContextId?: string,
   preferredStatus: LearnerContext['status'] = 'active',
+  requestedSchoolYearId?: string,
 ): Promise<LearnersReadSnapshot> {
-  const activeSchoolYear = await repository.getActiveSchoolYear();
-  const schoolYearQuery = activeSchoolYear ? { schoolYearId: activeSchoolYear.id } : {};
+  const [activeSchoolYear, schoolYears] = await Promise.all([
+    repository.getActiveSchoolYear(),
+    repository.listSchoolYears(),
+  ]);
+  const selectedSchoolYear =
+    schoolYears.find((schoolYear) => schoolYear.id === requestedSchoolYearId) ?? activeSchoolYear;
+  const schoolYearQuery = selectedSchoolYear ? { schoolYearId: selectedSchoolYear.id } : {};
   const [activeContexts, archivedContexts] = await Promise.all([
     repository.listLearnerContexts({ ...schoolYearQuery, status: 'active' }),
     repository.listLearnerContexts({ ...schoolYearQuery, status: 'archived' }),
@@ -24,7 +30,7 @@ export async function loadLearnersReadSnapshot(
 
   if (!selectedContext) {
     return {
-      activeSchoolYear,
+      activeSchoolYear: selectedSchoolYear,
       contexts,
       selectedContext: null,
       lessonSeries: [],
@@ -40,7 +46,7 @@ export async function loadLearnersReadSnapshot(
   ]);
 
   return {
-    activeSchoolYear,
+    activeSchoolYear: selectedSchoolYear,
     contexts,
     selectedContext,
     lessonSeries,

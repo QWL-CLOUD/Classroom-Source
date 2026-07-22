@@ -533,3 +533,19 @@
     display: none;
   }
 }
+
+/* Phase 3D-5B-9: active school-year context links to its lifecycle workspace. */
+.schoolYearLink {
+  border-radius: 4px;
+  text-decoration: none;
+}
+
+.schoolYearLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.schoolYearLink:focus-visible {
+  outline: 3px solid currentcolor;
+  outline-offset: 3px;
+}

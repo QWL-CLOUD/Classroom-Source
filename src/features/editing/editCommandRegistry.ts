@@ -26,6 +26,11 @@ import {
   type ScheduleExceptionCommand,
 } from '@/features/scheduleExceptions/scheduleExceptionCommands';
 import {
+  parseSchoolYearCommand,
+  SCHOOL_YEAR_COMMAND_PREFIX,
+  type SchoolYearCommand,
+} from '@/features/schoolYears/schoolYearCommands';
+import {
   parseTaskCommand,
   TASK_COMMAND_PREFIX,
   type TaskCommand,
@@ -50,7 +55,8 @@ export type SupportedEditCommand =
   | { entity: 'learner-context'; command: LearnerContextCommand }
   | { entity: 'learner-notice'; command: LearnerNoticeCommand }
   | { entity: 'task'; command: TaskCommand }
-  | { entity: 'reminder'; command: ReminderCommand };
+  | { entity: 'reminder'; command: ReminderCommand }
+  | { entity: 'school-year'; command: SchoolYearCommand };
 
 export function isSupportedEditChangeLog(log: ChangeLog): boolean {
   return (
@@ -61,7 +67,8 @@ export function isSupportedEditChangeLog(log: ChangeLog): boolean {
     log.commandType.startsWith(LEARNER_CONTEXT_COMMAND_PREFIX) ||
     log.commandType.startsWith(LEARNER_NOTICE_COMMAND_PREFIX) ||
     log.commandType.startsWith(TASK_COMMAND_PREFIX) ||
-    log.commandType.startsWith(REMINDER_COMMAND_PREFIX)
+    log.commandType.startsWith(REMINDER_COMMAND_PREFIX) ||
+    log.commandType.startsWith(SCHOOL_YEAR_COMMAND_PREFIX)
   );
 }
 
@@ -106,6 +113,12 @@ export function parseSupportedEditCommand(commandType: string, json: string): Su
     return {
       entity: 'reminder',
       command: parseReminderCommand(json),
+    };
+  }
+  if (commandType.startsWith(SCHOOL_YEAR_COMMAND_PREFIX)) {
+    return {
+      entity: 'school-year',
+      command: parseSchoolYearCommand(json),
     };
   }
   if (commandType.startsWith(SCHEDULE_EXCEPTION_COMMAND_PREFIX)) {
@@ -173,6 +186,14 @@ export async function applySupportedEditCommand(
     for (const operation of parsed.command.operations) {
       if (operation.action === 'put') await db.reminders.put(operation.record);
       else await db.reminders.delete(operation.id);
+    }
+    return;
+  }
+
+  if (parsed.entity === 'school-year') {
+    for (const operation of parsed.command.operations) {
+      if (operation.action === 'put') await db.schoolYears.put(operation.record);
+      else await db.schoolYears.delete(operation.id);
     }
     return;
   }
