@@ -95,6 +95,37 @@ describe('CategoryMutationService', () => {
     });
   });
 
+  it('updates name and presentation as one undoable editor command', async () => {
+    await database.categoryValues.put(
+      value('purpose-reading', 'Reading', 'purpose-tag', {
+        colorKey: 'blue',
+        iconKey: 'book-open',
+      }),
+    );
+    ids = ['log-update'];
+
+    await service.update('purpose-reading', {
+      name: 'Reading comprehension',
+      colorKey: 'teal',
+      iconKey: 'target',
+    });
+
+    expect(await database.categoryValues.get('purpose-reading')).toMatchObject({
+      name: 'Reading comprehension',
+      aliases: ['Reading'],
+      colorKey: 'teal',
+      iconKey: 'target',
+    });
+
+    await history.undo();
+    expect(await database.categoryValues.get('purpose-reading')).toMatchObject({
+      name: 'Reading',
+      aliases: [],
+      colorKey: 'blue',
+      iconKey: 'book-open',
+    });
+  });
+
   it('reorders active values as one undoable compound command', async () => {
     await database.categoryValues.bulkPut([
       value('first', 'First', 'purpose-tag', { sortOrder: 0 }),

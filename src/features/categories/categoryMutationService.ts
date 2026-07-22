@@ -143,6 +143,56 @@ export class CategoryMutationService {
     return result.value;
   }
 
+  async update(id: string, values: CategoryValueEditorValues): Promise<CategoryValue> {
+    const parsed = categoryValueEditorValuesSchema.parse(values);
+    const result = await this.db.transaction(
+      'rw',
+      this.db.categoryValues,
+      this.db.changeLog,
+      async (): Promise<CommitResult<CategoryValue>> => {
+        const existing = await this.requireValue(id);
+        this.requireNotMerged(existing);
+        const normalizedName = normalizeCategoryName(parsed.name);
+        const nameChanged = normalizedName !== existing.normalizedName;
+        if (nameChanged) {
+          const familyValues = await this.listValidatedValues(existing.familyId);
+          this.assertNameAvailable(familyValues, parsed.name, new Set([existing.id]));
+        }
+        const retainedAliases = nameChanged
+          ? existing.aliases.filter((alias) => normalizeCategoryName(alias) !== normalizedName)
+          : existing.aliases;
+        const aliases = nameChanged
+          ? normalizeCategoryAliases([...retainedAliases, existing.name])
+          : { aliases: existing.aliases, normalizedAliases: existing.normalizedAliases };
+        if (
+          parsed.name === existing.name &&
+          parsed.colorKey === existing.colorKey &&
+          parsed.iconKey === existing.iconKey
+        ) {
+          throw new Error('The category value is unchanged.');
+        }
+        const updated = categoryValueSchema.parse({
+          ...existing,
+          name: parsed.name,
+          normalizedName,
+          aliases: aliases.aliases,
+          normalizedAliases: aliases.normalizedAliases,
+          colorKey: parsed.colorKey,
+          iconKey: parsed.iconKey,
+          updatedAt: this.now(),
+        });
+        return this.commitSingleValueChange(
+          existing,
+          updated,
+          'category.update',
+          `Update “${existing.name}”`,
+        );
+      },
+    );
+    this.notifyNewChange(result.log);
+    return result.value;
+  }
+
   async rename(id: string, name: string): Promise<CategoryValue> {
     const parsedName = z.string().trim().min(1).max(120).parse(name);
     const result = await this.db.transaction(
