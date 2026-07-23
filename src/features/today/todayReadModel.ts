@@ -7,6 +7,10 @@ import type {
 } from '@/domain/models/entities';
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
 import { resolveScheduleOccurrence } from '@/features/scheduleExceptions/scheduleOccurrenceResolver';
+import {
+  scheduleOccurrenceIsVisibleForSchoolYear,
+  type SchoolYearScheduleBoundary,
+} from '@/features/schoolYears/schoolYearScheduleBoundary';
 import { formatLongDate, parseLocalDate, todayLocalDate } from '@/shared/dates/localDate';
 
 export type TodayItemSource = 'calendar-event' | 'schedule-block' | 'session-occurrence';
@@ -411,6 +415,7 @@ export function buildTodayReadModel(
   scheduleExceptions: readonly ScheduleException[] = [],
   lessonPlans: readonly LessonPlan[] = [],
   sessionOccurrences: readonly SessionOccurrence[] = [],
+  schoolYearBoundary?: SchoolYearScheduleBoundary | null,
 ): TodayReadModel {
   requireLocalDate(selectedDate);
   requireLocalDate(currentDate);
@@ -420,6 +425,13 @@ export function buildTodayReadModel(
   const visibleScheduleBlocks = scheduleBlocks
     .map((block) => resolveScheduleOccurrence(block, selectedDate, scheduleExceptions))
     .filter((occurrence) => occurrence !== null)
+    .filter((occurrence) =>
+      scheduleOccurrenceIsVisibleForSchoolYear(
+        selectedDate,
+        occurrence.exception?.action,
+        schoolYearBoundary,
+      ),
+    )
     .map((occurrence) => occurrence.block);
   const visibleCalendarEvents = calendarEvents.filter((event) =>
     calendarEventOccursOnDate(event, selectedDate),

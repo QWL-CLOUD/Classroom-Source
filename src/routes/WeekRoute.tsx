@@ -12,6 +12,7 @@ import { parseWeekViewQuery, toWeekViewQuery } from '@/features/week/weekNavigat
 import type { WeekDayItem, WeekViewFilter } from '@/features/week/weekReadModel';
 import { buildWeekReadModel, getWeekRange, shiftWeek } from '@/features/week/weekReadModel';
 import { useScheduleExceptionsForRange } from '@/features/scheduleExceptions/useScheduleExceptionsForRange';
+import { useActiveSchoolYear } from '@/features/schoolYears/useActiveSchoolYear';
 import { useWeekPlanningReadModel } from '@/features/week/useWeekPlanningReadModel';
 import { useWorkspaceReadModel } from '@/features/workspace/useWorkspaceReadModel';
 import { todayLocalDate } from '@/shared/dates/localDate';
@@ -79,6 +80,11 @@ export function WeekRoute() {
     endDate: range.sundayDate,
   });
   const scheduleExceptions = useScheduleExceptionsForRange(range.mondayDate, range.sundayDate);
+  const activeSchoolYearState = useActiveSchoolYear();
+  const schoolYearBoundary =
+    activeSchoolYearState.status === 'ready'
+      ? (activeSchoolYearState.data ?? undefined)
+      : undefined;
   const week = useMemo(
     () =>
       state.status === 'ready' && planningState.status === 'ready'
@@ -91,9 +97,10 @@ export function WeekRoute() {
             planningState.data.lessonPlans,
             planningState.data.sessionOccurrences,
             scheduleExceptions ?? [],
+            schoolYearBoundary,
           )
         : null,
-    [date, planningState, scheduleExceptions, state, weekView],
+    [date, planningState, scheduleExceptions, schoolYearBoundary, state, weekView],
   );
   const scheduleHierarchy = useMemo<ReadonlyMap<string, ScheduleBlockHierarchyMetadata>>(
     () =>
