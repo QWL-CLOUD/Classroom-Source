@@ -6,6 +6,11 @@ import {
 } from '@/features/categories/categoryCommands';
 import { changeLogSchema, type ChangeLog } from '@/domain/models/entities';
 import {
+  LIBRARY_CATALOG_COMMAND_PREFIX,
+  parseLibraryCatalogCommand,
+  type LibraryCatalogCommand,
+} from '@/features/libraryCatalog/libraryCatalogCommands';
+import {
   LEARNER_NOTICE_COMMAND_PREFIX,
   parseLearnerNoticeCommand,
   type LearnerNoticeCommand,
@@ -60,6 +65,7 @@ export type SupportedEditCommand =
   | { entity: 'planning'; command: PlanningCommand }
   | { entity: 'learner-context'; command: LearnerContextCommand }
   | { entity: 'learner-notice'; command: LearnerNoticeCommand }
+  | { entity: 'library-catalog'; command: LibraryCatalogCommand }
   | { entity: 'task'; command: TaskCommand }
   | { entity: 'reminder'; command: ReminderCommand }
   | { entity: 'school-year'; command: SchoolYearCommand };
@@ -73,6 +79,7 @@ export function isSupportedEditChangeLog(log: ChangeLog): boolean {
     log.commandType.startsWith(PLANNING_COMMAND_PREFIX) ||
     log.commandType.startsWith(LEARNER_CONTEXT_COMMAND_PREFIX) ||
     log.commandType.startsWith(LEARNER_NOTICE_COMMAND_PREFIX) ||
+    log.commandType.startsWith(LIBRARY_CATALOG_COMMAND_PREFIX) ||
     log.commandType.startsWith(TASK_COMMAND_PREFIX) ||
     log.commandType.startsWith(REMINDER_COMMAND_PREFIX) ||
     log.commandType.startsWith(SCHOOL_YEAR_COMMAND_PREFIX)
@@ -114,6 +121,12 @@ export function parseSupportedEditCommand(commandType: string, json: string): Su
     return {
       entity: 'learner-notice',
       command: parseLearnerNoticeCommand(json),
+    };
+  }
+  if (commandType.startsWith(LIBRARY_CATALOG_COMMAND_PREFIX)) {
+    return {
+      entity: 'library-catalog',
+      command: parseLibraryCatalogCommand(json),
     };
   }
   if (commandType.startsWith(TASK_COMMAND_PREFIX)) {
@@ -200,6 +213,23 @@ export async function applySupportedEditCommand(
       } else if (operation.table === 'tasks') {
         if (operation.action === 'put') await db.tasks.put(operation.record);
         else await db.tasks.delete(operation.id);
+      } else if (operation.action === 'put') {
+        await db.categoryAssignments.put(operation.record);
+      } else {
+        await db.categoryAssignments.delete(operation.id);
+      }
+    }
+    return;
+  }
+
+  if (parsed.entity === 'library-catalog') {
+    for (const operation of parsed.command.operations) {
+      if (operation.table === 'libraryItems') {
+        if (operation.action === 'put') {
+          await db.libraryItems.put(operation.record);
+        } else {
+          await db.libraryItems.delete(operation.id);
+        }
       } else if (operation.action === 'put') {
         await db.categoryAssignments.put(operation.record);
       } else {

@@ -89,9 +89,10 @@ test('workspace navigation preserves context and final focus patterns stay acces
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('./#/library');
   await expect(page).toHaveTitle('Library · Classroom');
-  await expect(page.locator('#main-content').getByText('Planned', { exact: true })).toBeVisible();
-  await expect(page.getByText('Phase 3E-2 — Library Catalog Foundation')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Open Planning' })).toBeVisible();
+  const libraryMain = page.locator('#main-content');
+  await expect(libraryMain.getByRole('heading', { level: 1, name: 'Library' })).toBeVisible();
+  await expect(libraryMain.getByRole('button', { name: 'New Library item' })).toBeVisible();
+  await expect(libraryMain.getByRole('region', { name: 'Library catalog filters' })).toBeVisible();
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
   ).toBe(true);
