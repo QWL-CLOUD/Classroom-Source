@@ -102,6 +102,29 @@ test('Learners provides a searchable directory, creation flow, and tabbed select
   await directoryActions.getByRole('button', { name: 'Manage details & lifecycle' }).click();
   await expect(page.getByRole('tab', { name: 'Details', selected: true })).toBeVisible();
 
+  await page.setViewportSize({ width: 1240, height: 800 });
+
+  await expect(directory).toBeVisible();
+  const selectedWorkspace = page.getByRole('region', { name: 'Planning for Anna Wang' });
+  await expect(selectedWorkspace).toBeVisible();
+
+  const [sidebarBox, directoryBox, selectedWorkspaceBox] = await Promise.all([
+    page.getByRole('complementary', { name: 'Primary navigation' }).boundingBox(),
+    directory.boundingBox(),
+    selectedWorkspace.boundingBox(),
+  ]);
+
+  expect(sidebarBox).not.toBeNull();
+  expect(directoryBox).not.toBeNull();
+  expect(selectedWorkspaceBox).not.toBeNull();
+  expect(sidebarBox!.width).toBeLessThanOrEqual(100);
+  expect(directoryBox!.width).toBeGreaterThanOrEqual(280);
+  expect(selectedWorkspaceBox!.width).toBeGreaterThanOrEqual(520);
+  expect(directoryBox!.x + directoryBox!.width).toBeLessThanOrEqual(selectedWorkspaceBox!.x - 8);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByRole('region', { name: 'Learner contexts' })).toBeHidden();
   await expect(page.getByRole('region', { name: 'Selected learner context' })).toContainText(
