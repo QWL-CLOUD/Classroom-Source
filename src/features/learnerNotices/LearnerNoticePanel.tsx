@@ -12,7 +12,12 @@ import { useId, useMemo, useState, type FormEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 
 import { classroomDb } from '@/data/db/ClassroomDatabase';
-import type { LearnerContext, LearnerNotice, LearnerNoticeKind } from '@/domain/models/entities';
+import type {
+  LearnerContext,
+  LearnerNotice,
+  LearnerNoticeKind,
+  LearnerServiceOccurrence,
+} from '@/domain/models/entities';
 import { CategoryAssignmentFields } from '@/features/categories/CategoryAssignmentFields';
 import type { CategorySelectionMap } from '@/features/categories/categoryAssignmentSelection';
 import { useCategorySelectionDraft } from '@/features/categories/useCategorySelectionDraft';
@@ -29,13 +34,30 @@ import {
   selectLearnerNoticeView,
   type LearnerNoticeView,
 } from './learnerNoticeReadModel';
+import { formatLearnerServiceRecurrence } from './learnerServiceRecurrence';
 import styles from './LearnerNoticePanel.module.css';
+
+const weekdayChoices = [
+  { value: 1, label: 'Monday' },
+  { value: 2, label: 'Tuesday' },
+  { value: 3, label: 'Wednesday' },
+  { value: 4, label: 'Thursday' },
+  { value: 5, label: 'Friday' },
+  { value: 6, label: 'Saturday' },
+  { value: 7, label: 'Sunday' },
+] as const;
 
 interface NoticeFormState {
   kind: LearnerNoticeKind;
   title: string;
   details: string;
   noticeDate: string;
+  serviceRepeats: boolean;
+  serviceWeekdays: number[];
+  serviceStartsOn: string;
+  serviceEndsOn: string;
+  serviceStartTime: string;
+  serviceEndTime: string;
   createFollowUpTask: boolean;
   followUpScheduledDate: string;
 }
@@ -55,17 +77,39 @@ interface NoticeFormProps {
       followUpScheduledDate?: string;
     },
     categorySelections: CategorySelectionMap,
-  ) => Promise<void>;
+  ) => Promise<unknown>;
+}
+
+function minuteToInput(minute: number | undefined, fallback: string): string {
+  if (minute === undefined) return fallback;
+  return `${String(Math.floor(minute / 60)).padStart(2, '0')}:${String(minute % 60).padStart(
+    2,
+    '0',
+  )}`;
+}
+
+function inputToMinute(value: string): number {
+  const match = /^(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return Number.NaN;
+  return Number(match[1]) * 60 + Number(match[2]);
 }
 
 function initialFormState(initial?: LearnerNotice, defaultDate?: string): NoticeFormState {
+  const recurrence = initial?.serviceRecurrence;
+  const fallbackDate = defaultDate ?? todayLocalDate();
   return {
     kind: initial?.kind ?? 'ongoing-support',
     title: initial?.title ?? '',
     details: initial?.details ?? '',
-    noticeDate: initial?.noticeDate ?? defaultDate ?? '',
+    noticeDate: initial?.noticeDate ?? fallbackDate,
+    serviceRepeats: Boolean(recurrence),
+    serviceWeekdays: recurrence?.weekdays ?? [2],
+    serviceStartsOn: recurrence?.startsOn ?? fallbackDate,
+    serviceEndsOn: recurrence?.endsOn ?? '',
+    serviceStartTime: minuteToInput(recurrence?.startMinute, '10:00'),
+    serviceEndTime: minuteToInput(recurrence?.endMinute, '10:30'),
     createFollowUpTask: false,
-    followUpScheduledDate: initial?.noticeDate ?? defaultDate ?? '',
+    followUpScheduledDate: initial?.noticeDate ?? recurrence?.startsOn ?? fallbackDate,
   };
 }
 
@@ -80,9 +124,7 @@ function NoticeForm({
   onSubmit,
 }: NoticeFormProps) {
   const id = useId();
-  const [values, setValues] = useState<NoticeFormState>(() =>
-    initialFormState(initial, defaultDate),
-  );
+  const [values, setValues] = useState(() => initialFormState(initial, defaultDate));
   const [error, setError] = useState<string | null>(null);
   const categoryDraft = useCategorySelectionDraft('learner-notice', initial?.id);
 
@@ -90,6 +132,17 @@ function NoticeForm({
     event.preventDefault();
     setError(null);
     try {
+      const serviceRecurrence =
+        values.kind === 'learner-service' && values.serviceRepeats
+          ? {
+              frequency: 'weekly' as const,
+              weekdays: values.serviceWeekdays,
+              startsOn: values.serviceStartsOn,
+              endsOn: values.serviceEndsOn || undefined,
+              startMinute: inputToMinute(values.serviceStartTime),
+              endMinute: inputToMinute(values.serviceEndTime),
+            }
+          : undefined;
       await onSubmit(
         {
           contextId,
@@ -97,6 +150,7 @@ function NoticeForm({
           title: values.title,
           details: values.details,
           noticeDate: values.kind === 'date-specific-notice' ? values.noticeDate : undefined,
+          serviceRecurrence,
           createFollowUpTask: allowFollowUp ? values.createFollowUpTask : false,
           followUpScheduledDate:
             allowFollowUp && values.createFollowUpTask
@@ -130,43 +184,170 @@ function NoticeForm({
             <option value="learner-service">Learner Service</option>
           </select>
         </label>
+
         {values.kind === 'date-specific-notice' ? (
-          <label htmlFor={`${id}-date`}>
+          <label htmlFor={`${id}-notice-date`}>
             <span>Notice date</span>
             <input
-              id={`${id}-date`}
+              id={`${id}-notice-date`}
               type="date"
               value={values.noticeDate}
               onChange={(event) =>
-                setValues((current) => ({ ...current, noticeDate: event.target.value }))
+                setValues((current) => ({
+                  ...current,
+                  noticeDate: event.target.value,
+                }))
               }
               required
             />
           </label>
         ) : null}
       </div>
+
+      {values.kind === 'learner-service' ? (
+        <fieldset className={styles.recurrenceGroup}>
+          <legend>Service schedule</legend>
+          <label className={styles.checkboxLabel} htmlFor={`${id}-service-repeat`}>
+            <input
+              id={`${id}-service-repeat`}
+              type="checkbox"
+              checked={values.serviceRepeats}
+              onChange={(event) =>
+                setValues((current) => ({
+                  ...current,
+                  serviceRepeats: event.target.checked,
+                }))
+              }
+            />
+            <span>Repeat weekly</span>
+          </label>
+
+          {values.serviceRepeats ? (
+            <>
+              <fieldset className={styles.weekdayGroup}>
+                <legend>Service days</legend>
+                <div className={styles.weekdayGrid}>
+                  {weekdayChoices.map((weekday) => (
+                    <label className={styles.checkboxLabel} key={weekday.value}>
+                      <input
+                        type="checkbox"
+                        checked={values.serviceWeekdays.includes(weekday.value)}
+                        onChange={(event) =>
+                          setValues((current) => ({
+                            ...current,
+                            serviceWeekdays: event.target.checked
+                              ? [...current.serviceWeekdays, weekday.value].sort()
+                              : current.serviceWeekdays.filter((value) => value !== weekday.value),
+                          }))
+                        }
+                      />
+                      <span>{weekday.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              <div className={styles.formGrid}>
+                <label htmlFor={`${id}-service-start-date`}>
+                  <span>Starts</span>
+                  <input
+                    id={`${id}-service-start-date`}
+                    type="date"
+                    value={values.serviceStartsOn}
+                    onChange={(event) =>
+                      setValues((current) => ({
+                        ...current,
+                        serviceStartsOn: event.target.value,
+                      }))
+                    }
+                    required
+                  />
+                </label>
+                <label htmlFor={`${id}-service-end-date`}>
+                  <span>Ends</span>
+                  <input
+                    id={`${id}-service-end-date`}
+                    type="date"
+                    value={values.serviceEndsOn}
+                    onChange={(event) =>
+                      setValues((current) => ({
+                        ...current,
+                        serviceEndsOn: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+                <label htmlFor={`${id}-service-start-time`}>
+                  <span>Start time</span>
+                  <input
+                    id={`${id}-service-start-time`}
+                    type="time"
+                    value={values.serviceStartTime}
+                    onChange={(event) =>
+                      setValues((current) => ({
+                        ...current,
+                        serviceStartTime: event.target.value,
+                      }))
+                    }
+                    required
+                  />
+                </label>
+                <label htmlFor={`${id}-service-end-time`}>
+                  <span>End time</span>
+                  <input
+                    id={`${id}-service-end-time`}
+                    type="time"
+                    value={values.serviceEndTime}
+                    onChange={(event) =>
+                      setValues((current) => ({
+                        ...current,
+                        serviceEndTime: event.target.value,
+                      }))
+                    }
+                    required
+                  />
+                </label>
+              </div>
+            </>
+          ) : (
+            <p className={styles.recurrenceHint}>
+              Without recurrence, this service keeps the existing open-ended behavior and appears in
+              Students to Notice every day.
+            </p>
+          )}
+        </fieldset>
+      ) : null}
+
       <label htmlFor={`${id}-title`}>
         <span>Title</span>
         <input
           id={`${id}-title`}
           value={values.title}
-          maxLength={240}
-          onChange={(event) => setValues((current) => ({ ...current, title: event.target.value }))}
+          onChange={(event) =>
+            setValues((current) => ({
+              ...current,
+              title: event.target.value,
+            }))
+          }
           required
         />
       </label>
+
       <label htmlFor={`${id}-details`}>
         <span>Details</span>
         <textarea
           id={`${id}-details`}
           rows={4}
           value={values.details}
-          maxLength={5000}
           onChange={(event) =>
-            setValues((current) => ({ ...current, details: event.target.value }))
+            setValues((current) => ({
+              ...current,
+              details: event.target.value,
+            }))
           }
         />
       </label>
+
       {allowFollowUp ? (
         <div className={styles.followUpGroup}>
           <label className={styles.checkboxLabel} htmlFor={`${id}-follow-up`}>
@@ -201,17 +382,20 @@ function NoticeForm({
           ) : null}
         </div>
       ) : null}
+
       <CategoryAssignmentFields
         snapshot={categoryDraft.snapshot}
         selectedSets={categoryDraft.selectedSets}
         disabled={busy}
         onToggle={categoryDraft.toggle}
       />
+
       {error ? (
         <p className={styles.error} role="alert">
           {error}
         </p>
       ) : null}
+
       <div className={styles.formActions}>
         <button
           className="button button-primary"
@@ -231,10 +415,12 @@ function NoticeForm({
 function NoticeCard({
   notice,
   followUpCount,
+  occurrences,
   onBusy,
 }: {
   notice: LearnerNotice;
   followUpCount: number;
+  occurrences: LearnerServiceOccurrence[];
   onBusy: (action: () => Promise<unknown>) => Promise<boolean>;
 }) {
   const [editing, setEditing] = useState(false);
@@ -244,14 +430,23 @@ function NoticeCard({
   async function checkDelete(): Promise<void> {
     const impact = await learnerNoticeMutationService.previewDelete(notice.id);
     if (!impact.canDelete) {
-      setDeleteMessage(
-        `Delete is blocked: ${impact.reminders} reminder${impact.reminders === 1 ? '' : 's'} and ${impact.followUpTasks} follow-up task${impact.followUpTasks === 1 ? '' : 's'} are linked.`,
-      );
+      const linked = [
+        impact.reminders ? `${impact.reminders} reminder${impact.reminders === 1 ? '' : 's'}` : '',
+        impact.followUpTasks
+          ? `${impact.followUpTasks} follow-up task${impact.followUpTasks === 1 ? '' : 's'}`
+          : '',
+        impact.serviceOccurrences
+          ? `${impact.serviceOccurrences} service occurrence${
+              impact.serviceOccurrences === 1 ? '' : 's'
+            }`
+          : '',
+      ].filter(Boolean);
+      setDeleteMessage(`Delete is blocked: ${linked.join(' and ')} are linked.`);
       setConfirmingDelete(false);
       return;
     }
     setDeleteMessage(
-      'No linked reminders or follow-up Tasks were found. Confirm permanent deletion.',
+      'No linked reminders, follow-up Tasks, or service occurrences were found. Confirm permanent deletion.',
     );
     setConfirmingDelete(true);
   }
@@ -293,23 +488,61 @@ function NoticeCard({
                 <Edit3 size={16} aria-hidden="true" />
               </button>
             </div>
+
             {notice.noticeDate ? (
               <p className={styles.date}>For {formatShortDate(notice.noticeDate)}</p>
+            ) : null}
+            {notice.serviceRecurrence ? (
+              <p className={styles.recurrenceSummary}>
+                {formatLearnerServiceRecurrence(notice.serviceRecurrence)}
+              </p>
             ) : null}
             {notice.details ? <p className={styles.details}>{notice.details}</p> : null}
             {followUpCount > 0 ? (
               <p className={styles.linkedTaskNote}>
-                {followUpCount} linked follow-up Task{followUpCount === 1 ? '' : 's'} ·{' '}
-                <a href="#/tasks">Open Tasks</a>
+                {followUpCount} linked follow-up Task
+                {followUpCount === 1 ? '' : 's'} · <a href="#/tasks">Open Tasks</a>
               </p>
+            ) : null}
+
+            {occurrences.length > 0 ? (
+              <details className={styles.occurrenceHistory}>
+                <summary>Occurrence history ({occurrences.length})</summary>
+                <ul>
+                  {occurrences.map((occurrence) => (
+                    <li key={occurrence.id}>
+                      <span>
+                        {formatShortDate(occurrence.date)} ·{' '}
+                        {occurrence.status === 'completed' ? 'Completed' : 'Cancelled'}
+                      </span>
+                      <button
+                        className="button button-quiet"
+                        type="button"
+                        onClick={() =>
+                          void onBusy(() =>
+                            learnerNoticeMutationService.restoreOccurrence(
+                              notice.id,
+                              occurrence.date,
+                            ),
+                          )
+                        }
+                      >
+                        Restore occurrence
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </details>
             ) : null}
 
             <ReminderPanel
               sourceType="learner-notice"
               sourceId={notice.id}
               sourceTitle={notice.title}
-              defaultDate={notice.noticeDate ?? todayLocalDate()}
-              defaultMinute={9 * 60}
+              defaultDate={
+                notice.noticeDate ?? notice.serviceRecurrence?.startsOn ?? todayLocalDate()
+              }
+              defaultMinute={notice.serviceRecurrence?.startMinute ?? 9 * 60}
             />
 
             {deleteMessage ? (
@@ -317,6 +550,7 @@ function NoticeCard({
                 {deleteMessage}
               </p>
             ) : null}
+
             <div className={styles.actions}>
               {notice.status === 'active' ? (
                 <button
@@ -335,6 +569,7 @@ function NoticeCard({
                   <RotateCcw size={15} aria-hidden="true" /> Reopen
                 </button>
               )}
+
               {notice.status !== 'archived' ? (
                 <button
                   className="button"
@@ -344,6 +579,7 @@ function NoticeCard({
                   <Archive size={15} aria-hidden="true" /> Archive
                 </button>
               ) : null}
+
               {!confirmingDelete ? (
                 <button
                   className="button button-quiet"
@@ -392,13 +628,27 @@ export function LearnerNoticePanel({ context }: { context: LearnerContext }) {
   const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   const data = useLiveQuery(async () => {
-    const [notices, tasks] = await Promise.all([
+    const [notices, tasks, occurrences] = await Promise.all([
       classroomDb.learnerNotices.where('contextId').equals(context.id).toArray(),
       classroomDb.tasks.filter((task) => task.linkedEntityType === 'learner-notice').toArray(),
+      classroomDb.learnerServiceOccurrences.toArray(),
     ]);
-    return { notices, tasks };
+    const noticeIds = new Set(notices.map((notice) => notice.id));
+    return {
+      notices,
+      tasks,
+      occurrences: occurrences
+        .filter((occurrence) => noticeIds.has(occurrence.learnerNoticeId))
+        .sort(
+          (first, second) =>
+            second.date.localeCompare(first.date) ||
+            second.updatedAt.localeCompare(first.updatedAt),
+        ),
+    };
   }, [context.id]);
+
   const visible = useMemo(() => selectLearnerNoticeView(data?.notices ?? [], view), [data, view]);
   const counts = useMemo(
     () => ({
@@ -432,7 +682,7 @@ export function LearnerNoticePanel({ context }: { context: LearnerContext }) {
       <div className={styles.heading}>
         <div>
           <p className="page-eyebrow">Learner support</p>
-          <h2>Support &amp; Notices</h2>
+          <h2>Support & Notices</h2>
         </div>
         {context.status === 'active' && !creating ? (
           <button className="button button-primary" type="button" onClick={() => setCreating(true)}>
@@ -440,15 +690,18 @@ export function LearnerNoticePanel({ context }: { context: LearnerContext }) {
           </button>
         ) : null}
       </div>
+
       <p className={styles.intro}>
         Ongoing Support, date-specific Notices, and Learner Services remain connected to this
         learner context.
       </p>
+
       {context.status === 'archived' ? (
         <p className={styles.warning} role="status">
           Restore this context before adding a new support or notice record.
         </p>
       ) : null}
+
       {creating ? (
         <NoticeForm
           contextId={context.id}
@@ -465,11 +718,13 @@ export function LearnerNoticePanel({ context }: { context: LearnerContext }) {
           }}
         />
       ) : null}
+
       {error ? (
         <p className={styles.error} role="alert">
           {error}
         </p>
       ) : null}
+
       <div className={styles.tabs} role="tablist" aria-label="Learner support views">
         <button
           type="button"
@@ -488,6 +743,7 @@ export function LearnerNoticePanel({ context }: { context: LearnerContext }) {
           History <span>{counts.history}</span>
         </button>
       </div>
+
       {data === undefined ? (
         <p className={styles.message}>Loading learner support records…</p>
       ) : visible.length === 0 ? (
@@ -502,7 +758,9 @@ export function LearnerNoticePanel({ context }: { context: LearnerContext }) {
       ) : (
         <ul
           className={styles.list}
-          aria-label={`${view === 'active' ? 'Active' : 'History'} support and notices for ${context.name}`}
+          aria-label={`${
+            view === 'active' ? 'Active' : 'History'
+          } support and notices for ${context.name}`}
         >
           {visible.map((notice) => (
             <NoticeCard
@@ -511,6 +769,9 @@ export function LearnerNoticePanel({ context }: { context: LearnerContext }) {
               followUpCount={
                 (data.tasks ?? []).filter((task) => task.linkedEntityId === notice.id).length
               }
+              occurrences={(data.occurrences ?? []).filter(
+                (occurrence) => occurrence.learnerNoticeId === notice.id,
+              )}
               onBusy={run}
             />
           ))}

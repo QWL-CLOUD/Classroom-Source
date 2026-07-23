@@ -156,6 +156,7 @@ describe('LearnerNoticeMutationService', () => {
       noticeTitle: 'Linked support',
       reminders: 1,
       followUpTasks: 1,
+      serviceOccurrences: 0,
       totalLinkedRecords: 2,
       canDelete: false,
     });
@@ -181,5 +182,46 @@ describe('LearnerNoticeMutationService', () => {
     expect(await database.learnerNotices.get('notice-1')).toBeDefined();
     await history.redo();
     expect(await database.learnerNotices.get('notice-1')).toBeUndefined();
+  });
+  it('records one recurring service occurrence and keeps it globally undoable', async () => {
+    const service = createService([
+      'service-1',
+      '01-create-log',
+      '02-complete-log',
+      '03-restore-log',
+    ]);
+    const history = new EditHistoryService(database, {
+      now: () => '2026-07-21T15:00:00.000Z',
+    });
+
+    await service.create({
+      contextId: activeContext.id,
+      kind: 'learner-service',
+      title: 'Weekly speech support',
+      serviceRecurrence: {
+        frequency: 'weekly',
+        weekdays: [2],
+        startsOn: '2026-07-01',
+        endsOn: '2026-07-31',
+        startMinute: 600,
+        endMinute: 630,
+      },
+    });
+
+    await service.completeOccurrence('service-1', '2026-07-21');
+    expect(await database.learnerServiceOccurrences.get('service-1:2026-07-21')).toMatchObject({
+      status: 'completed',
+    });
+
+    await history.undo();
+    expect(await database.learnerServiceOccurrences.get('service-1:2026-07-21')).toBeUndefined();
+
+    await history.redo();
+    expect(await database.learnerServiceOccurrences.get('service-1:2026-07-21')).toMatchObject({
+      status: 'completed',
+    });
+
+    await service.restoreOccurrence('service-1', '2026-07-21');
+    expect(await database.learnerServiceOccurrences.get('service-1:2026-07-21')).toBeUndefined();
   });
 });

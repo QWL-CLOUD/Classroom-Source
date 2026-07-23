@@ -2,7 +2,13 @@ import type {
   LearnerNotice,
   LearnerNoticeKind,
   LearnerNoticeStatus,
+  LearnerServiceOccurrence,
 } from '@/domain/models/entities';
+
+import {
+  learnerServiceOccurrenceIsClosed,
+  learnerServiceOccursOnDate,
+} from './learnerServiceRecurrence';
 
 export type LearnerNoticeView = 'active' | 'history';
 
@@ -54,18 +60,31 @@ export function selectLearnerNoticeView(
 export function selectTodayLearnerNotices(
   notices: readonly LearnerNotice[],
   selectedDate: string,
+  occurrences: readonly LearnerServiceOccurrence[] = [],
 ): LearnerNotice[] {
   return notices
     .filter((notice) => {
       if (notice.status !== 'active') return false;
-      if (notice.kind === 'date-specific-notice') return notice.noticeDate === selectedDate;
+      if (notice.kind === 'date-specific-notice') {
+        return notice.noticeDate === selectedDate;
+      }
+      if (notice.kind === 'learner-service' && notice.serviceRecurrence) {
+        return (
+          learnerServiceOccursOnDate(notice, selectedDate) &&
+          !learnerServiceOccurrenceIsClosed(occurrences, notice.id, selectedDate)
+        );
+      }
       return true;
     })
-    .sort(
-      (first, second) =>
+    .sort((first, second) => {
+      const firstMinute = first.serviceRecurrence?.startMinute ?? 1440;
+      const secondMinute = second.serviceRecurrence?.startMinute ?? 1440;
+      return (
+        firstMinute - secondMinute ||
         first.kind.localeCompare(second.kind) ||
         second.updatedAt.localeCompare(first.updatedAt) ||
         first.title.localeCompare(second.title) ||
-        first.id.localeCompare(second.id),
-    );
+        first.id.localeCompare(second.id)
+      );
+    });
 }

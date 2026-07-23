@@ -8,6 +8,7 @@ import type {
   ContextMembership,
   LearnerContext,
   LearnerNotice,
+  LearnerServiceOccurrence,
   LessonPlan,
   LessonSeries,
   MigrationRun,
@@ -25,6 +26,7 @@ export class ClassroomDatabase extends Dexie {
   schoolYears!: EntityTable<SchoolYear, 'id'>;
   learnerContexts!: EntityTable<LearnerContext, 'id'>;
   learnerNotices!: EntityTable<LearnerNotice, 'id'>;
+  learnerServiceOccurrences!: EntityTable<LearnerServiceOccurrence, 'id'>;
   contextMemberships!: EntityTable<ContextMembership, 'id'>;
   scheduleBlocks!: EntityTable<ScheduleBlock, 'id'>;
   scheduleExceptions!: EntityTable<ScheduleException, 'id'>;
@@ -127,6 +129,33 @@ export class ClassroomDatabase extends Dexie {
       quarantineRecords: 'id, migrationRunId, entityType, legacyStoreKey, createdAt',
       changeLog: 'id, createdAt, undoneAt, commandType',
       appSettings: 'key, updatedAt',
+    });
+
+    this.version(5).stores({
+      schoolYears: 'id, active, startsOn, endsOn',
+      learnerContexts: 'id, kind, schoolYearId, status, name',
+      learnerNotices: 'id, contextId, kind, status, noticeDate, updatedAt',
+      contextMemberships: 'id, containerContextId, memberContextId',
+      scheduleBlocks: 'id, parentId, contextId, *weekdays, effectiveFrom, effectiveTo, sortOrder',
+      scheduleExceptions: 'id, date, scheduleBlockId, action',
+      calendarEvents: 'id, startDate, endDate, category, contextId',
+      categoryValues:
+        'id, familyId, &[familyId+normalizedName], [familyId+lifecycleState], [familyId+sortOrder], lifecycleState, isDefault, mergedIntoId, *normalizedAliases',
+      categoryAssignments:
+        'id, categoryValueId, [entityType+entityId], [familyId+entityType+entityId], &[categoryValueId+entityType+entityId], entityType, entityId',
+      lessonSeries: 'id, contextId, subject',
+      lessonPlans: 'id, contextId, workflowState, seriesId, preferredScheduleBlockId, updatedAt',
+      sessionOccurrences: 'id, date, lessonPlanId, contextId, scheduleBlockId, deliveryState',
+      tasks: 'id, status, scheduledDate, dueDate, contextId, order, updatedAt',
+      quickCaptures: 'id, capturedOn, createdAt',
+      reminders:
+        'id, [sourceType+sourceId], sourceType, sourceId, status, remindDate, remindMinute, updatedAt',
+      migrationRuns: 'id, status, startedAt',
+      quarantineRecords: 'id, migrationRunId, entityType, legacyStoreKey, createdAt',
+      changeLog: 'id, createdAt, undoneAt, commandType',
+      appSettings: 'key, updatedAt',
+      learnerServiceOccurrences:
+        'id, &[learnerNoticeId+date], learnerNoticeId, date, status, updatedAt',
     });
   }
 }

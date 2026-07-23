@@ -2,9 +2,11 @@ import { z } from 'zod';
 
 import {
   learnerNoticeSchema,
+  learnerServiceOccurrenceSchema,
   taskSchema,
   type ChangeLog,
   type LearnerNotice,
+  type LearnerServiceOccurrence,
   type Task,
 } from '@/domain/models/entities';
 import {
@@ -26,6 +28,18 @@ const deleteLearnerNoticeOperationSchema = z.object({
   id: z.string().min(1),
 });
 
+const putLearnerServiceOccurrenceOperationSchema = z.object({
+  table: z.literal('learnerServiceOccurrences'),
+  action: z.literal('put'),
+  record: learnerServiceOccurrenceSchema,
+});
+
+const deleteLearnerServiceOccurrenceOperationSchema = z.object({
+  table: z.literal('learnerServiceOccurrences'),
+  action: z.literal('delete'),
+  id: z.string().min(1),
+});
+
 const putTaskOperationSchema = z.object({
   table: z.literal('tasks'),
   action: z.literal('put'),
@@ -41,6 +55,8 @@ const deleteTaskOperationSchema = z.object({
 export const learnerNoticeOperationSchema = z.union([
   putLearnerNoticeOperationSchema,
   deleteLearnerNoticeOperationSchema,
+  putLearnerServiceOccurrenceOperationSchema,
+  deleteLearnerServiceOccurrenceOperationSchema,
   putTaskOperationSchema,
   deleteTaskOperationSchema,
   categoryAssignmentOperationSchema,
@@ -68,15 +84,45 @@ export function putLearnerNoticeOperation(record: LearnerNotice): LearnerNoticeO
 }
 
 export function deleteLearnerNoticeOperation(id: string): LearnerNoticeOperation {
-  return learnerNoticeOperationSchema.parse({ table: 'learnerNotices', action: 'delete', id });
+  return learnerNoticeOperationSchema.parse({
+    table: 'learnerNotices',
+    action: 'delete',
+    id,
+  });
+}
+
+export function putLearnerServiceOccurrenceOperation(
+  record: LearnerServiceOccurrence,
+): LearnerNoticeOperation {
+  return learnerNoticeOperationSchema.parse({
+    table: 'learnerServiceOccurrences',
+    action: 'put',
+    record,
+  });
+}
+
+export function deleteLearnerServiceOccurrenceOperation(id: string): LearnerNoticeOperation {
+  return learnerNoticeOperationSchema.parse({
+    table: 'learnerServiceOccurrences',
+    action: 'delete',
+    id,
+  });
 }
 
 export function putFollowUpTaskOperation(record: Task): LearnerNoticeOperation {
-  return learnerNoticeOperationSchema.parse({ table: 'tasks', action: 'put', record });
+  return learnerNoticeOperationSchema.parse({
+    table: 'tasks',
+    action: 'put',
+    record,
+  });
 }
 
 export function deleteFollowUpTaskOperation(id: string): LearnerNoticeOperation {
-  return learnerNoticeOperationSchema.parse({ table: 'tasks', action: 'delete', id });
+  return learnerNoticeOperationSchema.parse({
+    table: 'tasks',
+    action: 'delete',
+    id,
+  });
 }
 
 export function createLearnerNoticeCommand(

@@ -4,11 +4,15 @@ import { classroomDb, type ClassroomDatabase } from '@/data/db/ClassroomDatabase
 import {
   changeLogSchema,
   learnerNoticeSchema,
+  learnerServiceOccurrenceSchema,
+  learnerServiceRecurrenceSchema,
   taskSchema,
   type ChangeLog,
   type LearnerContext,
   type LearnerNotice,
   type LearnerNoticeStatus,
+  type LearnerServiceOccurrence,
+  type LearnerServiceOccurrenceStatus,
   type Task,
 } from '@/domain/models/entities';
 import {
@@ -27,12 +31,15 @@ import {
   createLearnerNoticeCommand,
   deleteFollowUpTaskOperation,
   deleteLearnerNoticeOperation,
+  deleteLearnerServiceOccurrenceOperation,
   putFollowUpTaskOperation,
   putLearnerNoticeOperation,
+  putLearnerServiceOccurrenceOperation,
   serializeLearnerNoticeCommand,
   type LearnerNoticeCommandPair,
   type LearnerNoticeOperation,
 } from './learnerNoticeCommands';
+import { learnerServiceOccurrenceId, learnerServiceOccursOnDate } from './learnerServiceRecurrence';
 
 const optionalTrimmedString = (maximum: number) =>
   z.preprocess((value) => {
@@ -55,6 +62,7 @@ export const learnerNoticeEditorValuesSchema = z
     title: z.string().trim().min(1, 'Enter a notice title.').max(240),
     details: optionalTrimmedString(5000),
     noticeDate: optionalLocalDate,
+    serviceRecurrence: learnerServiceRecurrenceSchema.optional(),
   })
   .superRefine((value, context) => {
     if (value.kind === 'date-specific-notice' && !value.noticeDate) {
@@ -62,6 +70,13 @@ export const learnerNoticeEditorValuesSchema = z
         code: 'custom',
         message: 'Choose a date for a date-specific notice.',
         path: ['noticeDate'],
+      });
+    }
+    if (value.kind !== 'learner-service' && value.serviceRecurrence) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Weekly recurrence is available only for Learner Services.',
+        path: ['serviceRecurrence'],
       });
     }
   });
@@ -82,6 +97,7 @@ export interface LearnerNoticeDeleteImpact {
   noticeTitle: string;
   reminders: number;
   followUpTasks: number;
+  serviceOccurrences: number;
   totalLinkedRecords: number;
   canDelete: boolean;
 }
@@ -104,13 +120,23 @@ interface CommitResult<T> {
 
 export function learnerNoticeDeleteBlockingMessage(impact: LearnerNoticeDeleteImpact): string {
   const links: string[] = [];
-  if (impact.reminders)
+  if (impact.reminders) {
     links.push(`${impact.reminders} reminder${impact.reminders === 1 ? '' : 's'}`);
+  }
   if (impact.followUpTasks) {
     links.push(`${impact.followUpTasks} follow-up task${impact.followUpTasks === 1 ? '' : 's'}`);
   }
+  if (impact.serviceOccurrences) {
+    links.push(
+      `${impact.serviceOccurrences} service occurrence${
+        impact.serviceOccurrences === 1 ? '' : 's'
+      }`,
+    );
+  }
   if (links.length === 0) return '';
-  return `“${impact.noticeTitle}” cannot be deleted because it is linked to ${links.join(' and ')}. Archive it or remove those links first.`;
+  return `“${impact.noticeTitle}” cannot be deleted because it is linked to ${links.join(
+    ' and ',
+  )}. Archive it or remove those links first.`;
 }
 
 export class LearnerNoticeMutationService {
@@ -151,7 +177,9 @@ export class LearnerNoticeMutationService {
           kind: parsed.kind,
           title: parsed.title,
           details: parsed.details,
-          noticeDate: parsed.noticeDate,
+          noticeDate: parsed.kind === 'date-specific-notice' ? parsed.noticeDate : undefined,
+          serviceRecurrence:
+            parsed.kind === 'learner-service' ? parsed.serviceRecurrence : undefined,
           status: 'active',
           createdAt: now,
           updatedAt: now,
@@ -162,7 +190,10 @@ export class LearnerNoticeMutationService {
               title: `Follow up: ${notice.title}`,
               notes: notice.details,
               status: 'active',
-              scheduledDate: parsed.followUpScheduledDate ?? notice.noticeDate,
+              scheduledDate:
+                parsed.followUpScheduledDate ??
+                notice.noticeDate ??
+                notice.serviceRecurrence?.startsOn,
               contextId: notice.contextId,
               linkedEntityType: 'learner-notice',
               linkedEntityId: notice.id,
@@ -217,7 +248,6 @@ export class LearnerNoticeMutationService {
         return { value: { notice, followUpTask }, log };
       },
     );
-
     this.notifyNewChange(result.log);
     return result.value;
   }
@@ -235,6 +265,8 @@ export class LearnerNoticeMutationService {
       (existing, now) => ({
         ...existing,
         ...parsed,
+        noticeDate: parsed.kind === 'date-specific-notice' ? parsed.noticeDate : undefined,
+        serviceRecurrence: parsed.kind === 'learner-service' ? parsed.serviceRecurrence : undefined,
         updatedAt: now,
       }),
       categorySelections,
@@ -253,12 +285,52 @@ export class LearnerNoticeMutationService {
     return this.setStatus(id, 'archived');
   }
 
+  async completeOccurrence(
+    learnerNoticeId: string,
+    date: string,
+  ): Promise<LearnerServiceOccurrence> {
+    return this.setOccurrenceStatus(learnerNoticeId, date, 'completed');
+  }
+
+  async cancelOccurrence(learnerNoticeId: string, date: string): Promise<LearnerServiceOccurrence> {
+    return this.setOccurrenceStatus(learnerNoticeId, date, 'cancelled');
+  }
+
+  async restoreOccurrence(learnerNoticeId: string, date: string): Promise<void> {
+    const id = learnerServiceOccurrenceId(learnerNoticeId, date);
+    const log = await this.db.transaction(
+      'rw',
+      [this.db.learnerNotices, this.db.learnerServiceOccurrences, this.db.changeLog],
+      async () => {
+        const notice = await this.requireRecurringService(learnerNoticeId, date);
+        const existing = await this.db.learnerServiceOccurrences.get(id);
+        if (!existing) {
+          throw new Error('This learner service occurrence is already active.');
+        }
+        const now = this.now();
+        const commands: LearnerNoticeCommandPair = {
+          forward: createLearnerNoticeCommand([deleteLearnerServiceOccurrenceOperation(id)]),
+          inverse: createLearnerNoticeCommand([putLearnerServiceOccurrenceOperation(existing)]),
+        };
+        const nextLog = this.createChangeLog(
+          'learner-notice.restore-occurrence',
+          `Restore ${notice.title} on ${date}`,
+          commands,
+          now,
+        );
+        await clearSupportedRedoBranch(this.db);
+        await this.applyOperations(commands.forward.operations);
+        await this.db.changeLog.put(nextLog);
+        return nextLog;
+      },
+    );
+    this.notifyNewChange(log);
+  }
+
   async previewDelete(id: string): Promise<LearnerNoticeDeleteImpact> {
     return this.db.transaction(
       'r',
-      this.db.learnerNotices,
-      this.db.reminders,
-      this.db.tasks,
+      [this.db.learnerNotices, this.db.reminders, this.db.tasks, this.db.learnerServiceOccurrences],
       async () => this.readDeleteImpact(await this.requireNotice(id)),
     );
   }
@@ -266,15 +338,20 @@ export class LearnerNoticeMutationService {
   async delete(id: string): Promise<void> {
     const log = await this.db.transaction(
       'rw',
-      this.db.learnerNotices,
-      this.db.reminders,
-      this.db.tasks,
-      this.db.categoryAssignments,
-      this.db.changeLog,
+      [
+        this.db.learnerNotices,
+        this.db.reminders,
+        this.db.tasks,
+        this.db.learnerServiceOccurrences,
+        this.db.categoryAssignments,
+        this.db.changeLog,
+      ],
       async () => {
         const existing = await this.requireNotice(id);
         const impact = await this.readDeleteImpact(existing);
-        if (!impact.canDelete) throw new Error(learnerNoticeDeleteBlockingMessage(impact));
+        if (!impact.canDelete) {
+          throw new Error(learnerNoticeDeleteBlockingMessage(impact));
+        }
         const now = this.now();
         const categoryAssignments = await listCategoryAssignmentsForDeletion(
           this.db,
@@ -303,8 +380,58 @@ export class LearnerNoticeMutationService {
         return nextLog;
       },
     );
-
     this.notifyNewChange(log);
+  }
+
+  private async setOccurrenceStatus(
+    learnerNoticeId: string,
+    date: string,
+    status: LearnerServiceOccurrenceStatus,
+  ): Promise<LearnerServiceOccurrence> {
+    const result = await this.db.transaction(
+      'rw',
+      [this.db.learnerNotices, this.db.learnerServiceOccurrences, this.db.changeLog],
+      async (): Promise<CommitResult<LearnerServiceOccurrence>> => {
+        const notice = await this.requireRecurringService(learnerNoticeId, date);
+        const id = learnerServiceOccurrenceId(learnerNoticeId, date);
+        const existing = await this.db.learnerServiceOccurrences.get(id);
+        if (existing?.status === status) {
+          throw new Error(`This learner service occurrence is already ${status}.`);
+        }
+        const now = this.now();
+        const occurrence = learnerServiceOccurrenceSchema.parse({
+          id,
+          learnerNoticeId,
+          date,
+          status,
+          createdAt: existing?.createdAt ?? now,
+          updatedAt: now,
+          completedAt: status === 'completed' ? now : undefined,
+          cancelledAt: status === 'cancelled' ? now : undefined,
+        });
+        const commands: LearnerNoticeCommandPair = {
+          forward: createLearnerNoticeCommand([putLearnerServiceOccurrenceOperation(occurrence)]),
+          inverse: createLearnerNoticeCommand([
+            existing
+              ? putLearnerServiceOccurrenceOperation(existing)
+              : deleteLearnerServiceOccurrenceOperation(id),
+          ]),
+        };
+        const action = status === 'completed' ? 'Complete' : 'Cancel';
+        const log = this.createChangeLog(
+          `learner-notice.${status}-occurrence`,
+          `${action} ${notice.title} on ${date}`,
+          commands,
+          now,
+        );
+        await clearSupportedRedoBranch(this.db);
+        await this.applyOperations(commands.forward.operations);
+        await this.db.changeLog.put(log);
+        return { value: occurrence, log };
+      },
+    );
+    this.notifyNewChange(result.log);
+    return result.value;
   }
 
   private async replace(
@@ -316,10 +443,12 @@ export class LearnerNoticeMutationService {
   ): Promise<LearnerNotice> {
     const result = await this.db.transaction(
       'rw',
-      this.db.learnerNotices,
-      this.db.categoryValues,
-      this.db.categoryAssignments,
-      this.db.changeLog,
+      [
+        this.db.learnerNotices,
+        this.db.categoryValues,
+        this.db.categoryAssignments,
+        this.db.changeLog,
+      ],
       async (): Promise<CommitResult<LearnerNotice>> => {
         const existing = await this.requireNotice(id);
         const now = this.now();
@@ -352,19 +481,17 @@ export class LearnerNoticeMutationService {
         return { value: updated, log };
       },
     );
-
     this.notifyNewChange(result.log);
     return result.value;
   }
 
   private async setStatus(id: string, status: LearnerNoticeStatus): Promise<LearnerNotice> {
     const existing = await this.requireNotice(id);
-    if (existing.status === status) throw new Error(`This learner notice is already ${status}.`);
+    if (existing.status === status) {
+      throw new Error(`This learner notice is already ${status}.`);
+    }
     if (status === 'resolved' && existing.status !== 'active') {
       throw new Error('Only active learner notices can be resolved.');
-    }
-    if (status === 'active' && existing.status === 'active') {
-      throw new Error('This learner notice is already active.');
     }
     const action = status === 'active' ? 'Reopen' : status === 'resolved' ? 'Resolve' : 'Archive';
     return this.replace(
@@ -384,7 +511,7 @@ export class LearnerNoticeMutationService {
   }
 
   private async readDeleteImpact(notice: LearnerNotice): Promise<LearnerNoticeDeleteImpact> {
-    const [reminders, followUpTasks] = await Promise.all([
+    const [reminders, followUpTasks, serviceOccurrences] = await Promise.all([
       this.db.reminders
         .where('[sourceType+sourceId]')
         .equals(['learner-notice', notice.id])
@@ -394,13 +521,15 @@ export class LearnerNoticeMutationService {
           (task) => task.linkedEntityType === 'learner-notice' && task.linkedEntityId === notice.id,
         )
         .count(),
+      this.db.learnerServiceOccurrences.where('learnerNoticeId').equals(notice.id).count(),
     ]);
-    const totalLinkedRecords = reminders + followUpTasks;
+    const totalLinkedRecords = reminders + followUpTasks + serviceOccurrences;
     return {
       noticeId: notice.id,
       noticeTitle: notice.title,
       reminders,
       followUpTasks,
+      serviceOccurrences,
       totalLinkedRecords,
       canDelete: totalLinkedRecords === 0,
     };
@@ -408,7 +537,9 @@ export class LearnerNoticeMutationService {
 
   private async requireSelectableContext(id: string): Promise<LearnerContext> {
     const context = await this.db.learnerContexts.get(id);
-    if (!context) throw new Error('The selected learner context no longer exists.');
+    if (!context) {
+      throw new Error('The selected learner context no longer exists.');
+    }
     if (context.status !== 'active') {
       throw new Error('Archived learner contexts cannot receive new support or notice records.');
     }
@@ -421,14 +552,40 @@ export class LearnerNoticeMutationService {
     return learnerNoticeSchema.parse(notice);
   }
 
+  private async requireRecurringService(id: string, date: string): Promise<LearnerNotice> {
+    const notice = await this.requireNotice(id);
+    if (notice.status !== 'active') {
+      throw new Error('Only active learner services can record occurrences.');
+    }
+    if (!notice.serviceRecurrence) {
+      throw new Error('This learner service does not have a weekly recurrence.');
+    }
+    if (!learnerServiceOccursOnDate(notice, date)) {
+      throw new Error('This date is not part of the learner service recurrence.');
+    }
+    return notice;
+  }
+
   private async applyOperations(operations: readonly LearnerNoticeOperation[]): Promise<void> {
     for (const operation of operations) {
       if (operation.table === 'learnerNotices') {
-        if (operation.action === 'put') await this.db.learnerNotices.put(operation.record);
-        else await this.db.learnerNotices.delete(operation.id);
+        if (operation.action === 'put') {
+          await this.db.learnerNotices.put(operation.record);
+        } else {
+          await this.db.learnerNotices.delete(operation.id);
+        }
+      } else if (operation.table === 'learnerServiceOccurrences') {
+        if (operation.action === 'put') {
+          await this.db.learnerServiceOccurrences.put(operation.record);
+        } else {
+          await this.db.learnerServiceOccurrences.delete(operation.id);
+        }
       } else if (operation.table === 'tasks') {
-        if (operation.action === 'put') await this.db.tasks.put(operation.record);
-        else await this.db.tasks.delete(operation.id);
+        if (operation.action === 'put') {
+          await this.db.tasks.put(operation.record);
+        } else {
+          await this.db.tasks.delete(operation.id);
+        }
       } else if (operation.action === 'put') {
         await this.db.categoryAssignments.put(operation.record);
       } else {
@@ -454,7 +611,11 @@ export class LearnerNoticeMutationService {
   }
 
   private notifyNewChange(log: ChangeLog): void {
-    notifyEditHistoryChanged({ canUndo: true, canRedo: false, undoLabel: log.label });
+    notifyEditHistoryChanged({
+      canUndo: true,
+      canRedo: false,
+      undoLabel: log.label,
+    });
   }
 }
 
