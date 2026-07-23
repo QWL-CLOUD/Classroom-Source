@@ -3,6 +3,7 @@ import {
   categoryValueSchema,
   learnerNoticeSchema,
   learnerServiceOccurrenceSchema,
+  libraryCatalogItemSchema,
   lessonPlanSchema,
   reminderSchema,
   scheduleBlockSchema,
@@ -208,5 +209,29 @@ describe('domain schemas', () => {
         completedAt: '2026-07-21T14:00:00.000Z',
       }),
     ).toMatchObject({ status: 'completed' });
+  });
+  it('validates stable Library Catalog metadata and archive lifecycle', () => {
+    const active = libraryCatalogItemSchema.parse({
+      id: 'resource-1',
+      catalogType: 'resource',
+      title: 'Weather slides',
+      description: 'Reusable oral-language prompts.',
+      tags: ['Speaking', 'Weather'],
+      status: 'active',
+      createdAt: '2026-07-23T12:00:00.000Z',
+      updatedAt: '2026-07-23T12:00:00.000Z',
+    });
+    expect(active).toMatchObject({
+      catalogType: 'resource',
+      status: 'active',
+      tags: ['Speaking', 'Weather'],
+    });
+    expect(() =>
+      libraryCatalogItemSchema.parse({
+        ...active,
+        status: 'archived',
+        archivedAt: undefined,
+      }),
+    ).toThrow('requires archivedAt');
   });
 });

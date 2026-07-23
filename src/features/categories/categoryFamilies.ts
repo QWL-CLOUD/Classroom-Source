@@ -52,10 +52,10 @@ export const CATEGORY_FAMILIES = [
   {
     id: 'resource-format',
     label: 'Resource Formats',
-    description: 'Stable format vocabulary for future Library resources.',
+    description: 'Stable format vocabulary for Library resources.',
     selectionMode: 'single',
     entityTypes: ['library-item'],
-    assignmentAvailability: 'future',
+    assignmentAvailability: 'current',
   },
   {
     id: 'task-label',

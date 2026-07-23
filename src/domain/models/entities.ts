@@ -334,6 +334,39 @@ export const taskSchema = z
     path: ['dueDate'],
   });
 
+export const libraryCatalogTypeSchema = z.enum(['activity', 'resource', 'assessment', 'standard']);
+
+export const libraryCatalogStatusSchema = z.enum(['active', 'archived']);
+
+export const libraryCatalogItemSchema = z
+  .object({
+    id: idSchema,
+    catalogType: libraryCatalogTypeSchema,
+    title: z.string().trim().min(1).max(240),
+    description: z.string().trim().max(5000).optional(),
+    tags: z.array(z.string().trim().min(1).max(80)).max(30).default([]),
+    status: libraryCatalogStatusSchema.default('active'),
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+    archivedAt: timestampSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.status === 'active' && value.archivedAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An active Library item cannot contain archivedAt.',
+        path: ['archivedAt'],
+      });
+    }
+    if (value.status === 'archived' && !value.archivedAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An archived Library item requires archivedAt.',
+        path: ['archivedAt'],
+      });
+    }
+  });
+
 export const categoryFamilyIdSchema = z.enum([
   'template-format',
   'focus-tag',
@@ -542,6 +575,9 @@ export type ReminderStatus = z.infer<typeof reminderStatusSchema>;
 export type Reminder = z.infer<typeof reminderSchema>;
 export type TaskStatus = z.infer<typeof taskStatusSchema>;
 export type Task = z.infer<typeof taskSchema>;
+export type LibraryCatalogType = z.infer<typeof libraryCatalogTypeSchema>;
+export type LibraryCatalogStatus = z.infer<typeof libraryCatalogStatusSchema>;
+export type LibraryCatalogItem = z.infer<typeof libraryCatalogItemSchema>;
 export type CategoryFamilyId = z.infer<typeof categoryFamilyIdSchema>;
 export type CategoryColorKey = z.infer<typeof categoryColorKeySchema>;
 export type CategoryIconKey = z.infer<typeof categoryIconKeySchema>;

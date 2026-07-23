@@ -78,7 +78,9 @@ test('mobile drawer keeps the same hierarchy and opens the active route group', 
     'true',
   );
   await expect(navigation.getByRole('link', { name: 'Library', exact: true })).toBeVisible();
-  await expect(page.locator('main').getByText('Resources', { exact: true })).toBeVisible();
+  await expect(
+    page.locator('main').getByRole('heading', { level: 1, name: 'Library' }),
+  ).toBeVisible();
 
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
