@@ -117,7 +117,8 @@ test('Learners provides a searchable directory, creation flow, and tabbed select
   expect(sidebarBox).not.toBeNull();
   expect(directoryBox).not.toBeNull();
   expect(selectedWorkspaceBox).not.toBeNull();
-  expect(sidebarBox!.width).toBeLessThanOrEqual(100);
+  expect(sidebarBox!.width).toBeGreaterThanOrEqual(270);
+  expect(sidebarBox!.width).toBeLessThanOrEqual(300);
   expect(directoryBox!.width).toBeGreaterThanOrEqual(280);
   expect(selectedWorkspaceBox!.width).toBeGreaterThanOrEqual(520);
   expect(directoryBox!.x + directoryBox!.width).toBeLessThanOrEqual(selectedWorkspaceBox!.x - 8);

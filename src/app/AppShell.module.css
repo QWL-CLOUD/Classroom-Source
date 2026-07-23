@@ -552,75 +552,11 @@
   outline-offset: 3px;
 }
 
-/* Learners medium-width responsive closure.
-   Keep the full navigation at >= 1400px, use a compact rail on the Learners
-   route from 881–1399px, and preserve every other route's desktop navigation. */
+/* Learners medium-width stable-navigation closure.
+   Keep desktop navigation consistent across routes. Only the Learners content
+   padding is tightened at laptop widths. */
 @media (min-width: 881px) and (max-width: 1399px) {
-  .shell[data-route='learners'],
-  .shell[data-route='learners'][data-sidebar-collapsed='true'] {
-    grid-template-columns: 88px minmax(0, 1fr);
-  }
-
-  .shell[data-route='learners'] .sidebar {
-    padding: 18px 12px;
-  }
-
-  .shell[data-route='learners'] .brandRow,
-  .shell[data-route='learners'][data-sidebar-collapsed='true'] .brandRow {
-    grid-template-columns: 1fr;
-    justify-items: center;
-  }
-
-  .shell[data-route='learners'] .desktopCollapseButton {
-    display: none;
-  }
-
-  .shell[data-route='learners'] .nav,
-  .shell[data-route='learners'][data-sidebar-collapsed='true'] .nav {
-    gap: 7px;
-  }
-
-  .shell[data-route='learners'] .navGroup,
-  .shell[data-route='learners'][data-sidebar-collapsed='true'] .navGroup {
-    width: 100%;
-    padding-top: 7px;
-  }
-
-  .shell[data-route='learners'] .primaryNavGroup,
-  .shell[data-route='learners'][data-sidebar-collapsed='true'] .primaryNavGroup {
-    padding-top: 0;
-  }
-
-  .shell[data-route='learners'] .navGroup[data-collapsible='true'] .navGroupLinks,
-  .shell[data-route='learners'][data-sidebar-collapsed='true']
-    .navGroup[data-collapsible='true']
-    .navGroupLinks {
-    display: grid;
-  }
-
-  .shell[data-route='learners'] .navLink,
-  .shell[data-route='learners'][data-sidebar-collapsed='true'] .navLink {
-    justify-content: center;
-    padding: 0;
-  }
-
-  .shell[data-route='learners'] .brandText,
-  .shell[data-route='learners'] .navGroup h2,
-  .shell[data-route='learners'] .navLink span,
-  .shell[data-route='learners'] .sidebarFooter span,
-  .shell[data-route='learners'][data-sidebar-collapsed='true'] .brandText,
-  .shell[data-route='learners'][data-sidebar-collapsed='true'] .navGroup h2,
-  .shell[data-route='learners'][data-sidebar-collapsed='true'] .navLink span,
-  .shell[data-route='learners'][data-sidebar-collapsed='true'] .sidebarFooter span {
-    display: none;
-  }
-
-  .shell[data-route='learners'] .sidebarFooter {
-    justify-content: center;
-    padding-inline: 0;
-  }
-
   .shell[data-route='learners'] .content {
-    padding: 26px clamp(22px, 2.7vw, 34px) 88px;
+    padding: 26px clamp(20px, 2vw, 28px) 88px;
   }
 }
