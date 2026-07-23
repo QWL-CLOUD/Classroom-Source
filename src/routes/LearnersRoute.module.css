@@ -1820,3 +1820,48 @@
     flex: 1 0 auto;
   }
 }
+
+/* Learners stable-navigation workspace tuning.
+   Keep the approved wide layout unchanged while fitting the normal desktop
+   navigation and Learners workspace around 1240px. */
+@media (min-width: 1101px) and (max-width: 1399px) {
+  .pageHeader {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .headerTools {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .schoolYearPicker {
+    width: min(100%, 260px);
+    min-width: 220px;
+  }
+
+  .layout {
+    grid-template-columns: minmax(270px, 300px) minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .selectedContextHeader {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .selectedContextActions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .workspaceTabs {
+    overflow-x: auto;
+  }
+
+  .workspaceTabs button {
+    flex: 0 0 auto;
+  }
+}
