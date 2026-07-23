@@ -1693,3 +1693,130 @@
     width: min(250px, calc(100vw - 28px));
   }
 }
+
+/* Learners medium-width responsive layout closure.
+   The approved wide layout remains unchanged at >= 1400px. */
+@media (min-width: 1101px) and (max-width: 1399px) {
+  .learnersPage {
+    gap: 14px;
+  }
+
+  .pageHeader {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px;
+    align-items: end;
+    padding-block: 0;
+  }
+
+  .pageHeader h1 {
+    font-size: 40px;
+  }
+
+  .pageHeader p:not(:global(.page-eyebrow)) {
+    max-width: 610px;
+    margin-top: 7px;
+    font-size: 14px;
+  }
+
+  .headerTools {
+    min-width: 0;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  .schoolYearPicker {
+    width: 240px;
+    min-width: 220px;
+  }
+
+  .layout {
+    grid-template-columns: minmax(280px, 310px) minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .contextPanel {
+    top: 14px;
+    max-height: calc(100dvh - 108px);
+    padding: 16px;
+  }
+
+  .selectedContextHeader {
+    gap: 14px;
+    padding: 16px 18px;
+  }
+
+  .selectedContextHeader .contextTitleRow h2 {
+    font-size: 22px;
+  }
+
+  .selectedContextActions {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  .workspaceTabs button {
+    padding-inline: 10px;
+    font-size: 12px;
+  }
+}
+
+/* At smaller laptop widths, keep the compact navigation rail but switch the
+   Learners workspace to the existing master-detail mobile pattern before the
+   two-column workspace becomes cramped. */
+@media (min-width: 901px) and (max-width: 1100px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .pageHeader,
+  .createPanelHeading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .headerTools {
+    width: 100%;
+    min-width: 0;
+    justify-content: flex-start;
+  }
+
+  .contextPanel {
+    display: none;
+    position: static;
+    max-height: none;
+  }
+
+  .mobileContextSummary {
+    min-width: 0;
+    display: grid;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 16px;
+    border: 1px solid var(--border-soft);
+    border-radius: 16px;
+    background: var(--surface-card);
+  }
+
+  .mobileContextPicker,
+  .mobileContextPicker > summary {
+    width: 100%;
+  }
+
+  .selectedContextHeader {
+    display: none;
+  }
+
+  .mobileSelectedActions,
+  .mobileSelectedActions > * {
+    width: 100%;
+  }
+
+  .workspaceTabs {
+    overflow-x: auto;
+  }
+
+  .workspaceTabs button {
+    flex: 1 0 auto;
+  }
+}

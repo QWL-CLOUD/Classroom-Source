@@ -218,6 +218,7 @@ export function AppShell() {
       </a>
       <div
         className={styles.shell}
+        data-route={location.pathname.startsWith('/learners') ? 'learners' : undefined}
         data-sidebar-collapsed={sidebarCollapsed}
         data-mobile-navigation-open={mobileNavigationOpen}
       >
