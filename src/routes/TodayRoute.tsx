@@ -25,6 +25,7 @@ import type {
 } from '@/features/today/todayReadModel';
 import { buildTodayReadModel } from '@/features/today/todayReadModel';
 import { useScheduleExceptionsForRange } from '@/features/scheduleExceptions/useScheduleExceptionsForRange';
+import { useActiveSchoolYear } from '@/features/schoolYears/useActiveSchoolYear';
 import { AgendaSummary } from '@/features/agenda/AgendaSummary';
 import { TodayLearnerNoticeList } from '@/features/learnerNotices/TodayLearnerNoticeList';
 import { TodayReminderList } from '@/features/reminders/TodayReminderList';
@@ -151,6 +152,11 @@ export function TodayRoute() {
     startDate: date,
     endDate: date,
   });
+  const activeSchoolYearState = useActiveSchoolYear();
+  const schoolYearBoundary =
+    activeSchoolYearState.status === 'ready'
+      ? (activeSchoolYearState.data ?? undefined)
+      : undefined;
   const scheduleHierarchy = useMemo<ReadonlyMap<string, ScheduleBlockHierarchyMetadata>>(
     () =>
       state.status === 'ready'
@@ -177,9 +183,18 @@ export function TodayRoute() {
             scheduleExceptions ?? [],
             planningState.data.lessonPlans,
             planningState.data.sessionOccurrences,
+            schoolYearBoundary,
           )
         : null,
-    [currentDate, currentMinute, date, planningState, scheduleExceptions, state],
+    [
+      currentDate,
+      currentMinute,
+      date,
+      planningState,
+      scheduleExceptions,
+      schoolYearBoundary,
+      state,
+    ],
   );
   const weekHref = getTodayWeekHref(date, today);
 

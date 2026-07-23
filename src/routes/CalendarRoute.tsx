@@ -19,6 +19,7 @@ import {
 } from '@/features/editing/scheduleBlockHierarchy';
 import { buildPlanningEntryHref } from '@/features/planning/planningNavigation';
 import { useScheduleExceptionsForRange } from '@/features/scheduleExceptions/useScheduleExceptionsForRange';
+import { useActiveSchoolYear } from '@/features/schoolYears/useActiveSchoolYear';
 import { useWeekPlanningReadModel } from '@/features/week/useWeekPlanningReadModel';
 import { buildWeekHref } from '@/features/week/weekNavigation';
 import { useWorkspaceReadModel } from '@/features/workspace/useWorkspaceReadModel';
@@ -481,6 +482,11 @@ export function CalendarRoute() {
     startDate: monthRange.gridStartDate,
     endDate: monthRange.gridEndDate,
   });
+  const activeSchoolYearState = useActiveSchoolYear();
+  const schoolYearBoundary =
+    activeSchoolYearState.status === 'ready'
+      ? (activeSchoolYearState.data ?? undefined)
+      : undefined;
   const scheduleHierarchy = useMemo<ReadonlyMap<string, ScheduleBlockHierarchyMetadata>>(
     () =>
       state.status === 'ready'
@@ -500,9 +506,10 @@ export function CalendarRoute() {
             scheduleExceptions ?? [],
             planningState.data.lessonPlans,
             planningState.data.sessionOccurrences,
+            schoolYearBoundary,
           )
         : null,
-    [currentDate, date, planningState, scheduleExceptions, state],
+    [currentDate, date, planningState, scheduleExceptions, schoolYearBoundary, state],
   );
 
   const previousMonthDate = shiftCalendarMonth(date, -1);

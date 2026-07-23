@@ -10,6 +10,10 @@ import type {
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
 import { resolveScheduleOccurrence } from '@/features/scheduleExceptions/scheduleOccurrenceResolver';
 import {
+  scheduleOccurrenceIsVisibleForSchoolYear,
+  type SchoolYearScheduleBoundary,
+} from '@/features/schoolYears/schoolYearScheduleBoundary';
+import {
   formatLongDate,
   getMonday,
   getWeekDates,
@@ -373,6 +377,7 @@ export function buildWeekReadModel(
   lessonPlans: readonly LessonPlan[] = [],
   sessionOccurrences: readonly SessionOccurrence[] = [],
   scheduleExceptions: readonly ScheduleException[] = [],
+  schoolYearBoundary?: SchoolYearScheduleBoundary | null,
 ): WeekReadModel {
   const range = getWeekRange(anchorDate);
   const blockById = new Map(scheduleBlocks.map((block) => [block.id, block]));
@@ -388,6 +393,13 @@ export function buildWeekReadModel(
         resolveScheduleOccurrence(block, date, scheduleExceptions, { requireShowInWeek: true }),
       )
       .filter((occurrence) => occurrence !== null)
+      .filter((occurrence) =>
+        scheduleOccurrenceIsVisibleForSchoolYear(
+          date,
+          occurrence.exception?.action,
+          schoolYearBoundary,
+        ),
+      )
       .map((occurrence) => {
         visibleScheduleBlockIds.add(occurrence.block.id);
         return toScheduleItem(occurrence.block, date, blockById);

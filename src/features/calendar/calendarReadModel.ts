@@ -22,6 +22,10 @@ import {
   todayLocalDate,
 } from '@/shared/dates/localDate';
 import { resolveScheduleOccurrence } from '@/features/scheduleExceptions/scheduleOccurrenceResolver';
+import {
+  scheduleOccurrenceIsVisibleForSchoolYear,
+  type SchoolYearScheduleBoundary,
+} from '@/features/schoolYears/schoolYearScheduleBoundary';
 
 export const CALENDAR_WEEKDAY_LABELS = [
   'Monday',
@@ -271,6 +275,7 @@ export function buildCalendarMonthReadModel(
   scheduleExceptions: readonly ScheduleException[] = [],
   lessonPlans: readonly LessonPlan[] = [],
   sessionOccurrences: readonly SessionOccurrence[] = [],
+  schoolYearBoundary?: SchoolYearScheduleBoundary | null,
 ): CalendarMonthReadModel {
   const range = getCalendarMonthRange(anchorDate);
   const blockById = new Map(scheduleBlocks.map((block) => [block.id, block]));
@@ -283,6 +288,13 @@ export function buildCalendarMonthReadModel(
     const scheduleItems = scheduleBlocks
       .map((block) => resolveScheduleOccurrence(block, date, scheduleExceptions))
       .filter((occurrence) => occurrence !== null)
+      .filter((occurrence) =>
+        scheduleOccurrenceIsVisibleForSchoolYear(
+          date,
+          occurrence.exception?.action,
+          schoolYearBoundary,
+        ),
+      )
       .map((occurrence) => {
         visibleScheduleBlockIds.add(occurrence.block.id);
         return toScheduleItem(
