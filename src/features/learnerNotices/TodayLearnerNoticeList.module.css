@@ -102,3 +102,9 @@
   flex-wrap: wrap;
   gap: 7px;
 }
+
+/* Learner Service Recurrence */
+.serviceTime {
+  color: #23483f !important;
+  font-weight: 800;
+}

@@ -185,6 +185,39 @@ export const learnerNoticeKindSchema = z.enum([
 
 export const learnerNoticeStatusSchema = z.enum(['active', 'resolved', 'archived']);
 
+export const learnerServiceRecurrenceSchema = z
+  .object({
+    frequency: z.literal('weekly').default('weekly'),
+    weekdays: z.array(z.number().int().min(1).max(7)).min(1),
+    startsOn: localDateSchema,
+    endsOn: localDateSchema.optional(),
+    startMinute: minuteSchema,
+    endMinute: minuteSchema,
+  })
+  .superRefine((value, context) => {
+    if (new Set(value.weekdays).size !== value.weekdays.length) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Learner service weekdays must be unique.',
+        path: ['weekdays'],
+      });
+    }
+    if (value.endsOn && value.endsOn < value.startsOn) {
+      context.addIssue({
+        code: 'custom',
+        message: 'The learner service end date must be on or after its start date.',
+        path: ['endsOn'],
+      });
+    }
+    if (value.endMinute <= value.startMinute) {
+      context.addIssue({
+        code: 'custom',
+        message: 'The learner service end time must be after its start time.',
+        path: ['endMinute'],
+      });
+    }
+  });
+
 export const learnerNoticeSchema = z
   .object({
     id: idSchema,
@@ -193,6 +226,7 @@ export const learnerNoticeSchema = z
     title: z.string().min(1).max(240),
     details: z.string().max(5000).optional(),
     noticeDate: localDateSchema.optional(),
+    serviceRecurrence: learnerServiceRecurrenceSchema.optional(),
     status: learnerNoticeStatusSchema.default('active'),
     createdAt: timestampSchema,
     updatedAt: timestampSchema,
@@ -205,6 +239,43 @@ export const learnerNoticeSchema = z
         code: 'custom',
         message: 'A date-specific notice requires a date.',
         path: ['noticeDate'],
+      });
+    }
+    if (value.kind !== 'learner-service' && value.serviceRecurrence) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Only a Learner Service can contain service recurrence.',
+        path: ['serviceRecurrence'],
+      });
+    }
+  });
+
+export const learnerServiceOccurrenceStatusSchema = z.enum(['completed', 'cancelled']);
+
+export const learnerServiceOccurrenceSchema = z
+  .object({
+    id: idSchema,
+    learnerNoticeId: idSchema,
+    date: localDateSchema,
+    status: learnerServiceOccurrenceStatusSchema,
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+    completedAt: timestampSchema.optional(),
+    cancelledAt: timestampSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.status === 'completed' && !value.completedAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A completed service occurrence requires completedAt.',
+        path: ['completedAt'],
+      });
+    }
+    if (value.status === 'cancelled' && !value.cancelledAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A cancelled service occurrence requires cancelledAt.',
+        path: ['cancelledAt'],
       });
     }
   });
@@ -462,7 +533,10 @@ export type LessonPlan = z.infer<typeof lessonPlanSchema>;
 export type SessionOccurrence = z.infer<typeof sessionOccurrenceSchema>;
 export type LearnerNoticeKind = z.infer<typeof learnerNoticeKindSchema>;
 export type LearnerNoticeStatus = z.infer<typeof learnerNoticeStatusSchema>;
+export type LearnerServiceRecurrence = z.infer<typeof learnerServiceRecurrenceSchema>;
 export type LearnerNotice = z.infer<typeof learnerNoticeSchema>;
+export type LearnerServiceOccurrenceStatus = z.infer<typeof learnerServiceOccurrenceStatusSchema>;
+export type LearnerServiceOccurrence = z.infer<typeof learnerServiceOccurrenceSchema>;
 export type ReminderSourceType = z.infer<typeof reminderSourceTypeSchema>;
 export type ReminderStatus = z.infer<typeof reminderStatusSchema>;
 export type Reminder = z.infer<typeof reminderSchema>;

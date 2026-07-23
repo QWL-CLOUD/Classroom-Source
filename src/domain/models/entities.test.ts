@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   categoryValueSchema,
   learnerNoticeSchema,
+  learnerServiceOccurrenceSchema,
   lessonPlanSchema,
   reminderSchema,
   scheduleBlockSchema,
@@ -166,5 +167,46 @@ describe('domain schemas', () => {
         lifecycleState: 'archived',
       }),
     ).toThrow('archived school year');
+  });
+  it('validates weekly Learner Service recurrence and acted-on occurrences', () => {
+    const service = learnerNoticeSchema.parse({
+      id: 'service-weekly',
+      contextId: 'context-1',
+      kind: 'learner-service',
+      title: 'Speech support',
+      status: 'active',
+      serviceRecurrence: {
+        frequency: 'weekly',
+        weekdays: [2],
+        startsOn: '2026-07-01',
+        endsOn: '2026-07-31',
+        startMinute: 600,
+        endMinute: 630,
+      },
+      createdAt: '2026-07-23T12:00:00.000Z',
+      updatedAt: '2026-07-23T12:00:00.000Z',
+    });
+    expect(service.serviceRecurrence?.weekdays).toEqual([2]);
+    expect(() =>
+      learnerNoticeSchema.parse({
+        ...service,
+        serviceRecurrence: {
+          ...service.serviceRecurrence,
+          endMinute: 590,
+        },
+      }),
+    ).toThrow('end time');
+
+    expect(
+      learnerServiceOccurrenceSchema.parse({
+        id: 'service-weekly:2026-07-21',
+        learnerNoticeId: 'service-weekly',
+        date: '2026-07-21',
+        status: 'completed',
+        createdAt: '2026-07-21T14:00:00.000Z',
+        updatedAt: '2026-07-21T14:00:00.000Z',
+        completedAt: '2026-07-21T14:00:00.000Z',
+      }),
+    ).toMatchObject({ status: 'completed' });
   });
 });

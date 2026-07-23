@@ -191,6 +191,12 @@ export async function applySupportedEditCommand(
       if (operation.table === 'learnerNotices') {
         if (operation.action === 'put') await db.learnerNotices.put(operation.record);
         else await db.learnerNotices.delete(operation.id);
+      } else if (operation.table === 'learnerServiceOccurrences') {
+        if (operation.action === 'put') {
+          await db.learnerServiceOccurrences.put(operation.record);
+        } else {
+          await db.learnerServiceOccurrences.delete(operation.id);
+        }
       } else if (operation.table === 'tasks') {
         if (operation.action === 'put') await db.tasks.put(operation.record);
         else await db.tasks.delete(operation.id);

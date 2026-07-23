@@ -277,3 +277,72 @@
     flex-direction: column;
   }
 }
+
+/* Learner Service Recurrence */
+.recurrenceGroup,
+.weekdayGroup {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.recurrenceGroup > legend,
+.weekdayGroup > legend {
+  padding: 0 5px;
+  color: var(--heading);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.weekdayGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 7px;
+}
+
+.recurrenceHint,
+.recurrenceSummary {
+  margin: 0;
+  color: #355f54;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.recurrenceSummary {
+  margin-top: 10px;
+  font-weight: 800;
+}
+
+.occurrenceHistory {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: #f7f9f7;
+}
+
+.occurrenceHistory summary {
+  color: var(--heading);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.occurrenceHistory ul {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.occurrenceHistory li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
