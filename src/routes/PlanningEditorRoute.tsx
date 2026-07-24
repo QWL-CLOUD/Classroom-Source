@@ -17,6 +17,7 @@ import { ZodError } from 'zod';
 import { classroomDb } from '@/data/db/ClassroomDatabase';
 import {
   learnerContextSchema,
+  libraryCatalogItemSchema,
   lessonPlanSchema,
   lessonSeriesSchema,
   scheduleBlockSchema,
@@ -24,6 +25,7 @@ import {
   schoolYearSchema,
   sessionOccurrenceSchema,
   type LearnerContext,
+  type LibraryCatalogItem,
   type LessonPlan,
   type LessonSeries,
   type ScheduleBlock,
@@ -72,6 +74,7 @@ interface PlanningEditorSnapshot {
   scheduleBlocks: ScheduleBlock[];
   lessonSeries: LessonSeries[];
   seriesPlans: LessonPlan[];
+  libraryItems: LibraryCatalogItem[];
   planningOccurrence: PlanningScheduleOccurrence | null;
   planningOccurrenceError: string | null;
 }
@@ -114,6 +117,7 @@ function PlanningEditorForm({
     scheduleBlocks,
     lessonSeries,
     seriesPlans,
+    libraryItems,
     planningOccurrence,
   } = snapshot;
   const [values, setValues] = useState<LessonPlanEditorValues>(() =>
@@ -476,14 +480,17 @@ function PlanningEditorForm({
         values={{
           learningTarget: values.learningTarget,
           notes: values.notes,
+          libraryLinks: values.libraryLinks,
           lessonFlow: values.lessonFlow,
         }}
         disabled={saving}
+        libraryItems={libraryItems}
         onChange={(updateContent) => {
           applyValues((current) => {
             const content = updateContent({
               learningTarget: current.learningTarget,
               notes: current.notes,
+              libraryLinks: current.libraryLinks ?? [],
               lessonFlow: current.lessonFlow,
             });
             return { ...current, ...content };
@@ -824,6 +831,9 @@ export function PlanningEditorRoute() {
           (value) => sessionOccurrenceSchema.parse(value),
         )
       : [];
+    const libraryItems = (await classroomDb.libraryItems.toArray()).map((value) =>
+      libraryCatalogItemSchema.parse(value),
+    );
 
     return {
       contexts,
@@ -834,6 +844,7 @@ export function PlanningEditorRoute() {
       scheduleBlocks,
       lessonSeries,
       seriesPlans,
+      libraryItems,
       planningOccurrence,
       planningOccurrenceError,
     };

@@ -4,6 +4,7 @@ import { classroomDb, type ClassroomDatabase } from '@/data/db/ClassroomDatabase
 import {
   changeLogSchema,
   libraryCatalogItemSchema,
+  libraryCatalogTypedFieldsSchema,
   type ChangeLog,
   type LibraryCatalogItem,
   type LibraryCatalogStatus,
@@ -24,6 +25,7 @@ import {
   type LibraryCatalogOperation,
 } from './libraryCatalogCommands';
 import { normalizeLibraryCatalogTags } from './libraryCatalogReadModel';
+import { typedFieldsForCatalogType } from './libraryCatalogTypedFields';
 
 const optionalTrimmedString = (maximum: number) =>
   z.preprocess((value) => {
@@ -32,17 +34,40 @@ const optionalTrimmedString = (maximum: number) =>
     return trimmed || undefined;
   }, z.string().max(maximum).optional());
 
-export const libraryCatalogCreateValuesSchema = z.object({
-  catalogType: z.enum(['activity', 'resource', 'assessment', 'standard']),
-  title: z.string().trim().min(1, 'Enter a Library item title.').max(240),
-  description: optionalTrimmedString(5000),
-  tags: z.array(z.string().max(80)).max(30).default([]),
-});
+export const libraryCatalogCreateValuesSchema = z
+  .object({
+    catalogType: z.enum(['activity', 'resource', 'assessment', 'standard']),
+    title: z.string().trim().min(1, 'Enter a Library item title.').max(240),
+    description: optionalTrimmedString(5000),
+    tags: z.array(z.string().max(80)).max(30).default([]),
+    typedFields: libraryCatalogTypedFieldsSchema.optional(),
+  })
+  .superRefine((values, context) => {
+    if (values.catalogType === 'standard' && values.typedFields) {
+      context.addIssue({
+        code: 'custom',
+        path: ['typedFields'],
+        message: 'Standards do not use Phase 3E-3 typed workflow fields.',
+      });
+    }
+    if (
+      values.catalogType !== 'standard' &&
+      values.typedFields &&
+      values.typedFields.catalogType !== values.catalogType
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['typedFields'],
+        message: 'Typed workflow fields must match the Catalog type.',
+      });
+    }
+  });
 
 export const libraryCatalogUpdateValuesSchema = z.object({
   title: z.string().trim().min(1, 'Enter a Library item title.').max(240),
   description: optionalTrimmedString(5000),
   tags: z.array(z.string().max(80)).max(30).default([]),
+  typedFields: libraryCatalogTypedFieldsSchema.optional(),
 });
 
 export type LibraryCatalogCreateValues = z.input<typeof libraryCatalogCreateValuesSchema>;
@@ -99,6 +124,7 @@ export class LibraryCatalogMutationService {
           title: parsed.title,
           description: parsed.description,
           tags: normalizeLibraryCatalogTags(parsed.tags),
+          typedFields: typedFieldsForCatalogType(parsed.catalogType, parsed.typedFields),
           status: 'active',
           createdAt: now,
           updatedAt: now,
@@ -155,6 +181,10 @@ export class LibraryCatalogMutationService {
         title: parsed.title,
         description: parsed.description,
         tags: normalizeLibraryCatalogTags(parsed.tags),
+        typedFields: typedFieldsForCatalogType(
+          existing.catalogType,
+          parsed.typedFields ?? existing.typedFields,
+        ),
         updatedAt: now,
       }),
       categorySelections,

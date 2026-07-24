@@ -55,3 +55,32 @@
     grid-template-columns: 1fr;
   }
 }
+
+.typeFields {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 14px;
+  border: 1px solid #bccdc5;
+  border-radius: 11px;
+  background: #f7faf8;
+}
+
+.typeFields legend {
+  padding: 0 6px;
+  color: var(--heading);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.phaseNote {
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px solid #b9c9e0;
+  border-radius: 10px;
+  color: #2d4d72;
+  background: #f0f5fc;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}

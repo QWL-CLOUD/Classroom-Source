@@ -102,6 +102,39 @@ describe('Library Catalog read model', () => {
     }
   });
 
+  it('searches Activity, Resource, and Assessment workflow fields', () => {
+    const values = [
+      item({
+        id: 'activity-1',
+        catalogType: 'activity',
+        title: 'Partner routine',
+        typedFields: {
+          catalogType: 'activity',
+          grouping: 'partners',
+          estimatedMinutes: 8,
+          directions: 'Explain one example to a partner.',
+        },
+      }),
+      item({
+        id: 'assessment-1',
+        catalogType: 'assessment',
+        title: 'Exit check',
+        typedFields: {
+          catalogType: 'assessment',
+          assessmentKind: 'formative',
+          studentPrompt: 'Compare two unit fractions.',
+          evidenceToCollect: 'A labeled model and one sentence.',
+        },
+      }),
+    ];
+
+    expect(filterLibraryCatalogItems(values, { ...defaults, query: 'partner' })).toHaveLength(1);
+    expect(filterLibraryCatalogItems(values, { ...defaults, query: 'labeled model' })).toHaveLength(
+      1,
+    );
+    expect(filterLibraryCatalogItems(values, { ...defaults, query: 'formative' })).toHaveLength(1);
+  });
+
   it('combines type, status, tag, and Resource Format filters', () => {
     const values = [
       {

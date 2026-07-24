@@ -22,6 +22,7 @@ describe('planning editor models', () => {
         workflowState: 'ready',
         durationMinutes: '45',
         learningTarget: ' Compare fractions. ',
+        libraryLinks: [{ libraryItemId: 'resource-1', catalogType: 'resource' }],
         lessonFlow: [
           {
             ...createLessonFlowStepEditorValues('guided-practice'),
@@ -29,6 +30,7 @@ describe('planning editor models', () => {
             title: '  Sort fraction cards  ',
             durationMinutes: '12',
             details: ' Work with a partner. ',
+            libraryLinks: [{ libraryItemId: 'activity-1', catalogType: 'activity' }],
           },
         ],
       }),
@@ -41,6 +43,7 @@ describe('planning editor models', () => {
         durationMinutes: 45,
         learningTarget: 'Compare fractions.',
         notes: undefined,
+        libraryLinks: [{ libraryItemId: 'resource-1', catalogType: 'resource' }],
         lessonFlow: [
           {
             id: 'step-1',
@@ -49,6 +52,7 @@ describe('planning editor models', () => {
             durationMinutes: 12,
             details: 'Work with a partner.',
             teacherNotes: undefined,
+            libraryLinks: [{ libraryItemId: 'activity-1', catalogType: 'activity' }],
           },
         ],
       },

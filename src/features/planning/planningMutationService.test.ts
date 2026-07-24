@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ClassroomDatabase } from '@/data/db/ClassroomDatabase';
 import { EditHistoryService } from '@/features/editing/editHistoryService';
+import { createLibraryApplicationLink } from '@/features/libraryCatalog/libraryApplicationModel';
 
 import {
   createLessonFlowStepEditorValues,
@@ -136,6 +137,85 @@ describe('planning mutation service', () => {
       contentOverride: {
         lessonFlow: [{ title: 'Session opening' }],
       },
+    });
+  });
+
+  it('stores stable Library links and snapshots inside the reversible plan command', async () => {
+    const resource = {
+      id: 'resource-1',
+      catalogType: 'resource' as const,
+      title: 'Fraction cards',
+      description: 'Reusable visual models.',
+      tags: ['Math'],
+      typedFields: {
+        catalogType: 'resource' as const,
+        sourceLocation: 'Binder A',
+      },
+      status: 'active' as const,
+      createdAt: '2026-07-23T12:00:00.000Z',
+      updatedAt: '2026-07-23T12:00:00.000Z',
+    };
+    const activity = {
+      id: 'activity-1',
+      catalogType: 'activity' as const,
+      title: 'Partner explanation',
+      tags: ['Speaking'],
+      typedFields: {
+        catalogType: 'activity' as const,
+        grouping: 'partners' as const,
+        estimatedMinutes: 8,
+      },
+      status: 'active' as const,
+      createdAt: '2026-07-23T12:00:00.000Z',
+      updatedAt: '2026-07-23T12:00:00.000Z',
+    };
+    await database.libraryItems.bulkPut([resource, activity]);
+
+    const plan = await service.createPlan('context', {
+      ...createLessonPlanEditorValues(),
+      title: 'Library-linked lesson',
+      libraryLinks: [createLibraryApplicationLink(resource)],
+      lessonFlow: [
+        {
+          ...createLessonFlowStepEditorValues('guided-practice'),
+          id: 'linked-step',
+          title: 'Explain a model',
+          libraryLinks: [
+            createLibraryApplicationLink(activity, {
+              captureSnapshot: true,
+              capturedAt: '2026-07-23T12:30:00.000Z',
+            }),
+          ],
+        },
+      ],
+    });
+
+    expect(await database.lessonPlans.get(plan.id)).toMatchObject({
+      libraryLinks: [{ libraryItemId: 'resource-1', catalogType: 'resource' }],
+      lessonFlow: [
+        {
+          id: 'linked-step',
+          libraryLinks: [
+            {
+              libraryItemId: 'activity-1',
+              catalogType: 'activity',
+              snapshot: { title: 'Partner explanation' },
+            },
+          ],
+        },
+      ],
+    });
+    expect(JSON.stringify((await database.lessonPlans.get(plan.id))?.libraryLinks)).not.toContain(
+      'Fraction cards',
+    );
+
+    await history.undo();
+    expect(await database.lessonPlans.get(plan.id)).toBeUndefined();
+
+    await history.redo();
+    expect(await database.lessonPlans.get(plan.id)).toMatchObject({
+      libraryLinks: [{ libraryItemId: 'resource-1' }],
+      lessonFlow: [{ libraryLinks: [{ libraryItemId: 'activity-1' }] }],
     });
   });
 
