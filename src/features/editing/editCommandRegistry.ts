@@ -16,6 +16,11 @@ import {
   type LessonTemplateCommand,
 } from '@/features/lessonTemplates/lessonTemplateCommands';
 import {
+  parseStandardCommand,
+  STANDARD_COMMAND_PREFIX,
+  type StandardCommand,
+} from '@/features/standards/standardCommands';
+import {
   LEARNER_NOTICE_COMMAND_PREFIX,
   parseLearnerNoticeCommand,
   type LearnerNoticeCommand,
@@ -72,6 +77,7 @@ export type SupportedEditCommand =
   | { entity: 'learner-notice'; command: LearnerNoticeCommand }
   | { entity: 'library-catalog'; command: LibraryCatalogCommand }
   | { entity: 'lesson-template'; command: LessonTemplateCommand }
+  | { entity: 'standard'; command: StandardCommand }
   | { entity: 'task'; command: TaskCommand }
   | { entity: 'reminder'; command: ReminderCommand }
   | { entity: 'school-year'; command: SchoolYearCommand };
@@ -87,6 +93,7 @@ export function isSupportedEditChangeLog(log: ChangeLog): boolean {
     log.commandType.startsWith(LEARNER_NOTICE_COMMAND_PREFIX) ||
     log.commandType.startsWith(LIBRARY_CATALOG_COMMAND_PREFIX) ||
     log.commandType.startsWith(LESSON_TEMPLATE_COMMAND_PREFIX) ||
+    log.commandType.startsWith(STANDARD_COMMAND_PREFIX) ||
     log.commandType.startsWith(TASK_COMMAND_PREFIX) ||
     log.commandType.startsWith(REMINDER_COMMAND_PREFIX) ||
     log.commandType.startsWith(SCHOOL_YEAR_COMMAND_PREFIX)
@@ -140,6 +147,12 @@ export function parseSupportedEditCommand(commandType: string, json: string): Su
     return {
       entity: 'lesson-template',
       command: parseLessonTemplateCommand(json),
+    };
+  }
+  if (commandType.startsWith(STANDARD_COMMAND_PREFIX)) {
+    return {
+      entity: 'standard',
+      command: parseStandardCommand(json),
     };
   }
   if (commandType.startsWith(TASK_COMMAND_PREFIX)) {
@@ -260,10 +273,30 @@ export async function applySupportedEditCommand(
         } else {
           await db.lessonTemplates.delete(operation.id);
         }
+      } else if (operation.table === 'standardAlignments') {
+        if (operation.action === 'put') {
+          await db.standardAlignments.put(operation.record);
+        } else {
+          await db.standardAlignments.delete(operation.id);
+        }
       } else if (operation.action === 'put') {
         await db.categoryAssignments.put(operation.record);
       } else {
         await db.categoryAssignments.delete(operation.id);
+      }
+    }
+    return;
+  }
+
+  if (parsed.entity === 'standard') {
+    for (const operation of parsed.command.operations) {
+      if (operation.table === 'standards') {
+        if (operation.action === 'put') await db.standards.put(operation.record);
+        else await db.standards.delete(operation.id);
+      } else if (operation.action === 'put') {
+        await db.standardAlignments.put(operation.record);
+      } else {
+        await db.standardAlignments.delete(operation.id);
       }
     }
     return;
@@ -310,6 +343,9 @@ export async function applySupportedEditCommand(
       } else if (operation.table === 'sessionOccurrences') {
         if (operation.action === 'put') await db.sessionOccurrences.put(operation.record);
         else await db.sessionOccurrences.delete(operation.id);
+      } else if (operation.table === 'standardAlignments') {
+        if (operation.action === 'put') await db.standardAlignments.put(operation.record);
+        else await db.standardAlignments.delete(operation.id);
       } else if (operation.action === 'put') {
         await db.categoryAssignments.put(operation.record);
       } else {

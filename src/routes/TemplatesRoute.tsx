@@ -8,10 +8,15 @@ import {
   categoryValueSchema,
   lessonTemplateSchema,
   libraryCatalogItemSchema,
+  standardAlignmentSchema,
+  standardSchema,
   type LessonTemplateStatus,
+  type Standard,
+  type StandardAlignment,
 } from '@/domain/models/entities';
 import { LessonFlowPreview } from '@/features/planning/LessonFlowEditor';
 import { LessonTemplateEditor } from '@/features/lessonTemplates/LessonTemplateEditor';
+import { StandardAlignmentPanel } from '@/features/standards/StandardAlignmentPanel';
 import { lessonTemplateMutationService } from '@/features/lessonTemplates/lessonTemplateMutationService';
 import {
   buildLessonTemplateViews,
@@ -28,20 +33,35 @@ function labels(values: readonly string[]): string {
 
 export function TemplatesRoute() {
   const data = useLiveQuery(async () => {
-    const [templateValues, assignmentValues, categoryValuesRaw, libraryValues] = await Promise.all([
+    const [
+      templateValues,
+      assignmentValues,
+      categoryValuesRaw,
+      libraryValues,
+      standardValues,
+      standardAlignmentValues,
+    ] = await Promise.all([
       classroomDb.lessonTemplates.toArray(),
       classroomDb.categoryAssignments.where('entityType').equals('lesson-template').toArray(),
       classroomDb.categoryValues.toArray(),
       classroomDb.libraryItems.toArray(),
+      classroomDb.standards.toArray(),
+      classroomDb.standardAlignments.where('targetType').equals('lesson-template').toArray(),
     ]);
     const templates = templateValues.map((value) => lessonTemplateSchema.parse(value));
     const assignments = assignmentValues.map((value) => categoryAssignmentSchema.parse(value));
     const categoryValues = categoryValuesRaw.map((value) => categoryValueSchema.parse(value));
     const libraryItems = libraryValues.map((value) => libraryCatalogItemSchema.parse(value));
+    const standards = standardValues.map((value) => standardSchema.parse(value));
+    const standardAlignments = standardAlignmentValues.map((value) =>
+      standardAlignmentSchema.parse(value),
+    );
     return {
       templates,
       views: buildLessonTemplateViews(templates, assignments, categoryValues),
       libraryItems,
+      standards,
+      standardAlignments,
       templateFormats: categoryValues
         .filter(
           (value) => value.familyId === 'template-format' && value.lifecycleState === 'active',
@@ -279,6 +299,8 @@ export function TemplatesRoute() {
             <TemplateDetails
               template={selected}
               libraryItems={data?.libraryItems ?? []}
+              standards={data?.standards ?? []}
+              standardAlignments={data?.standardAlignments ?? []}
               busy={busy}
               onEdit={() => setEditing(true)}
               onArchive={() => void run(() => lessonTemplateMutationService.archive(selected.id))}
@@ -294,6 +316,8 @@ export function TemplatesRoute() {
 function TemplateDetails({
   template,
   libraryItems,
+  standards,
+  standardAlignments,
   busy,
   onEdit,
   onArchive,
@@ -301,6 +325,8 @@ function TemplateDetails({
 }: {
   template: LessonTemplateView;
   libraryItems: Parameters<typeof LessonFlowPreview>[0]['libraryItems'];
+  standards: readonly Standard[];
+  standardAlignments: readonly StandardAlignment[];
   busy: boolean;
   onEdit: () => void;
   onArchive: () => void;
@@ -378,8 +404,18 @@ function TemplateDetails({
         libraryItems={libraryItems ?? []}
       />
 
+      <StandardAlignmentPanel
+        targetType="lesson-template"
+        targetId={template.id}
+        lessonFlow={template.lessonFlow}
+        standards={standards}
+        alignments={standardAlignments}
+        disabled={busy}
+      />
+
       <p className={styles.independence}>
-        Applying this template copies its current structure into a Plan. Later Plan edits do not
+        Applying this template copies its current structure into a Plan. Standard alignments remain
+        explicit on each source or target and are not silently duplicated. Later Plan edits do not
         change this source record, and later template edits do not rewrite existing Plans.
       </p>
     </article>

@@ -25,6 +25,8 @@ import {
   scheduleExceptionSchema,
   schoolYearSchema,
   sessionOccurrenceSchema,
+  standardAlignmentSchema,
+  standardSchema,
   type LearnerContext,
   type LibraryCatalogItem,
   type LessonPlan,
@@ -33,6 +35,8 @@ import {
   type ScheduleBlock,
   type ScheduleException,
   type SessionOccurrence,
+  type Standard,
+  type StandardAlignment,
 } from '@/domain/models/entities';
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
 import { CategoryAssignmentFields } from '@/features/categories/CategoryAssignmentFields';
@@ -59,6 +63,7 @@ import {
 } from '@/features/planning/planningMutationService';
 
 import { formatLongDate, parseLocalDate, todayLocalDate } from '@/shared/dates/localDate';
+import { StandardAlignmentPanel } from '@/features/standards/StandardAlignmentPanel';
 import { EditorActionMenu } from '@/shared/ui/EditorActionMenu';
 
 import styles from './PlanningEditorRoute.module.css';
@@ -80,6 +85,8 @@ interface PlanningEditorSnapshot {
   lessonTemplates: LessonTemplate[];
   seriesPlans: LessonPlan[];
   libraryItems: LibraryCatalogItem[];
+  standards: Standard[];
+  standardAlignments: StandardAlignment[];
   planningOccurrence: PlanningScheduleOccurrence | null;
   planningOccurrenceError: string | null;
 }
@@ -124,6 +131,8 @@ function PlanningEditorForm({
     lessonTemplates,
     seriesPlans,
     libraryItems,
+    standards,
+    standardAlignments,
     planningOccurrence,
   } = snapshot;
   const [values, setValues] = useState<LessonPlanEditorValues>(() =>
@@ -517,6 +526,22 @@ function PlanningEditorForm({
         }}
       />
 
+      {plan ? (
+        <StandardAlignmentPanel
+          targetType="lesson-plan"
+          targetId={plan.id}
+          lessonFlow={plan.lessonFlow ?? []}
+          standards={standards}
+          alignments={standardAlignments}
+          disabled={saving}
+        />
+      ) : (
+        <section className={styles.notice} aria-label="Standards alignment availability">
+          Save this Plan before adding explicit Plan-level or Lesson Flow step-level Standards
+          alignments.
+        </section>
+      )}
+
       {currentSeries && currentSeriesIndex >= 0 ? (
         <section className={styles.seriesPosition} aria-label="Lesson series position">
           <div>
@@ -856,6 +881,17 @@ export function PlanningEditorRoute() {
     const lessonTemplates = (await classroomDb.lessonTemplates.toArray()).map((value) =>
       lessonTemplateSchema.parse(value),
     );
+    const standards = (await classroomDb.standards.toArray()).map((value) =>
+      standardSchema.parse(value),
+    );
+    const standardAlignments = plan
+      ? (
+          await classroomDb.standardAlignments
+            .where('[targetType+targetId]')
+            .equals(['lesson-plan', plan.id])
+            .toArray()
+        ).map((value) => standardAlignmentSchema.parse(value))
+      : [];
 
     return {
       contexts,
@@ -868,6 +904,8 @@ export function PlanningEditorRoute() {
       lessonTemplates,
       seriesPlans,
       libraryItems,
+      standards,
+      standardAlignments,
       planningOccurrence,
       planningOccurrenceError,
     };

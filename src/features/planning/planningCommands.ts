@@ -13,6 +13,10 @@ import {
   categoryAssignmentOperationSchema,
   type CategoryAssignmentOperation,
 } from '@/features/categories/categoryCommands';
+import {
+  standardAlignmentOperationSchema,
+  type StandardAlignmentOperation,
+} from '@/features/standards/standardCommands';
 
 export const PLANNING_COMMAND_PREFIX = 'planning.';
 
@@ -60,6 +64,7 @@ export const planningOperationSchema = z.union([
   putSessionOperationSchema,
   deleteSessionOperationSchema,
   categoryAssignmentOperationSchema,
+  standardAlignmentOperationSchema,
 ]);
 
 export const planningCommandSchema = z.object({
@@ -67,7 +72,9 @@ export const planningCommandSchema = z.object({
 });
 
 export type PlanningOperation =
-  z.infer<typeof planningOperationSchema> | CategoryAssignmentOperation;
+  | z.infer<typeof planningOperationSchema>
+  | CategoryAssignmentOperation
+  | StandardAlignmentOperation;
 export type PlanningCommand = z.infer<typeof planningCommandSchema>;
 
 export interface PlanningCommandPair {

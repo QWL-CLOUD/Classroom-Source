@@ -27,6 +27,14 @@ import { clearSupportedRedoBranch } from '@/features/editing/editCommandRegistry
 import { notifyEditHistoryChanged } from '@/features/editing/editHistorySignal';
 import { listLibraryApplicationLinks } from '@/features/libraryCatalog/libraryApplicationModel';
 import { resolveScheduleOccurrence } from '@/features/scheduleExceptions/scheduleOccurrenceResolver';
+import {
+  listOrphanedStepAlignments,
+  listStandardAlignmentsForTarget,
+} from '@/features/standards/standardAlignmentCleanup';
+import {
+  deleteStandardAlignmentOperation,
+  putStandardAlignmentOperation,
+} from '@/features/standards/standardCommands';
 
 import {
   createPlanningCommand,
@@ -113,6 +121,7 @@ export class PlanningMutationService {
         this.db.learnerContexts,
         this.db.lessonSeries,
         this.db.lessonPlans,
+        this.db.standardAlignments,
         this.db.libraryItems,
         this.db.sessionOccurrences,
         this.db.categoryValues,
@@ -216,6 +225,7 @@ export class PlanningMutationService {
         this.db.learnerContexts,
         this.db.lessonSeries,
         this.db.lessonPlans,
+        this.db.standardAlignments,
         this.db.libraryItems,
         this.db.sessionOccurrences,
         this.db.scheduleBlocks,
@@ -383,6 +393,7 @@ export class PlanningMutationService {
       [
         this.db.lessonSeries,
         this.db.lessonPlans,
+        this.db.standardAlignments,
         this.db.libraryItems,
         this.db.sessionOccurrences,
         this.db.categoryValues,
@@ -459,6 +470,12 @@ export class PlanningMutationService {
           sequence,
           updatedAt: timestamp,
         });
+        const orphanedAlignments = await listOrphanedStepAlignments(
+          this.db,
+          'lesson-plan',
+          updated.id,
+          new Set((updated.lessonFlow ?? []).map((step) => step.id)),
+        );
         const forwardPlans = uniquePlans([...afterPeers, updated]);
         const inversePlans = uniquePlans([...beforePeers, existing]);
         const categoryPlan = await buildCategoryAssignmentChangePlan(
@@ -478,10 +495,14 @@ export class PlanningMutationService {
               ? [putLessonSeriesOperation(assignment.createdSeries)]
               : []),
             ...forwardPlans.map(putLessonPlanOperation),
+            ...orphanedAlignments.map((alignment) =>
+              deleteStandardAlignmentOperation(alignment.id),
+            ),
             ...categoryPlan.forward,
           ]),
           inverse: createPlanningCommand([
             ...categoryPlan.inverse,
+            ...orphanedAlignments.map(putStandardAlignmentOperation),
             ...inversePlans.map(putLessonPlanOperation),
             ...(assignment.createdSeries
               ? [deleteLessonSeriesOperation(assignment.createdSeries.id)]
@@ -510,6 +531,7 @@ export class PlanningMutationService {
       'rw',
       this.db.lessonPlans,
       this.db.sessionOccurrences,
+      this.db.standardAlignments,
       this.db.categoryAssignments,
       this.db.changeLog,
       async () => {
@@ -536,9 +558,15 @@ export class PlanningMutationService {
           'lesson-plan',
           existing.id,
         );
+        const standardAlignments = await listStandardAlignmentsForTarget(
+          this.db,
+          'lesson-plan',
+          existing.id,
+        );
         const commands: PlanningCommandPair = {
           forward: createPlanningCommand([
             ...categoryAssignments.map((item) => deleteCategoryAssignmentOperation(item.id)),
+            ...standardAlignments.map((item) => deleteStandardAlignmentOperation(item.id)),
             ...sessions.map((session) => deleteSessionOperation(session.id)),
             deleteLessonPlanOperation(id),
             ...normalizedPeers.map(putLessonPlanOperation),
@@ -546,6 +574,7 @@ export class PlanningMutationService {
           inverse: createPlanningCommand([
             putLessonPlanOperation(existing),
             ...categoryAssignments.map(putCategoryAssignmentOperation),
+            ...standardAlignments.map(putStandardAlignmentOperation),
             ...sessions.map(putSessionOperation),
             ...peers.map(putLessonPlanOperation),
           ]),
@@ -1205,7 +1234,9 @@ export class PlanningMutationService {
       }
       const item = libraryCatalogItemSchema.parse(value);
       if (item.catalogType === 'standard') {
-        throw new Error('Standards cannot be attached before Phase 3F.');
+        throw new Error(
+          'Legacy Library Standard placeholders cannot be attached. Use explicit Standards alignment.',
+        );
       }
       if (item.catalogType !== link.catalogType) {
         throw new Error('An attached Library item no longer matches its saved Catalog type.');
@@ -1253,6 +1284,9 @@ export class PlanningMutationService {
       } else if (operation.table === 'sessionOccurrences') {
         if (operation.action === 'put') await this.db.sessionOccurrences.put(operation.record);
         else await this.db.sessionOccurrences.delete(operation.id);
+      } else if (operation.table === 'standardAlignments') {
+        if (operation.action === 'put') await this.db.standardAlignments.put(operation.record);
+        else await this.db.standardAlignments.delete(operation.id);
       } else if (operation.action === 'put') {
         await this.db.categoryAssignments.put(operation.record);
       } else {
