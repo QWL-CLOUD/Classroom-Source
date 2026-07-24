@@ -18,10 +18,12 @@ import { ZodError } from 'zod';
 import { classroomDb } from '@/data/db/ClassroomDatabase';
 import {
   learnerContextSchema,
+  libraryCatalogItemSchema,
   lessonPlanSchema,
   scheduleBlockSchema,
   sessionOccurrenceSchema,
   type LearnerContext,
+  type LibraryCatalogItem,
   type LessonPlan,
   type ScheduleBlock,
   type SessionOccurrence,
@@ -60,6 +62,7 @@ interface SessionEditorSnapshot {
   plan: LessonPlan | null;
   session: SessionOccurrence | null;
   scheduleBlocks: ScheduleBlock[];
+  libraryItems: LibraryCatalogItem[];
 }
 
 function getErrorMessage(cause: unknown): string {
@@ -80,7 +83,7 @@ function SessionEditorForm({
   returnTo: PlanningReturnTarget;
   service?: PlanningMutationService;
 }) {
-  const { context, plan, session, scheduleBlocks } = snapshot;
+  const { context, plan, session, scheduleBlocks, libraryItems } = snapshot;
   const defaultBlockId = session?.scheduleBlockId ?? plan?.preferredScheduleBlockId ?? '';
   const defaultBlock = scheduleBlocks.find((block) => block.id === defaultBlockId);
   const [values, setValues] = useState<SessionEditorValues>(() => {
@@ -187,6 +190,7 @@ function SessionEditorForm({
       const content = updateContentValues({
         learningTarget: current.learningTarget,
         notes: current.notes,
+        libraryLinks: current.libraryLinks ?? [],
         lessonFlow: current.lessonFlow,
       });
       return { ...current, ...content };
@@ -578,7 +582,7 @@ function SessionEditorForm({
         </div>
 
         {values.contentMode === 'inherit' ? (
-          <LessonFlowPreview content={inheritedContent} />
+          <LessonFlowPreview content={inheritedContent} libraryItems={libraryItems} />
         ) : (
           <LessonFlowEditor
             idPrefix="session-content"
@@ -586,9 +590,11 @@ function SessionEditorForm({
             values={{
               learningTarget: values.learningTarget,
               notes: values.notes,
+              libraryLinks: values.libraryLinks,
               lessonFlow: values.lessonFlow,
             }}
             disabled={saving}
+            libraryItems={libraryItems}
             onChange={updateContent}
           />
         )}
@@ -695,7 +701,11 @@ export function SessionEditorRoute() {
           first.startMinute - second.startMinute || first.title.localeCompare(second.title),
       );
 
-    return { context, plan, session, scheduleBlocks };
+    const libraryItems = (await classroomDb.libraryItems.toArray()).map((value) =>
+      libraryCatalogItemSchema.parse(value),
+    );
+
+    return { context, plan, session, scheduleBlocks, libraryItems };
   }, [planId, sessionId]);
 
   if (snapshot === undefined) {

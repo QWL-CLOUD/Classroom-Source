@@ -59,6 +59,11 @@ describe('LibraryCatalogMutationService', () => {
         title: ' Weather slides ',
         description: ' Visual prompts ',
         tags: ['Speaking', ' speaking ', 'Weather'],
+        typedFields: {
+          catalogType: 'resource',
+          sourceLocation: 'Shared drive / Weather',
+          usageNotes: 'Open in presentation mode.',
+        },
       },
       { 'resource-format': ['format-slides'] },
     );
@@ -70,6 +75,11 @@ describe('LibraryCatalogMutationService', () => {
       description: 'Visual prompts',
       tags: ['Speaking', 'Weather'],
       status: 'active',
+      typedFields: {
+        catalogType: 'resource',
+        sourceLocation: 'Shared drive / Weather',
+        usageNotes: 'Open in presentation mode.',
+      },
     });
     expect(await database.categoryAssignments.get('assignment-1')).toMatchObject({
       familyId: 'resource-format',
@@ -93,6 +103,12 @@ describe('LibraryCatalogMutationService', () => {
       title: 'Think–pair–share',
       description: 'Structured partner talk.',
       tags: ['Speaking', 'Collaboration'],
+      typedFields: {
+        catalogType: 'activity',
+        grouping: 'partners',
+        estimatedMinutes: 12,
+        directions: 'Partners take turns explaining one idea.',
+      },
     });
 
     expect(updated).toMatchObject({
@@ -101,6 +117,27 @@ describe('LibraryCatalogMutationService', () => {
       title: 'Think–pair–share',
       description: 'Structured partner talk.',
       tags: ['Speaking', 'Collaboration'],
+      typedFields: {
+        catalogType: 'activity',
+        grouping: 'partners',
+        estimatedMinutes: 12,
+        directions: 'Partners take turns explaining one idea.',
+      },
+    });
+
+    const history = new EditHistoryService(database, {
+      now: () => '2026-07-23T12:20:00.000Z',
+    });
+    await history.undo();
+    expect(await database.libraryItems.get('activity-1')).toMatchObject({
+      title: 'Think pair share',
+      typedFields: { catalogType: 'activity', grouping: 'flexible' },
+    });
+
+    await history.redo();
+    expect(await database.libraryItems.get('activity-1')).toMatchObject({
+      title: 'Think–pair–share',
+      typedFields: { catalogType: 'activity', grouping: 'partners' },
     });
   });
 

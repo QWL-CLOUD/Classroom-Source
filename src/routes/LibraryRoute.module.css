@@ -354,3 +354,37 @@
     grid-column: 2;
   }
 }
+
+.workflowSection {
+  display: grid;
+  gap: 10px;
+}
+
+.workflowSection h3,
+.workflowText p {
+  margin: 0;
+}
+
+.workflowSection h3 {
+  font-size: 15px;
+}
+
+.workflowText {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 11px;
+  background: #f8faf9;
+}
+
+.workflowText strong {
+  color: var(--heading);
+  font-size: 12px;
+}
+
+.workflowText p {
+  color: #46514d;
+  white-space: pre-wrap;
+  line-height: 1.55;
+}

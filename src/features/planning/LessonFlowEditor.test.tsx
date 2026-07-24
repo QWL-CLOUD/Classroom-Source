@@ -2,6 +2,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
+import type { LibraryCatalogItem } from '@/domain/models/entities';
+
 import type { LessonContentEditorValues } from './planningEditorModel';
 import { LessonFlowEditor } from './LessonFlowEditor';
 
@@ -117,5 +119,44 @@ describe('LessonFlowEditor', () => {
         Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
       }
     }
+  });
+
+  it('attaches a live Library source without copying Catalog content', () => {
+    const resource: LibraryCatalogItem = {
+      id: 'resource-1',
+      catalogType: 'resource',
+      title: 'Fraction cards',
+      description: 'Reusable visual models.',
+      tags: ['Math'],
+      typedFields: { catalogType: 'resource', sourceLocation: 'Binder A' },
+      status: 'active',
+      createdAt: '2026-07-23T12:00:00.000Z',
+      updatedAt: '2026-07-23T12:00:00.000Z',
+    };
+    let latestValues: LessonContentEditorValues = {
+      learningTarget: '',
+      notes: '',
+      libraryLinks: [],
+      lessonFlow: [],
+    };
+
+    render(
+      <LessonFlowEditor
+        idPrefix="lesson-library-test"
+        values={latestValues}
+        libraryItems={[resource]}
+        onChange={(update) => {
+          latestValues = update(latestValues);
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Add from Library'));
+    fireEvent.click(screen.getByRole('button', { name: 'Attach' }));
+
+    expect(latestValues.libraryLinks).toEqual([
+      { libraryItemId: 'resource-1', catalogType: 'resource' },
+    ]);
+    expect(JSON.stringify(latestValues.libraryLinks)).not.toContain('Fraction cards');
   });
 });

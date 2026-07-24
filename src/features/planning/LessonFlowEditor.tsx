@@ -1,7 +1,17 @@
 import { ArrowDown, ArrowUp, ChevronDown, Copy, Plus, Trash2 } from 'lucide-react';
 import { useLayoutEffect, useRef, useState } from 'react';
 
-import type { LessonContent, LessonFlowPhase } from '@/domain/models/entities';
+import type {
+  LessonContent,
+  LessonFlowPhase,
+  LibraryApplicationLink,
+  LibraryApplicationType,
+  LibraryCatalogItem,
+} from '@/domain/models/entities';
+import { LibraryItemLinkEditor } from '@/features/libraryCatalog/LibraryItemLinkEditor';
+import { resolveLibraryApplicationView } from '@/features/libraryCatalog/libraryApplicationModel';
+import { libraryCatalogTypeLabels } from '@/features/libraryCatalog/libraryCatalogReadModel';
+import { libraryCatalogWorkflowDetails } from '@/features/libraryCatalog/libraryCatalogTypedFields';
 import { moveLessonFlowStep } from '@/features/planning/lessonFlowEditorOperations';
 import {
   createLessonFlowStepEditorValues,
@@ -23,6 +33,7 @@ interface LessonFlowEditorProps {
   disabled?: boolean;
   idPrefix: string;
   headingLevel?: 2 | 3;
+  libraryItems?: readonly LibraryCatalogItem[];
 }
 
 function updateStep(
@@ -37,15 +48,76 @@ function closeStepMenu(target: HTMLElement): void {
   target.closest('details')?.removeAttribute('open');
 }
 
+const planLibraryTypes: readonly LibraryApplicationType[] = ['resource', 'activity', 'assessment'];
+const activityStepLibraryTypes: readonly LibraryApplicationType[] = [
+  'activity',
+  'resource',
+  'assessment',
+];
+const assessmentStepLibraryTypes: readonly LibraryApplicationType[] = [
+  'assessment',
+  'resource',
+  'activity',
+];
+
+function LibraryApplicationPreviewList({
+  label,
+  links,
+  items,
+}: {
+  label: string;
+  links: readonly LibraryApplicationLink[];
+  items: readonly LibraryCatalogItem[];
+}) {
+  if (links.length === 0) return null;
+  return (
+    <section className={styles.previewLibrary} aria-label={label}>
+      <strong>{label}</strong>
+      <ul className={styles.previewLibraryList}>
+        {links.map((link) => {
+          const view = resolveLibraryApplicationView(link, items);
+          const workflowDetails = libraryCatalogWorkflowDetails(view.typedFields);
+          return (
+            <li key={link.libraryItemId}>
+              <span>{libraryCatalogTypeLabels[view.catalogType]}</span>
+              <div>
+                <strong>{view.title}</strong>
+                <small>
+                  {view.usesSnapshot ? 'Frozen snapshot' : 'Live Library source'}
+                  {view.sourceStatus === 'archived' ? ' · Source archived' : ''}
+                  {view.sourceStatus === 'missing' ? ' · Source unavailable' : ''}
+                </small>
+                {view.description ? <p>{view.description}</p> : null}
+                {workflowDetails.length > 0 ? (
+                  <dl>
+                    {workflowDetails.map((detail) => (
+                      <div key={detail.label}>
+                        <dt>{detail.label}</dt>
+                        <dd>{detail.value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : null}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 export function LessonFlowEditor({
   values,
   onChange,
   disabled = false,
   idPrefix,
   headingLevel = 2,
+  libraryItems = [],
 }: LessonFlowEditorProps) {
   const [pendingFocusStepId, setPendingFocusStepId] = useState<string | null>(null);
   const titleInputRefs = useRef(new Map<string, HTMLInputElement>());
+  const contentLibraryLinks = values.libraryLinks ?? [];
   const parsedDurations = values.lessonFlow.map((step) => ({
     ...step,
     durationMinutes: step.durationMinutes ? Number(step.durationMinutes) : undefined,
@@ -150,10 +222,25 @@ export function LessonFlowEditor({
         </label>
       </div>
 
+      {libraryItems.length > 0 || contentLibraryLinks.length > 0 ? (
+        <LibraryItemLinkEditor
+          idPrefix={`${idPrefix}-lesson-library`}
+          label="Lesson Library"
+          description="Attach reusable sources to the whole lesson. Live links follow Catalog edits unless you explicitly freeze a snapshot."
+          links={contentLibraryLinks}
+          items={libraryItems}
+          allowedTypes={planLibraryTypes}
+          preferredType="resource"
+          disabled={disabled}
+          onChange={(links) => updateContent('libraryLinks', links)}
+        />
+      ) : null}
+
       {values.lessonFlow.length > 0 ? (
         <>
           <ol className={styles.stepList}>
             {values.lessonFlow.map((step, index) => {
+              const stepLibraryLinks = step.libraryLinks ?? [];
               const stepPrefix = `${idPrefix}-step-${step.id}`;
               const durationLabel = step.durationMinutes.trim()
                 ? `${step.durationMinutes.trim()} min`
@@ -337,6 +424,33 @@ export function LessonFlowEditor({
                       />
                     </label>
                   </div>
+
+                  {libraryItems.length > 0 || stepLibraryLinks.length > 0 ? (
+                    <LibraryItemLinkEditor
+                      key={`${step.id}-${step.phase}`}
+                      idPrefix={`${stepPrefix}-library`}
+                      label={`Step ${index + 1} Library`}
+                      description={
+                        step.phase === 'assessment'
+                          ? 'Assessment sources are prioritized for this step; Activities and Resources remain available.'
+                          : 'Activities are prioritized for this step; Resources and Assessments remain available.'
+                      }
+                      links={step.libraryLinks ?? []}
+                      items={libraryItems}
+                      allowedTypes={
+                        step.phase === 'assessment'
+                          ? assessmentStepLibraryTypes
+                          : activityStepLibraryTypes
+                      }
+                      preferredType={step.phase === 'assessment' ? 'assessment' : 'activity'}
+                      disabled={disabled}
+                      onChange={(links) =>
+                        updateLessonFlow((steps) =>
+                          updateStep(steps, index, { libraryLinks: links }),
+                        )
+                      }
+                    />
+                  ) : null}
                 </li>
               );
             })}
@@ -362,7 +476,13 @@ export function LessonFlowEditor({
   );
 }
 
-export function LessonFlowPreview({ content }: { content: LessonContent }) {
+export function LessonFlowPreview({
+  content,
+  libraryItems = [],
+}: {
+  content: LessonContent;
+  libraryItems?: readonly LibraryCatalogItem[];
+}) {
   const totalMinutes = lessonFlowDurationMinutes(content.lessonFlow);
   return (
     <section className={styles.preview} aria-label="Lesson flow preview">
@@ -388,6 +508,12 @@ export function LessonFlowPreview({ content }: { content: LessonContent }) {
         </section>
       ) : null}
 
+      <LibraryApplicationPreviewList
+        label="Lesson Library"
+        links={content.libraryLinks ?? []}
+        items={libraryItems}
+      />
+
       {content.lessonFlow.length > 0 ? (
         <ol className={styles.previewSteps}>
           {content.lessonFlow.map((step, index) => (
@@ -406,6 +532,11 @@ export function LessonFlowPreview({ content }: { content: LessonContent }) {
               {step.teacherNotes ? (
                 <p className={styles.teacherNote}>Teacher note: {step.teacherNotes}</p>
               ) : null}
+              <LibraryApplicationPreviewList
+                label={`Step ${index + 1} Library`}
+                links={step.libraryLinks ?? []}
+                items={libraryItems}
+              />
             </li>
           ))}
         </ol>

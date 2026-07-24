@@ -1,0 +1,279 @@
+.editor {
+  display: grid;
+  gap: 11px;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 11px;
+  background: #f7faf8;
+}
+
+.heading,
+.itemIdentity,
+.itemActions,
+.pickerControls,
+.resultList li,
+.noResults {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.heading {
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.heading strong,
+.itemIdentity strong,
+.resultList strong {
+  color: var(--heading);
+}
+
+.heading p,
+.attachedItem p,
+.empty,
+.noResults {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.count {
+  min-width: 26px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  color: #24584c;
+  background: #e4f1ed;
+  font-size: 11px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.attachedList,
+.resultList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attachedItem {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #c6d4ce;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.itemIdentity {
+  align-items: flex-start;
+}
+
+.itemIdentity > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.itemIdentity small,
+.resultList small {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.itemIcon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 8px;
+  color: #24584c;
+  background: #e4f1ed;
+}
+
+.itemActions {
+  flex-wrap: wrap;
+}
+
+.itemActions .button {
+  min-height: 32px;
+  padding: 0 9px;
+  font-size: 11px;
+}
+
+.picker {
+  position: relative;
+}
+
+.picker > summary {
+  width: fit-content;
+  list-style: none;
+  cursor: pointer;
+}
+
+.picker > summary::-webkit-details-marker {
+  display: none;
+}
+
+.pickerPanel {
+  display: grid;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid #b8c9c1;
+  border-radius: 11px;
+  background: #fff;
+}
+
+.pickerControls {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.35fr) minmax(240px, 1fr);
+  align-items: end;
+}
+
+.pickerControls label {
+  display: grid;
+  gap: 6px;
+  color: var(--heading);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.pickerControls input,
+.pickerControls select {
+  width: 100%;
+}
+
+.searchField > div {
+  position: relative;
+}
+
+.searchField svg:first-child {
+  position: absolute;
+  top: 50%;
+  left: 10px;
+  color: var(--muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.searchField input {
+  padding-left: 34px;
+  padding-right: 34px;
+}
+
+.searchField button {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  color: var(--muted);
+  background: transparent;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.snapshotChoice {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  color: #46514d;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.snapshotChoice input {
+  margin-top: 2px;
+}
+
+.resultList li {
+  justify-content: space-between;
+  padding: 9px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  background: #fbfcfb;
+}
+
+.resultList li > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.resultList .button {
+  flex: 0 0 auto;
+}
+
+.noResults {
+  padding: 10px;
+  border: 1px dashed #b8c9c1;
+  border-radius: 9px;
+}
+
+@media (max-width: 720px) {
+  .pickerControls {
+    grid-template-columns: 1fr;
+  }
+
+  .resultList li {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .resultList .button {
+    width: 100%;
+  }
+}
+
+.workflowDetails {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.workflowDetails > div {
+  display: grid;
+  grid-template-columns: minmax(105px, 0.25fr) minmax(0, 1fr);
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid #e2e9e5;
+}
+
+.workflowDetails dt {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.workflowDetails dd {
+  margin: 0;
+  color: #3f4b47;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 540px) {
+  .workflowDetails > div {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+}

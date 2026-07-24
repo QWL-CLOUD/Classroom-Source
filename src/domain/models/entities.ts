@@ -115,6 +115,154 @@ export const lessonSeriesSchema = z.object({
   updatedAt: timestampSchema.optional(),
 });
 
+export const libraryCatalogTypeSchema = z.enum(['activity', 'resource', 'assessment', 'standard']);
+
+export const libraryApplicationTypeSchema = z.enum(['activity', 'resource', 'assessment']);
+
+export const libraryCatalogStatusSchema = z.enum(['active', 'archived']);
+
+export const libraryActivityGroupingSchema = z.enum([
+  'whole-class',
+  'small-group',
+  'partners',
+  'individual',
+  'flexible',
+]);
+
+export const libraryAssessmentKindSchema = z.enum([
+  'diagnostic',
+  'formative',
+  'summative',
+  'self-assessment',
+  'other',
+]);
+
+export const libraryActivityFieldsSchema = z.object({
+  catalogType: z.literal('activity'),
+  grouping: libraryActivityGroupingSchema.default('flexible'),
+  estimatedMinutes: z.number().int().positive().max(1440).optional(),
+  directions: z.string().trim().max(5000).optional(),
+});
+
+export const libraryResourceFieldsSchema = z.object({
+  catalogType: z.literal('resource'),
+  sourceLocation: z.string().trim().max(2000).optional(),
+  usageNotes: z.string().trim().max(5000).optional(),
+});
+
+export const libraryAssessmentFieldsSchema = z.object({
+  catalogType: z.literal('assessment'),
+  assessmentKind: libraryAssessmentKindSchema.default('formative'),
+  studentPrompt: z.string().trim().max(5000).optional(),
+  evidenceToCollect: z.string().trim().max(5000).optional(),
+});
+
+export const libraryCatalogTypedFieldsSchema = z.discriminatedUnion('catalogType', [
+  libraryActivityFieldsSchema,
+  libraryResourceFieldsSchema,
+  libraryAssessmentFieldsSchema,
+]);
+
+export const libraryCatalogItemSchema = z
+  .object({
+    id: idSchema,
+    catalogType: libraryCatalogTypeSchema,
+    title: z.string().trim().min(1).max(240),
+    description: z.string().trim().max(5000).optional(),
+    tags: z.array(z.string().trim().min(1).max(80)).max(30).default([]),
+    typedFields: libraryCatalogTypedFieldsSchema.optional(),
+    status: libraryCatalogStatusSchema.default('active'),
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+    archivedAt: timestampSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.status === 'active' && value.archivedAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An active Library item cannot contain archivedAt.',
+        path: ['archivedAt'],
+      });
+    }
+    if (value.status === 'archived' && !value.archivedAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An archived Library item requires archivedAt.',
+        path: ['archivedAt'],
+      });
+    }
+    if (value.catalogType === 'standard' && value.typedFields) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Standards do not use Phase 3E-3 typed workflow fields.',
+        path: ['typedFields'],
+      });
+    }
+    if (
+      value.catalogType !== 'standard' &&
+      value.typedFields &&
+      value.typedFields.catalogType !== value.catalogType
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Library typed fields must match the Catalog type.',
+        path: ['typedFields'],
+      });
+    }
+  });
+
+export const libraryApplicationSnapshotSchema = z
+  .object({
+    catalogType: libraryApplicationTypeSchema,
+    title: z.string().trim().min(1).max(240),
+    description: z.string().trim().max(5000).optional(),
+    typedFields: libraryCatalogTypedFieldsSchema.optional(),
+    sourceUpdatedAt: timestampSchema,
+    capturedAt: timestampSchema,
+  })
+  .superRefine((value, context) => {
+    if (value.typedFields && value.typedFields.catalogType !== value.catalogType) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Snapshot typed fields must match the linked Catalog type.',
+        path: ['typedFields'],
+      });
+    }
+  });
+
+export const libraryApplicationLinkSchema = z
+  .object({
+    libraryItemId: idSchema,
+    catalogType: libraryApplicationTypeSchema,
+    snapshot: libraryApplicationSnapshotSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.snapshot && value.snapshot.catalogType !== value.catalogType) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Snapshot type must match the Library link type.',
+        path: ['snapshot'],
+      });
+    }
+  });
+
+export const libraryApplicationLinkListSchema = z
+  .array(libraryApplicationLinkSchema)
+  .max(100)
+  .superRefine((links, context) => {
+    const seen = new Set<string>();
+    links.forEach((link, index) => {
+      if (seen.has(link.libraryItemId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'A Library item can only be attached once in the same location.',
+          path: [index, 'libraryItemId'],
+        });
+      }
+      seen.add(link.libraryItemId);
+    });
+  });
+
 export const lessonFlowPhaseSchema = z.enum([
   'opening',
   'instruction',
@@ -133,11 +281,13 @@ export const lessonFlowStepSchema = z.object({
   durationMinutes: z.number().int().positive().max(1440).optional(),
   details: z.string().optional(),
   teacherNotes: z.string().optional(),
+  libraryLinks: libraryApplicationLinkListSchema.optional(),
 });
 
 export const lessonContentSchema = z.object({
   learningTarget: z.string().optional(),
   notes: z.string().optional(),
+  libraryLinks: libraryApplicationLinkListSchema.optional(),
   lessonFlow: z.array(lessonFlowStepSchema).default([]),
 });
 
@@ -153,6 +303,7 @@ export const lessonPlanSchema = z.object({
   durationMinutes: z.number().int().positive().optional(),
   learningTarget: z.string().optional(),
   notes: z.string().optional(),
+  libraryLinks: libraryApplicationLinkListSchema.optional(),
   lessonFlow: z.array(lessonFlowStepSchema).optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
@@ -332,39 +483,6 @@ export const taskSchema = z
   .refine((value) => value.dueMinute === undefined || value.dueDate !== undefined, {
     message: 'dueDate is required when dueMinute is set',
     path: ['dueDate'],
-  });
-
-export const libraryCatalogTypeSchema = z.enum(['activity', 'resource', 'assessment', 'standard']);
-
-export const libraryCatalogStatusSchema = z.enum(['active', 'archived']);
-
-export const libraryCatalogItemSchema = z
-  .object({
-    id: idSchema,
-    catalogType: libraryCatalogTypeSchema,
-    title: z.string().trim().min(1).max(240),
-    description: z.string().trim().max(5000).optional(),
-    tags: z.array(z.string().trim().min(1).max(80)).max(30).default([]),
-    status: libraryCatalogStatusSchema.default('active'),
-    createdAt: timestampSchema,
-    updatedAt: timestampSchema,
-    archivedAt: timestampSchema.optional(),
-  })
-  .superRefine((value, context) => {
-    if (value.status === 'active' && value.archivedAt) {
-      context.addIssue({
-        code: 'custom',
-        message: 'An active Library item cannot contain archivedAt.',
-        path: ['archivedAt'],
-      });
-    }
-    if (value.status === 'archived' && !value.archivedAt) {
-      context.addIssue({
-        code: 'custom',
-        message: 'An archived Library item requires archivedAt.',
-        path: ['archivedAt'],
-      });
-    }
   });
 
 export const categoryFamilyIdSchema = z.enum([
@@ -576,6 +694,15 @@ export type Reminder = z.infer<typeof reminderSchema>;
 export type TaskStatus = z.infer<typeof taskStatusSchema>;
 export type Task = z.infer<typeof taskSchema>;
 export type LibraryCatalogType = z.infer<typeof libraryCatalogTypeSchema>;
+export type LibraryApplicationType = z.infer<typeof libraryApplicationTypeSchema>;
+export type LibraryActivityGrouping = z.infer<typeof libraryActivityGroupingSchema>;
+export type LibraryAssessmentKind = z.infer<typeof libraryAssessmentKindSchema>;
+export type LibraryActivityFields = z.infer<typeof libraryActivityFieldsSchema>;
+export type LibraryResourceFields = z.infer<typeof libraryResourceFieldsSchema>;
+export type LibraryAssessmentFields = z.infer<typeof libraryAssessmentFieldsSchema>;
+export type LibraryCatalogTypedFields = z.infer<typeof libraryCatalogTypedFieldsSchema>;
+export type LibraryApplicationSnapshot = z.infer<typeof libraryApplicationSnapshotSchema>;
+export type LibraryApplicationLink = z.infer<typeof libraryApplicationLinkSchema>;
 export type LibraryCatalogStatus = z.infer<typeof libraryCatalogStatusSchema>;
 export type LibraryCatalogItem = z.infer<typeof libraryCatalogItemSchema>;
 export type CategoryFamilyId = z.infer<typeof categoryFamilyIdSchema>;

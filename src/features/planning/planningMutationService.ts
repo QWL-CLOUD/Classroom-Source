@@ -2,6 +2,7 @@ import { classroomDb, type ClassroomDatabase } from '@/data/db/ClassroomDatabase
 import {
   changeLogSchema,
   learnerContextSchema,
+  libraryCatalogItemSchema,
   lessonPlanSchema,
   lessonSeriesSchema,
   scheduleBlockSchema,
@@ -24,6 +25,7 @@ import {
 } from '@/features/categories/categoryCommands';
 import { clearSupportedRedoBranch } from '@/features/editing/editCommandRegistry';
 import { notifyEditHistoryChanged } from '@/features/editing/editHistorySignal';
+import { listLibraryApplicationLinks } from '@/features/libraryCatalog/libraryApplicationModel';
 import { resolveScheduleOccurrence } from '@/features/scheduleExceptions/scheduleOccurrenceResolver';
 
 import {
@@ -111,6 +113,7 @@ export class PlanningMutationService {
         this.db.learnerContexts,
         this.db.lessonSeries,
         this.db.lessonPlans,
+        this.db.libraryItems,
         this.db.sessionOccurrences,
         this.db.categoryValues,
         this.db.categoryAssignments,
@@ -123,6 +126,7 @@ export class PlanningMutationService {
         if (context.status !== 'active') {
           throw new Error('Restore this learner context before creating a new plan.');
         }
+        await this.validateLibraryLinks(parsed.fields);
 
         const timestamp = this.now();
         const planId = this.createId();
@@ -212,6 +216,7 @@ export class PlanningMutationService {
         this.db.learnerContexts,
         this.db.lessonSeries,
         this.db.lessonPlans,
+        this.db.libraryItems,
         this.db.sessionOccurrences,
         this.db.scheduleBlocks,
         this.db.scheduleExceptions,
@@ -273,6 +278,7 @@ export class PlanningMutationService {
             log: null,
           };
         }
+        await this.validateLibraryLinks(parsed.fields);
 
         const timestamp = this.now();
         const planId = this.createId();
@@ -377,6 +383,7 @@ export class PlanningMutationService {
       [
         this.db.lessonSeries,
         this.db.lessonPlans,
+        this.db.libraryItems,
         this.db.sessionOccurrences,
         this.db.categoryValues,
         this.db.categoryAssignments,
@@ -384,6 +391,7 @@ export class PlanningMutationService {
       ],
       async (): Promise<CommitResult<LessonPlan>> => {
         const existing = await this.requirePlan(id);
+        await this.validateLibraryLinks(parsed.fields);
         const timestamp = this.now();
         const assignment = await this.resolveSeriesAssignment(
           existing.contextId,
@@ -844,6 +852,7 @@ export class PlanningMutationService {
       [
         this.db.learnerContexts,
         this.db.lessonPlans,
+        this.db.libraryItems,
         this.db.sessionOccurrences,
         this.db.scheduleBlocks,
         this.db.scheduleExceptions,
@@ -869,6 +878,7 @@ export class PlanningMutationService {
           throw new Error('This plan already has an active scheduled session.');
         }
 
+        if (fields.contentOverride) await this.validateLibraryLinks(fields.contentOverride);
         const resolvedFields = await this.resolveSessionFields(fields);
         const session = sessionOccurrenceSchema.parse({
           id: this.createId(),
@@ -912,14 +922,18 @@ export class PlanningMutationService {
     const fields = parseSessionEditorValues(values);
     const result = await this.db.transaction(
       'rw',
-      this.db.lessonPlans,
-      this.db.sessionOccurrences,
-      this.db.scheduleBlocks,
-      this.db.scheduleExceptions,
-      this.db.changeLog,
+      [
+        this.db.lessonPlans,
+        this.db.libraryItems,
+        this.db.sessionOccurrences,
+        this.db.scheduleBlocks,
+        this.db.scheduleExceptions,
+        this.db.changeLog,
+      ],
       async (): Promise<CommitResult<SessionOccurrence>> => {
         const existing = await this.requireSession(id);
         const plan = await this.requirePlan(existing.lessonPlanId);
+        if (fields.contentOverride) await this.validateLibraryLinks(fields.contentOverride);
         const resolvedFields = await this.resolveSessionFields(fields);
         const updated = sessionOccurrenceSchema.parse({
           ...existing,
@@ -1175,6 +1189,28 @@ export class PlanningMutationService {
       startMinute: occurrence.block.startMinute,
       endMinute: occurrence.block.endMinute,
     };
+  }
+
+  private async validateLibraryLinks(
+    content: Parameters<typeof listLibraryApplicationLinks>[0],
+  ): Promise<void> {
+    const links = listLibraryApplicationLinks(content);
+    const checked = new Set<string>();
+    for (const link of links) {
+      if (checked.has(link.libraryItemId)) continue;
+      checked.add(link.libraryItemId);
+      const value = await this.db.libraryItems.get(link.libraryItemId);
+      if (!value) {
+        throw new Error('An attached Library item no longer exists. Remove it before saving.');
+      }
+      const item = libraryCatalogItemSchema.parse(value);
+      if (item.catalogType === 'standard') {
+        throw new Error('Standards cannot be attached before Phase 3F.');
+      }
+      if (item.catalogType !== link.catalogType) {
+        throw new Error('An attached Library item no longer matches its saved Catalog type.');
+      }
+    }
   }
 
   private async requireSeries(id: string): Promise<LessonSeries> {

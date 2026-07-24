@@ -15,7 +15,11 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 
 import { classroomDb } from '@/data/db/ClassroomDatabase';
-import type { LibraryCatalogStatus, LibraryCatalogType } from '@/domain/models/entities';
+import {
+  libraryCatalogItemSchema,
+  type LibraryCatalogStatus,
+  type LibraryCatalogType,
+} from '@/domain/models/entities';
 import { LibraryCatalogEditor } from '@/features/libraryCatalog/LibraryCatalogEditor';
 import { libraryCatalogMutationService } from '@/features/libraryCatalog/libraryCatalogMutationService';
 import {
@@ -26,6 +30,10 @@ import {
   listLibraryCatalogTags,
   type LibraryCatalogItemView,
 } from '@/features/libraryCatalog/libraryCatalogReadModel';
+import {
+  libraryActivityGroupingLabels,
+  libraryAssessmentKindLabels,
+} from '@/features/libraryCatalog/libraryCatalogTypedFields';
 
 import styles from './LibraryRoute.module.css';
 
@@ -40,11 +48,12 @@ function typeIcon(type: LibraryCatalogType): ReactNode {
 
 export function LibraryRoute() {
   const data = useLiveQuery(async () => {
-    const [items, assignments, categoryValues] = await Promise.all([
+    const [itemValues, assignments, categoryValues] = await Promise.all([
       classroomDb.libraryItems.toArray(),
       classroomDb.categoryAssignments.where('entityType').equals('library-item').toArray(),
       classroomDb.categoryValues.toArray(),
     ]);
+    const items = itemValues.map((value) => libraryCatalogItemSchema.parse(value));
     return {
       items,
       views: buildLibraryCatalogItemViews(items, assignments, categoryValues),
@@ -328,6 +337,7 @@ export function LibraryRoute() {
                         title: values.title,
                         description: values.description,
                         tags: values.tags,
+                        typedFields: values.typedFields,
                       },
                       categorySelections,
                     ),
@@ -421,6 +431,74 @@ function LibraryItemDetail({
           </div>
         ) : null}
       </dl>
+
+      {item.typedFields?.catalogType === 'activity' ? (
+        <section className={styles.workflowSection} aria-label="Activity workflow details">
+          <h3>Activity workflow</h3>
+          <dl className={styles.facts}>
+            <div>
+              <dt>Grouping</dt>
+              <dd>{libraryActivityGroupingLabels[item.typedFields.grouping]}</dd>
+            </div>
+            <div>
+              <dt>Estimated time</dt>
+              <dd>
+                {item.typedFields.estimatedMinutes
+                  ? `${item.typedFields.estimatedMinutes} minutes`
+                  : 'Not specified'}
+              </dd>
+            </div>
+          </dl>
+          {item.typedFields.directions ? (
+            <div className={styles.workflowText}>
+              <strong>Reusable directions</strong>
+              <p>{item.typedFields.directions}</p>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {item.typedFields?.catalogType === 'resource' ? (
+        <section className={styles.workflowSection} aria-label="Resource workflow details">
+          <h3>Resource workflow</h3>
+          <dl className={styles.facts}>
+            <div>
+              <dt>Source or location</dt>
+              <dd>{item.typedFields.sourceLocation ?? 'Not specified'}</dd>
+            </div>
+          </dl>
+          {item.typedFields.usageNotes ? (
+            <div className={styles.workflowText}>
+              <strong>Usage notes</strong>
+              <p>{item.typedFields.usageNotes}</p>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {item.typedFields?.catalogType === 'assessment' ? (
+        <section className={styles.workflowSection} aria-label="Assessment workflow details">
+          <h3>Assessment workflow</h3>
+          <dl className={styles.facts}>
+            <div>
+              <dt>Assessment kind</dt>
+              <dd>{libraryAssessmentKindLabels[item.typedFields.assessmentKind]}</dd>
+            </div>
+          </dl>
+          {item.typedFields.studentPrompt ? (
+            <div className={styles.workflowText}>
+              <strong>Student prompt</strong>
+              <p>{item.typedFields.studentPrompt}</p>
+            </div>
+          ) : null}
+          {item.typedFields.evidenceToCollect ? (
+            <div className={styles.workflowText}>
+              <strong>Evidence to collect</strong>
+              <p>{item.typedFields.evidenceToCollect}</p>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <div className={styles.tagSection}>
         <h3>Tags</h3>

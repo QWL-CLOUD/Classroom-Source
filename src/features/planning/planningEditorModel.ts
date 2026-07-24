@@ -2,11 +2,13 @@ import { z } from 'zod';
 
 import {
   lessonContentSchema,
+  libraryApplicationLinkListSchema,
   lessonFlowPhaseSchema,
   lessonFlowStepSchema,
   lessonPlanSchema,
   sessionOccurrenceSchema,
   type LessonContent,
+  type LibraryApplicationLink,
   type LessonFlowPhase,
   type LessonFlowStep,
   type LessonPlan,
@@ -36,11 +38,13 @@ export interface LessonFlowStepEditorValues {
   durationMinutes: string;
   details: string;
   teacherNotes: string;
+  libraryLinks?: LibraryApplicationLink[];
 }
 
 export interface LessonContentEditorValues {
   learningTarget: string;
   notes: string;
+  libraryLinks?: LibraryApplicationLink[];
   lessonFlow: LessonFlowStepEditorValues[];
 }
 
@@ -85,6 +89,7 @@ export type LessonPlanEditableFields = Pick<
   | 'durationMinutes'
   | 'learningTarget'
   | 'notes'
+  | 'libraryLinks'
   | 'lessonFlow'
 >;
 
@@ -114,11 +119,13 @@ export const lessonFlowStepEditorValuesSchema = z.object({
   durationMinutes: optionalDurationSchema,
   details: z.string(),
   teacherNotes: z.string(),
+  libraryLinks: libraryApplicationLinkListSchema.default([]),
 });
 
 export const lessonContentEditorValuesSchema = z.object({
   learningTarget: z.string(),
   notes: z.string(),
+  libraryLinks: libraryApplicationLinkListSchema.default([]),
   lessonFlow: z.array(lessonFlowStepEditorValuesSchema),
 });
 
@@ -197,6 +204,7 @@ function parseLessonFlowStep(values: LessonFlowStepEditorValues): LessonFlowStep
     durationMinutes: parsed.durationMinutes ? Number(parsed.durationMinutes) : undefined,
     details: parsed.details.trim() || undefined,
     teacherNotes: parsed.teacherNotes.trim() || undefined,
+    libraryLinks: parsed.libraryLinks ?? [],
   });
 }
 
@@ -205,6 +213,7 @@ export function parseLessonContentEditorValues(input: LessonContentEditorValues)
   return lessonContentSchema.parse({
     learningTarget: values.learningTarget.trim() || undefined,
     notes: values.notes.trim() || undefined,
+    libraryLinks: values.libraryLinks,
     lessonFlow: values.lessonFlow.map(parseLessonFlowStep),
   });
 }
@@ -264,6 +273,7 @@ export function createLessonFlowStepEditorValues(
     durationMinutes: '',
     details: '',
     teacherNotes: '',
+    libraryLinks: [],
   };
 }
 
@@ -276,6 +286,7 @@ export function toLessonFlowStepEditorValues(step: LessonFlowStep): LessonFlowSt
     durationMinutes: parsed.durationMinutes?.toString() ?? '',
     details: parsed.details ?? '',
     teacherNotes: parsed.teacherNotes ?? '',
+    libraryLinks: parsed.libraryLinks ?? [],
   };
 }
 
@@ -285,6 +296,7 @@ export function createLessonContentEditorValues(
   return {
     learningTarget: content?.learningTarget ?? '',
     notes: content?.notes ?? '',
+    libraryLinks: content?.libraryLinks ?? [],
     lessonFlow: (content?.lessonFlow ?? []).map(toLessonFlowStepEditorValues),
   };
 }
@@ -303,6 +315,7 @@ export function resolveSessionLessonContent(
     content: lessonContentSchema.parse({
       learningTarget: parsedPlan.learningTarget,
       notes: parsedPlan.notes,
+      libraryLinks: parsedPlan.libraryLinks ?? [],
       lessonFlow: parsedPlan.lessonFlow ?? [],
     }),
   };
@@ -342,6 +355,7 @@ export function toLessonPlanEditorValues(plan: LessonPlan): LessonPlanEditorValu
     ...createLessonContentEditorValues({
       learningTarget: parsed.learningTarget,
       notes: parsed.notes,
+      libraryLinks: parsed.libraryLinks ?? [],
       lessonFlow: parsed.lessonFlow ?? [],
     }),
   };

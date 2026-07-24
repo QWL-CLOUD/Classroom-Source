@@ -1,3 +1,5 @@
+import { libraryCatalogTypedFieldsSearchText } from '@/features/libraryCatalog/libraryCatalogTypedFields';
+
 import type {
   CategoryAssignment,
   CategoryValue,
@@ -83,6 +85,7 @@ function searchableText(item: LibraryCatalogItemView): string {
     item.tags.join(' '),
     item.resourceFormatLabel ?? '',
     libraryCatalogTypeLabels[item.catalogType],
+    libraryCatalogTypedFieldsSearchText(item),
   ]
     .join(' ')
     .toLocaleLowerCase('en');
