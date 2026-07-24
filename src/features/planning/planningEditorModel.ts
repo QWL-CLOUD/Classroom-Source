@@ -6,12 +6,14 @@ import {
   lessonFlowPhaseSchema,
   lessonFlowStepSchema,
   lessonPlanSchema,
+  lessonTemplateApplicationSchema,
   sessionOccurrenceSchema,
   type LessonContent,
   type LibraryApplicationLink,
   type LessonFlowPhase,
   type LessonFlowStep,
   type LessonPlan,
+  type LessonTemplateApplication,
   type SessionOccurrence,
 } from '@/domain/models/entities';
 import { minuteToTime, timeToMinute } from '@/features/editing/calendarEventEditorModel';
@@ -53,6 +55,7 @@ export type LessonSeriesMode = 'none' | 'existing' | 'new';
 export interface LessonPlanEditorValues extends LessonContentEditorValues {
   title: string;
   subject: string;
+  templateApplication?: LessonTemplateApplication;
   workflowState: LessonPlan['workflowState'];
   preferredScheduleBlockId: string;
   durationMinutes: string;
@@ -91,6 +94,7 @@ export type LessonPlanEditableFields = Pick<
   | 'notes'
   | 'libraryLinks'
   | 'lessonFlow'
+  | 'templateApplication'
 >;
 
 export type LessonSeriesAssignment =
@@ -136,6 +140,7 @@ export const lessonPlanEditorValuesSchema = lessonContentEditorValuesSchema
     workflowState: z.enum(['draft', 'ready']),
     preferredScheduleBlockId: z.string(),
     durationMinutes: optionalDurationSchema,
+    templateApplication: lessonTemplateApplicationSchema.optional(),
     seriesMode: z.enum(['none', 'existing', 'new']),
     seriesId: z.string(),
     newSeriesTitle: z.string(),
@@ -236,6 +241,7 @@ export function parseLessonPlanEditorValues(
       workflowState: values.workflowState,
       preferredScheduleBlockId: values.preferredScheduleBlockId || undefined,
       durationMinutes: values.durationMinutes ? Number(values.durationMinutes) : undefined,
+      ...(values.templateApplication ? { templateApplication: values.templateApplication } : {}),
       ...content,
     },
     series,
@@ -334,6 +340,7 @@ export function createLessonPlanEditorValues(
     workflowState: 'draft',
     preferredScheduleBlockId,
     durationMinutes: '',
+    templateApplication: undefined,
     seriesMode: 'none',
     seriesId: '',
     newSeriesTitle: '',
@@ -349,6 +356,7 @@ export function toLessonPlanEditorValues(plan: LessonPlan): LessonPlanEditorValu
     workflowState: parsed.workflowState === 'archived' ? 'draft' : parsed.workflowState,
     preferredScheduleBlockId: parsed.preferredScheduleBlockId ?? '',
     durationMinutes: parsed.durationMinutes?.toString() ?? '',
+    templateApplication: parsed.templateApplication,
     seriesMode: parsed.seriesId ? 'existing' : 'none',
     seriesId: parsed.seriesId ?? '',
     newSeriesTitle: '',

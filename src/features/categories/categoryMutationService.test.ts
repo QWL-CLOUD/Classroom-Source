@@ -53,6 +53,17 @@ async function seedPlan(id = 'plan-1'): Promise<void> {
   });
 }
 
+async function seedTemplate(id = 'template-1'): Promise<void> {
+  await database.lessonTemplates.put({
+    id,
+    title: 'Workshop template',
+    status: 'active',
+    lessonFlow: [],
+    createdAt: now,
+    updatedAt: now,
+  });
+}
+
 beforeEach(async () => {
   database = new ClassroomDatabase(`category-mutation-${crypto.randomUUID()}`);
   await database.open();
@@ -336,9 +347,17 @@ describe('CategoryMutationService', () => {
     await history.undo();
     expect(await database.categoryAssignments.get('assignment-1')).toBeUndefined();
 
-    await expect(
-      service.assign('template-format', 'lesson-template', 'template-1'),
-    ).rejects.toThrow(/later roadmap phase/);
+    await seedTemplate();
+    ids = ['assignment-template', 'log-template-assign'];
+    await service.assign('template-format', 'lesson-template', 'template-1');
+    expect(await database.categoryAssignments.get('assignment-template')).toMatchObject({
+      familyId: 'template-format',
+      entityType: 'lesson-template',
+      entityId: 'template-1',
+    });
+    await history.undo();
+    expect(await database.categoryAssignments.get('assignment-template')).toBeUndefined();
+
     await expect(service.assign('purpose', 'task', 'task-1')).rejects.toThrow(/cannot be assigned/);
   });
 });

@@ -23,14 +23,14 @@ export const CATEGORY_FAMILIES = [
     description: 'Reusable structures for lesson templates.',
     selectionMode: 'single',
     entityTypes: ['lesson-template'],
-    assignmentAvailability: 'future',
+    assignmentAvailability: 'current',
   },
   {
     id: 'focus-tag',
     label: 'Focus Tags',
     description: 'Instructional skills, language domains, or learning priorities.',
     selectionMode: 'multiple',
-    entityTypes: ['lesson-plan'],
+    entityTypes: ['lesson-plan', 'lesson-template'],
     assignmentAvailability: 'current',
   },
   {
@@ -38,7 +38,7 @@ export const CATEGORY_FAMILIES = [
     label: 'Purpose Tags',
     description: 'The teaching purpose or intended use of a plan.',
     selectionMode: 'multiple',
-    entityTypes: ['lesson-plan'],
+    entityTypes: ['lesson-plan', 'lesson-template'],
     assignmentAvailability: 'current',
   },
   {
@@ -46,7 +46,7 @@ export const CATEGORY_FAMILIES = [
     label: 'Theme Tags',
     description: 'Topics, units, or recurring curricular themes.',
     selectionMode: 'multiple',
-    entityTypes: ['lesson-plan'],
+    entityTypes: ['lesson-plan', 'lesson-template'],
     assignmentAvailability: 'current',
   },
   {

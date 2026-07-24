@@ -19,6 +19,7 @@ import { SessionEditorRoute } from '@/routes/SessionEditorRoute';
 import { SettingsRoute } from '@/routes/SettingsRoute';
 import { SystemHealthRoute } from '@/routes/SystemHealthRoute';
 import { TasksRoute } from '@/routes/TasksRoute';
+import { TemplatesRoute } from '@/routes/TemplatesRoute';
 import { TodayRoute } from '@/routes/TodayRoute';
 import { WeekRoute } from '@/routes/WeekRoute';
 
@@ -43,6 +44,7 @@ export const router = createHashRouter([
       { path: 'planning/edit', element: <PlanningEditorRoute /> },
       { path: 'planning/session', element: <SessionEditorRoute /> },
       { path: 'library', element: <LibraryRoute /> },
+      { path: 'templates', element: <TemplatesRoute /> },
       { path: 'categories', element: <CategoriesRoute /> },
       { path: 'insights', element: <InsightsRoute /> },
       { path: 'import', element: <ImportRoute /> },

@@ -1,0 +1,95 @@
+.panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+}
+
+.heading h2,
+.heading p {
+  margin: 0;
+}
+
+.heading > div:nth-child(2) {
+  display: grid;
+  gap: 4px;
+}
+
+.heading > a,
+.empty a {
+  font-weight: 800;
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--surface-subtle);
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.controls label {
+  display: grid;
+  gap: 6px;
+}
+
+.controls label > span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.preview,
+.source,
+.empty {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--surface-subtle);
+}
+
+.preview {
+  display: grid;
+  gap: 3px;
+}
+
+.preview span,
+.preview p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.empty {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+@media (max-width: 720px) {
+  .heading,
+  .controls {
+    grid-template-columns: 1fr;
+  }
+
+  .heading > a {
+    justify-self: start;
+  }
+}

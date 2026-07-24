@@ -9,6 +9,7 @@ import {
   Import,
   LayoutDashboard,
   Library,
+  LayoutTemplate,
   ListTodo,
   Menu,
   Redo2,
@@ -52,7 +53,8 @@ const collapsibleNavigationGroups: Array<{
     id: 'resources',
     label: 'Resources',
     links: [
-      { to: '/library', label: 'Library', icon: Library, status: 'planned' },
+      { to: '/library', label: 'Library', icon: Library },
+      { to: '/templates', label: 'Lesson Templates', icon: LayoutTemplate },
       { to: '/categories', label: 'Categories & Labels', icon: Tags },
     ],
   },
@@ -92,6 +94,9 @@ function getRoutePresentation(pathname: string): { title: string; layout: Conten
   if (pathname.startsWith('/tasks')) return { title: 'Tasks', layout: 'standard' };
   if (pathname.startsWith('/learners')) return { title: 'Learners', layout: 'standard' };
   if (pathname.startsWith('/library')) return { title: 'Library', layout: 'standard' };
+  if (pathname.startsWith('/templates')) {
+    return { title: 'Lesson Templates', layout: 'standard' };
+  }
   if (pathname.startsWith('/categories')) {
     return { title: 'Categories & Labels', layout: 'standard' };
   }
