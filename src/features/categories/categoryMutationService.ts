@@ -451,6 +451,7 @@ export class CategoryMutationService {
         this.db.categoryValues,
         this.db.categoryAssignments,
         this.db.lessonPlans,
+        this.db.lessonTemplates,
         this.db.tasks,
         this.db.learnerNotices,
         this.db.changeLog,
@@ -766,7 +767,9 @@ export class CategoryMutationService {
   ): Promise<void> {
     let exists = false;
     if (entityType === 'lesson-plan') exists = Boolean(await this.db.lessonPlans.get(entityId));
-    else if (entityType === 'task') exists = Boolean(await this.db.tasks.get(entityId));
+    else if (entityType === 'lesson-template') {
+      exists = Boolean(await this.db.lessonTemplates.get(entityId));
+    } else if (entityType === 'task') exists = Boolean(await this.db.tasks.get(entityId));
     else if (entityType === 'learner-notice') {
       exists = Boolean(await this.db.learnerNotices.get(entityId));
     } else {

@@ -17,7 +17,12 @@ export const DEFAULT_NAVIGATION_GROUP_PREFERENCES: NavigationGroupPreferences = 
 export const NAVIGATION_GROUP_STORAGE_KEY = 'classroom.navigation.groups.v1';
 
 export function navigationGroupForPath(pathname: string): NavigationGroupId | undefined {
-  if (pathname.startsWith('/library') || pathname.startsWith('/categories')) return 'resources';
+  if (
+    pathname.startsWith('/library') ||
+    pathname.startsWith('/templates') ||
+    pathname.startsWith('/categories')
+  )
+    return 'resources';
   if (pathname.startsWith('/insights')) return 'reflect';
   if (
     pathname.startsWith('/import') ||

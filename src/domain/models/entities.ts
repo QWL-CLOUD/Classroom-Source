@@ -291,6 +291,45 @@ export const lessonContentSchema = z.object({
   lessonFlow: z.array(lessonFlowStepSchema).default([]),
 });
 
+export const lessonTemplateStatusSchema = z.enum(['active', 'archived']);
+
+export const lessonTemplateApplicationSchema = z.object({
+  templateId: idSchema,
+  templateTitle: z.string().trim().min(1).max(240),
+  sourceUpdatedAt: timestampSchema,
+  appliedAt: timestampSchema,
+});
+
+export const lessonTemplateSchema = lessonContentSchema
+  .extend({
+    id: idSchema,
+    title: z.string().trim().min(1).max(240),
+    description: z.string().trim().max(5000).optional(),
+    defaultPlanTitle: z.string().trim().max(240).optional(),
+    subject: z.string().trim().max(240).optional(),
+    durationMinutes: z.number().int().positive().max(1440).optional(),
+    status: lessonTemplateStatusSchema.default('active'),
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+    archivedAt: timestampSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.status === 'active' && value.archivedAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An active lesson template cannot contain archivedAt.',
+        path: ['archivedAt'],
+      });
+    }
+    if (value.status === 'archived' && !value.archivedAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An archived lesson template requires archivedAt.',
+        path: ['archivedAt'],
+      });
+    }
+  });
+
 export const lessonPlanSchema = z.object({
   id: idSchema,
   contextId: idSchema,
@@ -305,6 +344,7 @@ export const lessonPlanSchema = z.object({
   notes: z.string().optional(),
   libraryLinks: libraryApplicationLinkListSchema.optional(),
   lessonFlow: z.array(lessonFlowStepSchema).optional(),
+  templateApplication: lessonTemplateApplicationSchema.optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
 });
@@ -680,6 +720,9 @@ export type LessonSeries = z.infer<typeof lessonSeriesSchema>;
 export type LessonFlowPhase = z.infer<typeof lessonFlowPhaseSchema>;
 export type LessonFlowStep = z.infer<typeof lessonFlowStepSchema>;
 export type LessonContent = z.infer<typeof lessonContentSchema>;
+export type LessonTemplateStatus = z.infer<typeof lessonTemplateStatusSchema>;
+export type LessonTemplateApplication = z.infer<typeof lessonTemplateApplicationSchema>;
+export type LessonTemplate = z.infer<typeof lessonTemplateSchema>;
 export type LessonPlan = z.infer<typeof lessonPlanSchema>;
 export type SessionOccurrence = z.infer<typeof sessionOccurrenceSchema>;
 export type LearnerNoticeKind = z.infer<typeof learnerNoticeKindSchema>;

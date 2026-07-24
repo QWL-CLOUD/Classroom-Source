@@ -20,6 +20,7 @@ import {
   libraryCatalogItemSchema,
   lessonPlanSchema,
   lessonSeriesSchema,
+  lessonTemplateSchema,
   scheduleBlockSchema,
   scheduleExceptionSchema,
   schoolYearSchema,
@@ -28,6 +29,7 @@ import {
   type LibraryCatalogItem,
   type LessonPlan,
   type LessonSeries,
+  type LessonTemplate,
   type ScheduleBlock,
   type ScheduleException,
   type SessionOccurrence,
@@ -35,6 +37,8 @@ import {
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
 import { CategoryAssignmentFields } from '@/features/categories/CategoryAssignmentFields';
 import { useCategorySelectionDraft } from '@/features/categories/useCategorySelectionDraft';
+import { LessonTemplateApplyPanel } from '@/features/lessonTemplates/LessonTemplateApplyPanel';
+import { applyLessonTemplateToPlanEditorValues } from '@/features/lessonTemplates/lessonTemplateApplication';
 import { LessonFlowEditor } from '@/features/planning/LessonFlowEditor';
 import { formatLessonSeriesPositionLabel } from '@/features/planning/lessonSeriesPresentation';
 import {
@@ -73,6 +77,7 @@ interface PlanningEditorSnapshot {
   contextSessions: SessionOccurrence[];
   scheduleBlocks: ScheduleBlock[];
   lessonSeries: LessonSeries[];
+  lessonTemplates: LessonTemplate[];
   seriesPlans: LessonPlan[];
   libraryItems: LibraryCatalogItem[];
   planningOccurrence: PlanningScheduleOccurrence | null;
@@ -116,6 +121,7 @@ function PlanningEditorForm({
     contextSessions,
     scheduleBlocks,
     lessonSeries,
+    lessonTemplates,
     seriesPlans,
     libraryItems,
     planningOccurrence,
@@ -467,6 +473,19 @@ function PlanningEditorForm({
           />
         </label>
       </div>
+
+      <LessonTemplateApplyPanel
+        templates={lessonTemplates}
+        currentApplication={values.templateApplication}
+        disabled={saving}
+        onApply={(template) => {
+          try {
+            applyValues((current) => applyLessonTemplateToPlanEditorValues(current, template));
+          } catch (cause) {
+            setError(getErrorMessage(cause));
+          }
+        }}
+      />
 
       <CategoryAssignmentFields
         snapshot={categoryDraft.snapshot}
@@ -834,6 +853,9 @@ export function PlanningEditorRoute() {
     const libraryItems = (await classroomDb.libraryItems.toArray()).map((value) =>
       libraryCatalogItemSchema.parse(value),
     );
+    const lessonTemplates = (await classroomDb.lessonTemplates.toArray()).map((value) =>
+      lessonTemplateSchema.parse(value),
+    );
 
     return {
       contexts,
@@ -843,6 +865,7 @@ export function PlanningEditorRoute() {
       contextSessions,
       scheduleBlocks,
       lessonSeries,
+      lessonTemplates,
       seriesPlans,
       libraryItems,
       planningOccurrence,
