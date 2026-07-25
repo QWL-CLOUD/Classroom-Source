@@ -112,7 +112,7 @@ export function CategoriesRoute() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const items = state.status === 'ready' ? state.items : [];
+  const items = useMemo(() => (state.status === 'ready' ? state.items : []), [state]);
   const visibleItems = useMemo(() => filterCategoryWorkspaceItems(items, view), [items, view]);
   const activeItems = useMemo(() => filterCategoryWorkspaceItems(items, 'active'), [items]);
   const archivedCount = useMemo(

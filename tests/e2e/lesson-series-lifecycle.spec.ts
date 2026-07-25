@@ -144,6 +144,7 @@ test('Lesson Series lifecycle preserves plans, sessions, and teaching history', 
     page.getByLabel('Lesson series').getByRole('option', { name: 'Renamed lifecycle unit' }),
   ).toHaveCount(0);
   await page.getByRole('link', { name: 'Back to Learners' }).click();
+  await page.goto('./#/learners?context=series-lifecycle-context&date=2026-07-18');
   const returnedPlanning = page.getByRole('region', {
     name: 'Planning for Series lifecycle class',
   });
