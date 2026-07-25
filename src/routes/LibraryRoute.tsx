@@ -1,5 +1,6 @@
 import {
   Archive,
+  ArrowRight,
   BookOpen,
   Boxes,
   ClipboardCheck,
@@ -118,6 +119,13 @@ export function LibraryRoute() {
     }
   }
 
+  function selectCatalogType(nextType: 'all' | LibraryCatalogType): void {
+    setCatalogType(nextType);
+    if (nextType !== 'all' && nextType !== 'resource') {
+      setResourceFormatId('');
+    }
+  }
+
   function clearFilters(): void {
     setQuery('');
     setCatalogType('all');
@@ -128,6 +136,16 @@ export function LibraryRoute() {
 
   const filterActive =
     query.trim() || catalogType !== 'all' || status !== 'active' || tag || resourceFormatId;
+  const hasLegacyStandards = (data?.views ?? []).some((item) => item.catalogType === 'standard');
+  const catalogTabs: Array<{ value: 'all' | LibraryCatalogType; label: string }> = [
+    { value: 'all', label: 'All' },
+    { value: 'activity', label: 'Activities' },
+    { value: 'resource', label: 'Resources' },
+    { value: 'assessment', label: 'Assessments' },
+  ];
+  if (hasLegacyStandards) {
+    catalogTabs.push({ value: 'standard', label: 'Legacy Standards' });
+  }
 
   return (
     <div className={`page-shell ${styles.page}`}>
@@ -136,22 +154,43 @@ export function LibraryRoute() {
           <p className="page-eyebrow">Reusable teaching catalog</p>
           <h1>Library</h1>
           <p>
-            Organize Activities, Resources, Assessments, and Standards with stable identities,
-            shared metadata, and one searchable catalog.
+            Organize reusable Activities, Resources, and Assessments. Standards now have their own
+            framework-aware workspace and alignment workflow.
           </p>
         </div>
-        <button
-          className="button button-primary"
-          type="button"
-          onClick={() => {
-            setCreating(true);
-            setEditing(false);
-            setError(null);
-          }}
-        >
-          <Plus size={17} aria-hidden="true" /> New Library item
-        </button>
+        <div className={styles.headerActions}>
+          <a className="button" href="#/standards">
+            <BookOpen size={17} aria-hidden="true" /> Open Standards
+            <ArrowRight size={15} aria-hidden="true" />
+          </a>
+          <button
+            className="button button-primary"
+            type="button"
+            onClick={() => {
+              setCreating(true);
+              setEditing(false);
+              setError(null);
+            }}
+          >
+            <Plus size={17} aria-hidden="true" /> New Library item
+          </button>
+        </div>
       </header>
+
+      <nav className={styles.catalogTabs} aria-label="Library catalog types">
+        {catalogTabs.map((tab) => (
+          <button
+            key={tab.value}
+            className={styles.catalogTab}
+            type="button"
+            data-selected={catalogType === tab.value}
+            aria-pressed={catalogType === tab.value}
+            onClick={() => selectCatalogType(tab.value)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
 
       <section className={`card ${styles.filters}`} aria-label="Library catalog filters">
         <label className={styles.searchField}>
@@ -164,20 +203,6 @@ export function LibraryRoute() {
               placeholder="Search titles, descriptions, tags, and formats"
             />
           </div>
-        </label>
-
-        <label>
-          <span>Type</span>
-          <select
-            value={catalogType}
-            onChange={(event) => setCatalogType(event.target.value as 'all' | LibraryCatalogType)}
-          >
-            <option value="all">All types</option>
-            <option value="activity">Activities</option>
-            <option value="resource">Resources</option>
-            <option value="assessment">Assessments</option>
-            <option value="standard">Legacy Standards</option>
-          </select>
         </label>
 
         <label>
@@ -208,6 +233,7 @@ export function LibraryRoute() {
           <span>Resource Format</span>
           <select
             value={resourceFormatId}
+            disabled={catalogType !== 'all' && catalogType !== 'resource'}
             onChange={(event) => setResourceFormatId(event.target.value)}
           >
             <option value="">All formats</option>
@@ -262,8 +288,11 @@ export function LibraryRoute() {
         <section className={`card ${styles.directory}`} aria-label="Library catalog results">
           <div className={styles.sectionHeading}>
             <div>
-              <p className="page-eyebrow">Catalog</p>
+              <p className="page-eyebrow">Catalog results</p>
               <h2>{visible.length} items</h2>
+              <p className={styles.resultContext}>
+                {catalogTabs.find((tab) => tab.value === catalogType)?.label ?? 'All'}
+              </p>
             </div>
           </div>
 
@@ -515,10 +544,10 @@ function LibraryItemDetail({
 
       {item.catalogType === 'standard' ? (
         <div className={styles.phaseNote}>
-          <strong>Standards Catalog foundation</strong>
+          <strong>Legacy Library Standard</strong>
           <span>
-            Import, Planning alignment, and coverage reporting are reserved for Phase 3F. This
-            record already has the stable identity needed for that later work.
+            This compatibility record remains readable, but new Standards and alignments belong in
+            the independent <a href="#/standards">Standards workspace</a>.
           </span>
         </div>
       ) : null}

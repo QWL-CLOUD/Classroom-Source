@@ -10,6 +10,58 @@
   gap: 24px;
 }
 
+.pageHeader > div:first-child,
+.detailHeader > div:first-child {
+  min-width: 0;
+}
+
+.headerActions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.headerActions a,
+.headerActions button {
+  max-width: 100%;
+}
+
+.catalogTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 82%, #edf4f1);
+}
+
+.catalogTab {
+  min-width: 0;
+  padding: 9px 13px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.catalogTab:hover {
+  background: #fff;
+  color: var(--heading);
+}
+
+.catalogTab[data-selected='true'] {
+  background: #fff;
+  color: #24584c;
+  box-shadow: 0 1px 4px rgb(39 73 65 / 12%);
+}
+
 .pageHeader h1,
 .sectionHeading h2,
 .detail h2 {
@@ -26,8 +78,8 @@
 .filters {
   display: grid;
   grid-template-columns:
-    minmax(240px, 1.7fr)
-    repeat(4, minmax(135px, 0.72fr))
+    minmax(260px, 1.7fr)
+    repeat(3, minmax(145px, 0.8fr))
     auto;
   align-items: end;
   gap: 12px;
@@ -113,6 +165,8 @@
 
 .itemButton {
   display: grid;
+  min-width: 0;
+  max-width: 100%;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 11px;
@@ -150,13 +204,22 @@
 
 .itemText strong,
 .itemText small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.itemText strong {
+  display: -webkit-box;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.35;
 }
 
 .itemText small {
   color: var(--muted);
+  line-height: 1.4;
 }
 
 .statusBadge,
@@ -169,6 +232,9 @@
   border-radius: 999px;
   background: #e8f3ef;
   color: #24584c;
+  max-width: 100%;
+  flex-shrink: 0;
+  overflow-wrap: anywhere;
   font-size: 11px;
   font-weight: 800;
 }
@@ -185,6 +251,7 @@
 
 .detailHeader h2 {
   margin-top: 10px;
+  overflow-wrap: anywhere;
 }
 
 .badges,
@@ -197,6 +264,7 @@
 .description,
 .muted {
   margin: 0;
+  overflow-wrap: anywhere;
   line-height: 1.65;
 }
 
@@ -280,6 +348,18 @@
   line-height: 1.5;
 }
 
+.phaseNote a {
+  color: inherit;
+  font-weight: 800;
+}
+
+.resultContext {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .error {
   margin: 0;
   border: 1px solid #df9a92;
@@ -313,11 +393,11 @@
 
 @media (max-width: 1180px) {
   .filters {
-    grid-template-columns: repeat(3, minmax(160px, 1fr));
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
   }
 
   .searchField {
-    grid-column: span 2;
+    grid-column: 1 / -1;
   }
 }
 
@@ -325,6 +405,11 @@
   .pageHeader,
   .detailHeader {
     flex-direction: column;
+  }
+
+  .headerActions {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   .workspace {
@@ -344,6 +429,16 @@
 
   .searchField {
     grid-column: auto;
+  }
+
+  .catalogTabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
+
+  .catalogTab {
+    flex: 0 0 auto;
   }
 
   .itemButton {

@@ -1,0 +1,126 @@
+import AxeBuilder from '@axe-core/playwright';
+import { expect, test, type Locator, type Page } from '@playwright/test';
+
+const timestamp = '2026-07-25T04:00:00.000Z';
+
+async function seedLongCatalogRecords(page: Page): Promise<void> {
+  await page.evaluate(async (createdAt) => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('classroom-v20');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction(['libraryItems', 'standards'], 'readwrite');
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error);
+        transaction.oncomplete = () => resolve();
+
+        transaction.objectStore('libraryItems').put({
+          id: 'responsive-library-activity',
+          catalogType: 'activity',
+          title:
+            'Collaborative multilingual fraction comparison routine with visual models and partner explanation prompts',
+          description:
+            'A deliberately long reusable Activity title used to verify that catalog controls wrap safely.',
+          tags: ['Fractions', 'Speaking'],
+          typedFields: {
+            catalogType: 'activity',
+            grouping: 'partners',
+            estimatedMinutes: 25,
+          },
+          status: 'active',
+          createdAt,
+          updatedAt: createdAt,
+        });
+
+        transaction.objectStore('standards').put({
+          id: 'responsive-standard',
+          issuingOrganization: 'Synthetic National Mathematics Standards Consortium',
+          frameworkTitle:
+            'Comprehensive Framework for Mathematical Reasoning, Communication, Representation, and Fraction Sense',
+          jurisdiction: 'Synthetic national scope',
+          subject: 'Mathematics and mathematical communication',
+          gradeBand: 'Grade 3 multilingual immersion learners',
+          version: '2026 extended responsive-label edition',
+          frameworkKey: 'synthetic-responsive-mathematics-2026',
+          code: '3.NF.REASONING.COMMUNICATION.EXTENDED.1',
+          normalizedCode: '3.nf.reasoning.communication.extended.1',
+          statement:
+            'Compare unit fractions, explain the comparison with visual models, and communicate how equal-sized wholes determine the meaning of the comparison.',
+          sortOrder: 0,
+          status: 'active',
+          createdAt,
+          updatedAt: createdAt,
+        });
+      });
+    } finally {
+      database.close();
+    }
+  }, timestamp);
+}
+
+async function expectChildrenContained(locator: Locator): Promise<void> {
+  expect(
+    await locator.evaluate((element) => {
+      const parent = element.getBoundingClientRect();
+      return [...element.children].every((child) => {
+        const rect = child.getBoundingClientRect();
+        return rect.left >= parent.left - 1 && rect.right <= parent.right + 1;
+      });
+    }),
+  ).toBe(true);
+}
+
+test('Library and Standards keep long catalog labels inside responsive controls', async ({
+  page,
+}) => {
+  await page.goto('./#/library');
+  await page.waitForFunction(async () => {
+    const databases = await indexedDB.databases();
+    return databases.some(
+      (database) => database.name === 'classroom-v20' && (database.version ?? 0) >= 8,
+    );
+  });
+  await seedLongCatalogRecords(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload();
+
+  const libraryMain = page.locator('#main-content');
+  await expect(libraryMain.getByRole('link', { name: /Open Standards/ })).toBeVisible();
+  await libraryMain.getByRole('button', { name: 'Activities', exact: true }).click();
+  await expect(
+    libraryMain.getByRole('button', { name: 'Activities', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
+
+  const libraryItem = libraryMain.getByRole('button', {
+    name: /Collaborative multilingual fraction comparison routine/,
+  });
+  await expect(libraryItem).toBeVisible();
+  await expectChildrenContained(libraryItem);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+
+  await libraryMain.getByRole('link', { name: /Open Standards/ }).click();
+  const standardsMain = page.locator('#main-content');
+  await expect(standardsMain.getByRole('heading', { level: 1, name: 'Standards' })).toBeVisible();
+  await expect(standardsMain.getByRole('link', { name: 'Open Library' })).toBeVisible();
+
+  const standardItem = standardsMain.getByRole('button', {
+    name: /3\.NF\.REASONING\.COMMUNICATION\.EXTENDED\.1/,
+  });
+  await expect(standardItem).toBeVisible();
+  await expectChildrenContained(standardItem);
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(
+    accessibility.violations,
+    accessibility.violations.map((violation) => `${violation.id}: ${violation.help}`).join('\n'),
+  ).toEqual([]);
+});

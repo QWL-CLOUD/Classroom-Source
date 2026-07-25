@@ -12,6 +12,24 @@
   gap: 1rem;
 }
 
+.pageHeader > div:first-child,
+.detailIdentity {
+  min-width: 0;
+}
+
+.headerActions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.headerActions a,
+.headerActions button {
+  max-width: 100%;
+}
+
 .pageHeader h1,
 .pageHeader p,
 .sectionHeading h2,
@@ -34,7 +52,31 @@
 
 .filters label {
   display: grid;
+  min-width: 0;
   gap: 0.35rem;
+}
+
+.filters input,
+.filters select {
+  width: 100%;
+  min-width: 0;
+}
+
+.filters label:first-child > div {
+  position: relative;
+}
+
+.filters label:first-child svg {
+  position: absolute;
+  top: 50%;
+  left: 0.7rem;
+  color: var(--text-muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.filters label:first-child input {
+  padding-left: 2.25rem;
 }
 
 .filters label > span {
@@ -52,7 +94,13 @@
 .details,
 .editorPanel {
   display: grid;
+  min-width: 0;
   gap: 1rem;
+}
+
+.directory {
+  position: sticky;
+  top: 1rem;
 }
 
 .list {
@@ -67,6 +115,8 @@
 
 .itemButton {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 0.65rem;
@@ -83,18 +133,33 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
+.itemText {
+  min-width: 0;
+}
+
 .itemText strong,
 .itemText small {
   display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.itemText strong {
+  line-height: 1.35;
 }
 
 .itemText small {
   margin-top: 0.2rem;
   color: var(--text-muted);
+  line-height: 1.4;
 }
 
 .status {
   display: inline-flex;
+  max-width: 100%;
+  flex-shrink: 0;
+  overflow-wrap: anywhere;
   border-radius: 999px;
   padding: 0.25rem 0.55rem;
   font-size: 0.78rem;
@@ -119,9 +184,17 @@
 }
 
 .statement {
+  margin: 0;
+  overflow-wrap: anywhere;
   font-size: 1.05rem;
   line-height: 1.6;
-  margin: 0;
+}
+
+.frameworkLabel,
+.frameworkSummary,
+.detailHeader h2 {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .metadata {
@@ -186,6 +259,10 @@
     grid-template-columns: 1fr;
   }
 
+  .directory {
+    position: static;
+  }
+
   .list {
     max-height: 24rem;
   }
@@ -197,9 +274,23 @@
     flex-direction: column;
   }
 
+  .headerActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
   .filters,
   .metadata {
     grid-template-columns: 1fr;
+  }
+
+  .itemButton {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .status {
+    justify-self: start;
   }
 
   .actions {
