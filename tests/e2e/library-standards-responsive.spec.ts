@@ -124,3 +124,66 @@ test('Library and Standards keep long catalog labels inside responsive controls'
     accessibility.violations.map((violation) => `${violation.id}: ${violation.help}`).join('\n'),
   ).toEqual([]);
 });
+
+test('Standards keeps header actions and filters inside the desktop workspace', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 820 });
+  await page.goto('./#/standards');
+  await page.waitForFunction(async () => {
+    const databases = await indexedDB.databases();
+    return databases.some(
+      (database) => database.name === 'classroom-v20' && (database.version ?? 0) >= 8,
+    );
+  });
+  await seedLongCatalogRecords(page);
+  await page.reload();
+
+  const main = page.locator('#main-content');
+  const filters = main.getByRole('region', { name: 'Standard filters' });
+  const openLibrary = main.getByRole('link', { name: 'Open Library' });
+  const newStandard = main.getByRole('button', { name: 'New Standard' });
+
+  await expect(filters).toBeVisible();
+  await expect(openLibrary).toBeVisible();
+  await expect(newStandard).toBeVisible();
+
+  expect(
+    await filters.evaluate((element) => {
+      const parent = element.getBoundingClientRect();
+      const controls = element.querySelectorAll('input, select, button');
+      return [...controls].every((control) => {
+        const rect = control.getBoundingClientRect();
+        return (
+          rect.left >= parent.left - 1 &&
+          rect.right <= parent.right + 1 &&
+          rect.top >= parent.top - 1 &&
+          rect.bottom <= parent.bottom + 1
+        );
+      });
+    }),
+  ).toBe(true);
+
+  const mainBox = await main.boundingBox();
+  const openLibraryBox = await openLibrary.boundingBox();
+  const newStandardBox = await newStandard.boundingBox();
+
+  expect(mainBox).not.toBeNull();
+  expect(openLibraryBox).not.toBeNull();
+  expect(newStandardBox).not.toBeNull();
+
+  for (const actionBox of [openLibraryBox!, newStandardBox!]) {
+    expect(actionBox.x).toBeGreaterThanOrEqual(mainBox!.x - 1);
+    expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(mainBox!.x + mainBox!.width + 1);
+  }
+
+  const standardItem = main.getByRole('button', {
+    name: /3\.NF\.REASONING\.COMMUNICATION\.EXTENDED\.1/,
+  });
+  await expect(standardItem).toBeVisible();
+  await expectChildrenContained(standardItem);
+
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+});

@@ -17,9 +17,19 @@
   min-width: 0;
 }
 
+.pageHeader {
+  flex-wrap: wrap;
+}
+
+.pageHeader > div:first-child {
+  flex: 1 1 32rem;
+}
+
 .headerActions {
   display: flex;
-  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 0.55rem;
@@ -44,16 +54,27 @@
 }
 
 .filters {
-  display: grid;
-  grid-template-columns: minmax(14rem, 2fr) repeat(4, minmax(10rem, 1fr)) auto;
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
   gap: 0.75rem;
-  align-items: end;
+  align-items: flex-end;
 }
 
 .filters label {
   display: grid;
   min-width: 0;
+  flex: 1 1 12rem;
   gap: 0.35rem;
+}
+
+.filters label:first-child {
+  flex: 2 1 20rem;
+}
+
+.filters > button {
+  max-width: 100%;
+  flex: 0 1 auto;
 }
 
 .filters input,
@@ -251,8 +272,13 @@
 }
 
 @media (max-width: 1100px) {
-  .filters {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .headerActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .filters label:first-child {
+    flex-basis: 100%;
   }
 
   .workspace {
@@ -279,9 +305,14 @@
     justify-content: flex-start;
   }
 
-  .filters,
   .metadata {
     grid-template-columns: 1fr;
+  }
+
+  .filters > label,
+  .filters > button {
+    width: 100%;
+    flex-basis: 100%;
   }
 
   .itemButton {
