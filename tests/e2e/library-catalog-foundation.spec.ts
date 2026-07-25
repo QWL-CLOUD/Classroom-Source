@@ -72,7 +72,10 @@ test('Library Catalog creates, filters, edits, archives, and restores stable rec
   await expect(details.getByText('Slide deck', { exact: true })).toBeVisible();
   await expect(details.getByText('Speaking', { exact: true })).toBeVisible();
 
-  await page.getByLabel('Type').selectOption('resource');
+  await page
+    .getByLabel('Library catalog types')
+    .getByRole('button', { name: 'Resources', exact: true })
+    .click();
   await page.getByLabel('Resource Format').selectOption('format-slide-deck');
   await page.getByLabel('Search').fill('oral language');
   await expect(

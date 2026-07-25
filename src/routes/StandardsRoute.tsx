@@ -1,4 +1,4 @@
-import { Archive, BookCheck, Pencil, Plus, RotateCcw, Search, X } from 'lucide-react';
+import { Archive, BookCheck, Boxes, Pencil, Plus, RotateCcw, Search, X } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -108,17 +108,22 @@ export function StandardsRoute() {
             Flow steps, and Lesson Templates.
           </p>
         </div>
-        <button
-          className="button button-primary"
-          type="button"
-          onClick={() => {
-            setCreating(true);
-            setEditing(false);
-            setError(null);
-          }}
-        >
-          <Plus size={17} aria-hidden="true" /> New Standard
-        </button>
+        <div className={styles.headerActions}>
+          <a className="button" href="#/library">
+            <Boxes size={17} aria-hidden="true" /> Open Library
+          </a>
+          <button
+            className="button button-primary"
+            type="button"
+            onClick={() => {
+              setCreating(true);
+              setEditing(false);
+              setError(null);
+            }}
+          >
+            <Plus size={17} aria-hidden="true" /> New Standard
+          </button>
+        </div>
       </header>
 
       <section className={`card ${styles.filters}`} aria-label="Standard filters">
@@ -252,7 +257,7 @@ export function StandardsRoute() {
                   >
                     <span className={styles.itemText}>
                       <strong>{standard.code}</strong>
-                      <small>
+                      <small className={styles.frameworkSummary}>
                         {standard.frameworkLabel}
                         {standard.subject ? ` · ${standard.subject}` : ''}
                         {standard.gradeBand ? ` · ${standard.gradeBand}` : ''}
@@ -331,8 +336,8 @@ function StandardDetails({
   return (
     <article className={styles.detailContent} aria-label={`${standard.code} Standard details`}>
       <header className={styles.detailHeader}>
-        <div>
-          <p className="page-eyebrow">{standard.frameworkLabel}</p>
+        <div className={styles.detailIdentity}>
+          <p className={`page-eyebrow ${styles.frameworkLabel}`}>{standard.frameworkLabel}</p>
           <h2>{standard.code}</h2>
           <span className={styles.status} data-status={standard.status}>
             {standardStatusLabels[standard.status]}
