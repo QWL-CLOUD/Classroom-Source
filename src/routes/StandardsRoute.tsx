@@ -127,75 +127,84 @@ export function StandardsRoute() {
       </header>
 
       <section className={`card ${styles.filters}`} aria-label="Standard filters">
-        <label>
-          <span>Search</span>
+        <div className={styles.filterHeader}>
           <div>
-            <Search size={16} aria-hidden="true" />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Code, statement, framework, or subject"
-            />
+            <strong>Filter Standards</strong>
+            <span>Search and narrow the independent source catalog.</span>
           </div>
-        </label>
-        <label>
-          <span>Status</span>
-          <select
-            value={status}
-            onChange={(event) => setStatus(event.target.value as 'all' | StandardStatus)}
+          <button
+            className={`button button-quiet ${styles.clearFilters}`}
+            type="button"
+            disabled={!filtersActive}
+            onClick={() => {
+              setQuery('');
+              setStatus('active');
+              setFrameworkKey('');
+              setSubject('');
+              setGradeBand('');
+            }}
           >
-            <option value="active">Active</option>
-            <option value="archived">Archived</option>
-            <option value="all">All statuses</option>
-          </select>
-        </label>
-        <label>
-          <span>Framework</span>
-          <select value={frameworkKey} onChange={(event) => setFrameworkKey(event.target.value)}>
-            <option value="">All frameworks</option>
-            {(data?.frameworks ?? []).map((framework) => (
-              <option key={framework.key} value={framework.key}>
-                {framework.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span>Subject</span>
-          <select value={subject} onChange={(event) => setSubject(event.target.value)}>
-            <option value="">All subjects</option>
-            {(data?.subjects ?? []).map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          <span>Grade band</span>
-          <select value={gradeBand} onChange={(event) => setGradeBand(event.target.value)}>
-            <option value="">All levels</option>
-            {(data?.gradeBands ?? []).map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          className="button button-quiet"
-          type="button"
-          disabled={!filtersActive}
-          onClick={() => {
-            setQuery('');
-            setStatus('active');
-            setFrameworkKey('');
-            setSubject('');
-            setGradeBand('');
-          }}
-        >
-          <X size={15} aria-hidden="true" /> Clear filters
-        </button>
+            <X size={15} aria-hidden="true" /> Clear filters
+          </button>
+        </div>
+
+        <div className={styles.filterGrid}>
+          <label>
+            <span>Search</span>
+            <div>
+              <Search size={16} aria-hidden="true" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Code, statement, framework, or subject"
+              />
+            </div>
+          </label>
+          <label>
+            <span>Status</span>
+            <select
+              value={status}
+              onChange={(event) => setStatus(event.target.value as 'all' | StandardStatus)}
+            >
+              <option value="active">Active</option>
+              <option value="archived">Archived</option>
+              <option value="all">All statuses</option>
+            </select>
+          </label>
+          <label>
+            <span>Framework</span>
+            <select value={frameworkKey} onChange={(event) => setFrameworkKey(event.target.value)}>
+              <option value="">All frameworks</option>
+              {(data?.frameworks ?? []).map((framework) => (
+                <option key={framework.key} value={framework.key}>
+                  {framework.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Subject</span>
+            <select value={subject} onChange={(event) => setSubject(event.target.value)}>
+              <option value="">All subjects</option>
+              {(data?.subjects ?? []).map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Grade band</span>
+            <select value={gradeBand} onChange={(event) => setGradeBand(event.target.value)}>
+              <option value="">All levels</option>
+              {(data?.gradeBands ?? []).map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
       </section>
 
       {error ? (
@@ -226,7 +235,7 @@ export function StandardsRoute() {
         </section>
       ) : null}
 
-      <div className={styles.workspace}>
+      <div className={styles.workspace} data-empty={!selected}>
         <section className={`card ${styles.directory}`} aria-label="Standard results">
           <div className={styles.sectionHeading}>
             <div>
@@ -239,8 +248,14 @@ export function StandardsRoute() {
           ) : visible.length === 0 ? (
             <div className={styles.empty} role="status">
               <BookCheck size={28} aria-hidden="true" />
-              <strong>No matching Standards</strong>
-              <span>Adjust the filters or create the first framework-aware Standard.</span>
+              <strong>
+                {filtersActive ? 'No Standards match these filters' : 'No Standards yet'}
+              </strong>
+              <span>
+                {filtersActive
+                  ? 'Adjust or clear the filters to return to the active catalog.'
+                  : 'Create the first framework-aware Standard to begin the catalog.'}
+              </span>
             </div>
           ) : (
             <ul className={styles.list}>
@@ -273,7 +288,11 @@ export function StandardsRoute() {
           )}
         </section>
 
-        <section className={`card ${styles.details}`} aria-label="Standard details">
+        <section
+          className={`card ${styles.details}`}
+          aria-label="Standard details"
+          hidden={!selected}
+        >
           {!selected ? (
             <div className={styles.empty} role="status">
               <BookCheck size={28} aria-hidden="true" />
