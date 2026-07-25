@@ -74,6 +74,24 @@ async function expectChildrenContained(locator: Locator): Promise<void> {
   ).toBe(true);
 }
 
+async function expectColorToken(locator: Locator, tokenName: string): Promise<void> {
+  const colors = await locator.evaluate((element, name) => {
+    const token = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    const probe = document.createElement('span');
+    probe.style.color = token;
+    document.body.append(probe);
+    const expected = getComputedStyle(probe).color;
+    probe.remove();
+
+    return {
+      actual: getComputedStyle(element).color,
+      expected,
+    };
+  }, tokenName);
+
+  expect(colors.actual).toBe(colors.expected);
+}
+
 test('Library and Standards keep long catalog labels inside responsive controls', async ({
   page,
 }) => {
@@ -114,6 +132,20 @@ test('Library and Standards keep long catalog labels inside responsive controls'
   });
   await expect(standardItem).toBeVisible();
   await expectChildrenContained(standardItem);
+
+  await expectColorToken(
+    standardsMain.getByText(/Manage framework-aware Standard identities/),
+    '--text-secondary',
+  );
+  await expectColorToken(
+    standardsMain.getByRole('region', { name: 'Standard filters' }).getByText('Search', {
+      exact: true,
+    }),
+    '--heading',
+  );
+  await expectColorToken(standardItem.locator('small').first(), '--text-secondary');
+  await expectColorToken(standardItem.locator('[data-status="active"]'), '--accent-strong');
+
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
   ).toBe(true);
@@ -230,8 +262,15 @@ test('Standards follows the lesson-template catalog workspace pattern', async ({
   await expect(filters.getByText('Filter Standards', { exact: true })).toHaveCount(0);
   await expect(clearFilters).toBeVisible();
   await expect(clearFilters).toBeDisabled();
-  await expect(results.getByText('No matching Standards', { exact: true })).toBeVisible();
+  const emptyHeading = results.getByText('No matching Standards', { exact: true });
+  const emptyCopy = results.getByText(
+    'Adjust the filters or create the first framework-aware Standard.',
+    { exact: true },
+  );
+  await expect(emptyHeading).toBeVisible();
   await expect(details.getByText('Select a Standard', { exact: true })).toBeVisible();
+  await expectColorToken(emptyHeading, '--heading');
+  await expectColorToken(emptyCopy, '--text-secondary');
 
   const filterControls = await Promise.all(
     [
