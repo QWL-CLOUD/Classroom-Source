@@ -1,5 +1,6 @@
 import {
   Archive,
+  BookCheck,
   BookOpen,
   CalendarDays,
   ChevronDown,
@@ -55,6 +56,7 @@ const collapsibleNavigationGroups: Array<{
     links: [
       { to: '/library', label: 'Library', icon: Library },
       { to: '/templates', label: 'Lesson Templates', icon: LayoutTemplate },
+      { to: '/standards', label: 'Standards', icon: BookCheck },
       { to: '/categories', label: 'Categories & Labels', icon: Tags },
     ],
   },
@@ -97,6 +99,7 @@ function getRoutePresentation(pathname: string): { title: string; layout: Conten
   if (pathname.startsWith('/templates')) {
     return { title: 'Lesson Templates', layout: 'standard' };
   }
+  if (pathname.startsWith('/standards')) return { title: 'Standards', layout: 'standard' };
   if (pathname.startsWith('/categories')) {
     return { title: 'Categories & Labels', layout: 'standard' };
   }

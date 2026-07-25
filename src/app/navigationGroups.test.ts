@@ -34,6 +34,7 @@ describe('navigation group preferences', () => {
     expect(navigationGroupForPath('/learners')).toBeUndefined();
     expect(navigationGroupForPath('/library')).toBe('resources');
     expect(navigationGroupForPath('/templates')).toBe('resources');
+    expect(navigationGroupForPath('/standards')).toBe('resources');
     expect(navigationGroupForPath('/categories')).toBe('resources');
     expect(navigationGroupForPath('/insights')).toBe('reflect');
     expect(navigationGroupForPath('/migration')).toBe('settingsData');

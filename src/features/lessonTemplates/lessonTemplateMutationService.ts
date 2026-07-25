@@ -14,6 +14,11 @@ import {
 import { clearSupportedRedoBranch } from '@/features/editing/editCommandRegistry';
 import { notifyEditHistoryChanged } from '@/features/editing/editHistorySignal';
 import { listLibraryApplicationLinks } from '@/features/libraryCatalog/libraryApplicationModel';
+import { listOrphanedStepAlignments } from '@/features/standards/standardAlignmentCleanup';
+import {
+  deleteStandardAlignmentOperation,
+  putStandardAlignmentOperation,
+} from '@/features/standards/standardCommands';
 
 import {
   createLessonTemplateCommand,
@@ -59,6 +64,7 @@ export class LessonTemplateMutationService {
       'rw',
       [
         this.db.lessonTemplates,
+        this.db.standardAlignments,
         this.db.libraryItems,
         this.db.categoryValues,
         this.db.categoryAssignments,
@@ -172,6 +178,7 @@ export class LessonTemplateMutationService {
       'rw',
       [
         this.db.lessonTemplates,
+        this.db.standardAlignments,
         this.db.libraryItems,
         this.db.categoryValues,
         this.db.categoryAssignments,
@@ -181,6 +188,12 @@ export class LessonTemplateMutationService {
         const existing = await this.requireTemplate(id);
         const now = this.now();
         const updated = await update(existing, now);
+        const orphanedAlignments = await listOrphanedStepAlignments(
+          this.db,
+          'lesson-template',
+          updated.id,
+          new Set(updated.lessonFlow.map((step) => step.id)),
+        );
         const categoryPlan = await buildCategoryAssignmentChangePlan(
           this.db,
           'lesson-template',
@@ -195,10 +208,14 @@ export class LessonTemplateMutationService {
         const commands: LessonTemplateCommandPair = {
           forward: createLessonTemplateCommand([
             putLessonTemplateOperation(updated),
+            ...orphanedAlignments.map((alignment) =>
+              deleteStandardAlignmentOperation(alignment.id),
+            ),
             ...categoryPlan.forward,
           ]),
           inverse: createLessonTemplateCommand([
             ...categoryPlan.inverse,
+            ...orphanedAlignments.map(putStandardAlignmentOperation),
             putLessonTemplateOperation(existing),
           ]),
         };
@@ -231,7 +248,9 @@ export class LessonTemplateMutationService {
       }
       const item = libraryCatalogItemSchema.parse(value);
       if (item.catalogType === 'standard') {
-        throw new Error('Standards cannot be linked before Phase 3F.');
+        throw new Error(
+          'Legacy Library Standard placeholders cannot be linked. Use explicit Standards alignment.',
+        );
       }
       if (item.catalogType !== link.catalogType) {
         throw new Error('A linked Library item no longer matches its saved Catalog type.');
@@ -255,6 +274,12 @@ export class LessonTemplateMutationService {
           await this.db.lessonTemplates.put(operation.record);
         } else {
           await this.db.lessonTemplates.delete(operation.id);
+        }
+      } else if (operation.table === 'standardAlignments') {
+        if (operation.action === 'put') {
+          await this.db.standardAlignments.put(operation.record);
+        } else {
+          await this.db.standardAlignments.delete(operation.id);
         }
       } else if (operation.action === 'put') {
         await this.db.categoryAssignments.put(operation.record);

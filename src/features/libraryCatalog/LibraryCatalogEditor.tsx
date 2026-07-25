@@ -155,7 +155,9 @@ export function LibraryCatalogEditor({
             <option value="activity">Activity</option>
             <option value="resource">Resource</option>
             <option value="assessment">Assessment</option>
-            <option value="standard">Standard</option>
+            {item?.catalogType === 'standard' ? (
+              <option value="standard">Legacy Standard placeholder</option>
+            ) : null}
           </select>
         </label>
 
@@ -332,8 +334,8 @@ export function LibraryCatalogEditor({
 
       {catalogType === 'standard' ? (
         <p className={styles.phaseNote}>
-          Standards keep stable Catalog identities in this phase. Import, alignment, and coverage
-          remain reserved for Phase 3F.
+          This is a legacy Library placeholder. Create and align independent Standard source records
+          in <a href="#/standards">Standards</a>.
         </p>
       ) : null}
 

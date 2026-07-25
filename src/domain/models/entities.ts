@@ -115,6 +115,77 @@ export const lessonSeriesSchema = z.object({
   updatedAt: timestampSchema.optional(),
 });
 
+export const standardStatusSchema = z.enum(['active', 'archived']);
+
+export const standardSchema = z
+  .object({
+    id: idSchema,
+    issuingOrganization: z.string().trim().min(1).max(240),
+    frameworkTitle: z.string().trim().min(1).max(500),
+    jurisdiction: z.string().trim().max(240).optional(),
+    subject: z.string().trim().max(240).optional(),
+    gradeBand: z.string().trim().max(120).optional(),
+    version: z.string().trim().max(120).optional(),
+    frameworkKey: z.string().min(1),
+    code: z.string().trim().min(1).max(160),
+    normalizedCode: z.string().min(1),
+    statement: z.string().trim().min(1).max(10_000),
+    parentStandardId: idSchema.optional(),
+    sortOrder: z.number().int().nonnegative().default(0),
+    status: standardStatusSchema.default('active'),
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+    archivedAt: timestampSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.parentStandardId === value.id) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A Standard cannot be its own parent.',
+        path: ['parentStandardId'],
+      });
+    }
+    if (value.status === 'active' && value.archivedAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An active Standard cannot contain archivedAt.',
+        path: ['archivedAt'],
+      });
+    }
+    if (value.status === 'archived' && !value.archivedAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An archived Standard requires archivedAt.',
+        path: ['archivedAt'],
+      });
+    }
+  });
+
+export const standardAlignmentTargetTypeSchema = z.enum(['lesson-plan', 'lesson-template']);
+
+export const standardAlignmentSchema = z
+  .object({
+    id: idSchema,
+    standardId: idSchema,
+    targetType: standardAlignmentTargetTypeSchema,
+    targetId: idSchema,
+    lessonFlowStepId: idSchema.optional(),
+    scopeKey: z.string().min(1),
+    createdAt: timestampSchema,
+  })
+  .superRefine((value, context) => {
+    const expectedScopeKey = value.lessonFlowStepId
+      ? `${value.targetType}:${value.targetId}:step:${value.lessonFlowStepId}`
+      : `${value.targetType}:${value.targetId}:root`;
+    if (value.scopeKey !== expectedScopeKey) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Standard alignment scopeKey must match its target and Lesson Flow step.',
+        path: ['scopeKey'],
+      });
+    }
+  });
+
 export const libraryCatalogTypeSchema = z.enum(['activity', 'resource', 'assessment', 'standard']);
 
 export const libraryApplicationTypeSchema = z.enum(['activity', 'resource', 'assessment']);
@@ -736,6 +807,10 @@ export type ReminderStatus = z.infer<typeof reminderStatusSchema>;
 export type Reminder = z.infer<typeof reminderSchema>;
 export type TaskStatus = z.infer<typeof taskStatusSchema>;
 export type Task = z.infer<typeof taskSchema>;
+export type StandardStatus = z.infer<typeof standardStatusSchema>;
+export type Standard = z.infer<typeof standardSchema>;
+export type StandardAlignmentTargetType = z.infer<typeof standardAlignmentTargetTypeSchema>;
+export type StandardAlignment = z.infer<typeof standardAlignmentSchema>;
 export type LibraryCatalogType = z.infer<typeof libraryCatalogTypeSchema>;
 export type LibraryApplicationType = z.infer<typeof libraryApplicationTypeSchema>;
 export type LibraryActivityGrouping = z.infer<typeof libraryActivityGroupingSchema>;

@@ -9,6 +9,10 @@ import {
   categoryAssignmentOperationSchema,
   type CategoryAssignmentOperation,
 } from '@/features/categories/categoryCommands';
+import {
+  standardAlignmentOperationSchema,
+  type StandardAlignmentOperation,
+} from '@/features/standards/standardCommands';
 
 export const LESSON_TEMPLATE_COMMAND_PREFIX = 'lesson-template.';
 
@@ -28,6 +32,7 @@ export const lessonTemplateOperationSchema = z.union([
   putLessonTemplateOperationSchema,
   deleteLessonTemplateOperationSchema,
   categoryAssignmentOperationSchema,
+  standardAlignmentOperationSchema,
 ]);
 
 export const lessonTemplateCommandSchema = z.object({
@@ -35,7 +40,9 @@ export const lessonTemplateCommandSchema = z.object({
 });
 
 export type LessonTemplateOperation =
-  z.infer<typeof lessonTemplateOperationSchema> | CategoryAssignmentOperation;
+  | z.infer<typeof lessonTemplateOperationSchema>
+  | CategoryAssignmentOperation
+  | StandardAlignmentOperation;
 export type LessonTemplateCommand = z.infer<typeof lessonTemplateCommandSchema>;
 
 export interface LessonTemplateCommandPair {

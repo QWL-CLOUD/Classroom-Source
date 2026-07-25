@@ -20,6 +20,7 @@ export function navigationGroupForPath(pathname: string): NavigationGroupId | un
   if (
     pathname.startsWith('/library') ||
     pathname.startsWith('/templates') ||
+    pathname.startsWith('/standards') ||
     pathname.startsWith('/categories')
   )
     return 'resources';

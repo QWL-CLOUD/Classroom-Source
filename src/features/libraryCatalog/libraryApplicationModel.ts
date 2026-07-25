@@ -27,7 +27,9 @@ export function createLibraryApplicationSnapshot(
 ): LibraryApplicationSnapshot {
   const parsed = libraryCatalogItemSchema.parse(item);
   if (parsed.catalogType === 'standard') {
-    throw new Error('Standards cannot be attached before Phase 3F.');
+    throw new Error(
+      'Legacy Library Standard placeholders cannot be attached. Use explicit Standards alignment.',
+    );
   }
   return libraryApplicationSnapshotSchema.parse({
     catalogType: parsed.catalogType,
@@ -45,7 +47,9 @@ export function createLibraryApplicationLink(
 ): LibraryApplicationLink {
   const parsed = libraryCatalogItemSchema.parse(item);
   if (parsed.catalogType === 'standard') {
-    throw new Error('Standards cannot be attached before Phase 3F.');
+    throw new Error(
+      'Legacy Library Standard placeholders cannot be attached. Use explicit Standards alignment.',
+    );
   }
   return libraryApplicationLinkSchema.parse({
     libraryItemId: parsed.id,

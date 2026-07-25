@@ -12,7 +12,7 @@ afterEach(async () => {
 });
 
 describe('ClassroomDatabase schema upgrades', () => {
-  it('upgrades legacy data to schema v7 and adds managed-category stores without losing Tasks', async () => {
+  it('upgrades legacy data to schema v8 and adds Standards stores without losing Tasks', async () => {
     const name = `classroom-v20-upgrade-${crypto.randomUUID()}`;
     names.push(name);
     const legacy = new Dexie(name);
@@ -33,7 +33,7 @@ describe('ClassroomDatabase schema upgrades', () => {
     const upgraded = new ClassroomDatabase(name);
     await upgraded.open();
 
-    expect(upgraded.verno).toBe(7);
+    expect(upgraded.verno).toBe(8);
     expect(await upgraded.tasks.get('legacy-task')).toBeDefined();
     await upgraded.reminders.put({
       id: 'reminder-1',
@@ -103,6 +103,31 @@ describe('ClassroomDatabase schema upgrades', () => {
       updatedAt: '2026-07-23T12:00:00.000Z',
     });
     expect(await upgraded.lessonTemplates.count()).toBe(1);
+
+    await upgraded.standards.put({
+      id: 'standard-1',
+      issuingOrganization: 'Synthetic organization',
+      frameworkTitle: 'Synthetic framework',
+      frameworkKey: 'synthetic organization|synthetic framework||2026',
+      version: '2026',
+      code: 'S.1',
+      normalizedCode: 's.1',
+      statement: 'Synthetic Standard statement.',
+      sortOrder: 0,
+      status: 'active',
+      createdAt: '2026-07-24T00:00:00.000Z',
+      updatedAt: '2026-07-24T00:00:00.000Z',
+    });
+    await upgraded.standardAlignments.put({
+      id: 'alignment-1',
+      standardId: 'standard-1',
+      targetType: 'lesson-template',
+      targetId: 'template-1',
+      scopeKey: 'lesson-template:template-1:root',
+      createdAt: '2026-07-24T00:00:00.000Z',
+    });
+    expect(await upgraded.standards.count()).toBe(1);
+    expect(await upgraded.standardAlignments.count()).toBe(1);
 
     upgraded.close();
   });

@@ -3,7 +3,11 @@ import { Link } from 'react-router-dom';
 import { classroomDb } from '@/data/db/ClassroomDatabase';
 import type { CoreRecordCounts } from '@/domain/readModels/workspaceReadModels';
 import { useWorkspaceDataSummary } from '@/features/workspace/useWorkspaceReadModel';
-import { buildLiveHealthChecks, type HealthCheckTone } from './systemHealthPresentation';
+import {
+  buildLiveHealthChecks,
+  EXPECTED_SCHEMA_VERSION,
+  type HealthCheckTone,
+} from './systemHealthPresentation';
 import styles from './SystemHealthRoute.module.css';
 
 const countLabels: ReadonlyArray<[keyof CoreRecordCounts, string]> = [
@@ -68,7 +72,10 @@ export function SystemHealthRoute() {
           <span>Active school year</span>
           <strong>{schoolYearCheck.statusLabel}</strong>
         </article>
-        <article className="card" data-tone={classroomDb.verno === 3 ? 'ready' : 'attention'}>
+        <article
+          className="card"
+          data-tone={classroomDb.verno === EXPECTED_SCHEMA_VERSION ? 'ready' : 'attention'}
+        >
           <ShieldCheck size={25} aria-hidden="true" />
           <span>Schema version</span>
           <strong>{classroomDb.verno}</strong>

@@ -176,7 +176,7 @@ export function LibraryRoute() {
             <option value="activity">Activities</option>
             <option value="resource">Resources</option>
             <option value="assessment">Assessments</option>
-            <option value="standard">Standards</option>
+            <option value="standard">Legacy Standards</option>
           </select>
         </label>
 

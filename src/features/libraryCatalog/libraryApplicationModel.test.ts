@@ -65,13 +65,15 @@ describe('Library application model', () => {
     });
   });
 
-  it('rejects Standards until the Phase 3F alignment workflow', () => {
+  it('rejects legacy Library Standard placeholders in application links', () => {
     expect(() =>
       createLibraryApplicationLink({
         ...source,
         catalogType: 'standard',
         typedFields: undefined,
       }),
-    ).toThrow('Standards cannot be attached before Phase 3F.');
+    ).toThrow(
+      'Legacy Library Standard placeholders cannot be attached. Use explicit Standards alignment.',
+    );
   });
 });
