@@ -131,7 +131,7 @@ test('Phase 2.1 preserves Week view and focus while keeping time labels readable
   const requestedScrollLeft = await weekGrid.evaluate((element) => {
     const target = Math.min(180, element.scrollWidth - element.clientWidth);
     element.scrollLeft = target;
-    return target;
+    return element.scrollLeft;
   });
   await expect
     .poll(async () =>

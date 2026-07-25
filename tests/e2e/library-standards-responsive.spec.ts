@@ -188,9 +188,7 @@ test('Standards keeps header actions and filters inside the desktop workspace', 
   ).toBe(true);
 });
 
-test('Standards presents a compact filter toolbar and one focused empty state', async ({
-  page,
-}) => {
+test('Standards follows the lesson-template catalog workspace pattern', async ({ page }) => {
   await page.setViewportSize({ width: 1680, height: 900 });
   await page.goto('./#/standards');
   await page.waitForFunction(async () => {
@@ -229,11 +227,11 @@ test('Standards presents a compact filter toolbar and one focused empty state', 
   const results = main.getByRole('region', { name: 'Standard results' });
   const details = main.getByRole('region', { name: 'Standard details' });
 
-  await expect(filters.getByText('Filter Standards', { exact: true })).toBeVisible();
+  await expect(filters.getByText('Filter Standards', { exact: true })).toHaveCount(0);
   await expect(clearFilters).toBeVisible();
   await expect(clearFilters).toBeDisabled();
-  await expect(results.getByText('No Standards yet', { exact: true })).toBeVisible();
-  await expect(details).not.toBeVisible();
+  await expect(results.getByText('No matching Standards', { exact: true })).toBeVisible();
+  await expect(details.getByText('Select a Standard', { exact: true })).toBeVisible();
 
   const filterControls = await Promise.all(
     [
@@ -246,20 +244,23 @@ test('Standards presents a compact filter toolbar and one focused empty state', 
   );
 
   for (const box of filterControls) expect(box).not.toBeNull();
-  // Native input and select controls can differ by a few CSS pixels across
-  // Chromium host renderers while remaining in the same grid row.
   const controlTops = filterControls.map((box) => box!.y);
   expect(Math.max(...controlTops) - Math.min(...controlTops)).toBeLessThanOrEqual(6);
 
   const clearBox = await clearFilters.boundingBox();
   expect(clearBox).not.toBeNull();
   expect(clearBox!.width).toBeLessThan(240);
+  const gradeBandBox = filterControls.at(-1)!;
+  expect(
+    Math.abs(clearBox!.y + clearBox!.height - (gradeBandBox!.y + gradeBandBox!.height)),
+  ).toBeLessThanOrEqual(6);
 
-  const filtersBox = await filters.boundingBox();
   const resultsBox = await results.boundingBox();
-  expect(filtersBox).not.toBeNull();
+  const detailsBox = await details.boundingBox();
   expect(resultsBox).not.toBeNull();
-  expect(Math.abs(resultsBox!.width - filtersBox!.width)).toBeLessThanOrEqual(2);
+  expect(detailsBox).not.toBeNull();
+  expect(Math.abs(resultsBox!.y - detailsBox!.y)).toBeLessThanOrEqual(2);
+  expect(resultsBox!.width).toBeLessThan(detailsBox!.width);
 
   expect(
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
