@@ -127,32 +127,11 @@ export function StandardsRoute() {
       </header>
 
       <section className={`card ${styles.filters}`} aria-label="Standard filters">
-        <div className={styles.filterHeader}>
-          <div>
-            <strong>Filter Standards</strong>
-            <span>Search and narrow the independent source catalog.</span>
-          </div>
-          <button
-            className={`button button-quiet ${styles.clearFilters}`}
-            type="button"
-            disabled={!filtersActive}
-            onClick={() => {
-              setQuery('');
-              setStatus('active');
-              setFrameworkKey('');
-              setSubject('');
-              setGradeBand('');
-            }}
-          >
-            <X size={15} aria-hidden="true" /> Clear filters
-          </button>
-        </div>
-
         <div className={styles.filterGrid}>
-          <label>
+          <label className={styles.searchField}>
             <span>Search</span>
             <div>
-              <Search size={16} aria-hidden="true" />
+              <Search size={17} aria-hidden="true" />
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
@@ -204,6 +183,20 @@ export function StandardsRoute() {
               ))}
             </select>
           </label>
+          <button
+            className="button button-quiet"
+            type="button"
+            disabled={!filtersActive}
+            onClick={() => {
+              setQuery('');
+              setStatus('active');
+              setFrameworkKey('');
+              setSubject('');
+              setGradeBand('');
+            }}
+          >
+            <X size={15} aria-hidden="true" /> Clear filters
+          </button>
         </div>
       </section>
 
@@ -235,7 +228,7 @@ export function StandardsRoute() {
         </section>
       ) : null}
 
-      <div className={styles.workspace} data-empty={!selected}>
+      <div className={styles.workspace}>
         <section className={`card ${styles.directory}`} aria-label="Standard results">
           <div className={styles.sectionHeading}>
             <div>
@@ -248,14 +241,8 @@ export function StandardsRoute() {
           ) : visible.length === 0 ? (
             <div className={styles.empty} role="status">
               <BookCheck size={28} aria-hidden="true" />
-              <strong>
-                {filtersActive ? 'No Standards match these filters' : 'No Standards yet'}
-              </strong>
-              <span>
-                {filtersActive
-                  ? 'Adjust or clear the filters to return to the active catalog.'
-                  : 'Create the first framework-aware Standard to begin the catalog.'}
-              </span>
+              <strong>No matching Standards</strong>
+              <span>Adjust the filters or create the first framework-aware Standard.</span>
             </div>
           ) : (
             <ul className={styles.list}>
@@ -270,6 +257,9 @@ export function StandardsRoute() {
                       setEditing(false);
                     }}
                   >
+                    <span className={styles.itemIcon}>
+                      <BookCheck size={18} aria-hidden="true" />
+                    </span>
                     <span className={styles.itemText}>
                       <strong>{standard.code}</strong>
                       <small className={styles.frameworkSummary}>
@@ -288,11 +278,7 @@ export function StandardsRoute() {
           )}
         </section>
 
-        <section
-          className={`card ${styles.details}`}
-          aria-label="Standard details"
-          hidden={!selected}
-        >
+        <section className={`card ${styles.details}`} aria-label="Standard details">
           {!selected ? (
             <div className={styles.empty} role="status">
               <BookCheck size={28} aria-hidden="true" />
