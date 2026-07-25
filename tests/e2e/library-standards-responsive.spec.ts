@@ -187,3 +187,81 @@ test('Standards keeps header actions and filters inside the desktop workspace', 
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
   ).toBe(true);
 });
+
+test('Standards presents a compact filter toolbar and one focused empty state', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1680, height: 900 });
+  await page.goto('./#/standards');
+  await page.waitForFunction(async () => {
+    const databases = await indexedDB.databases();
+    return databases.some(
+      (database) => database.name === 'classroom-v20' && (database.version ?? 0) >= 8,
+    );
+  });
+
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('classroom-v20');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction(['standards', 'standardAlignments'], 'readwrite');
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error);
+        transaction.oncomplete = () => resolve();
+        transaction.objectStore('standards').clear();
+        transaction.objectStore('standardAlignments').clear();
+      });
+    } finally {
+      database.close();
+    }
+  });
+
+  await page.reload();
+
+  const main = page.locator('#main-content');
+  const filters = main.getByRole('region', { name: 'Standard filters' });
+  const clearFilters = filters.getByRole('button', { name: 'Clear filters' });
+  const results = main.getByRole('region', { name: 'Standard results' });
+  const details = main.getByRole('region', { name: 'Standard details' });
+
+  await expect(filters.getByText('Filter Standards', { exact: true })).toBeVisible();
+  await expect(clearFilters).toBeVisible();
+  await expect(clearFilters).toBeDisabled();
+  await expect(results.getByText('No Standards yet', { exact: true })).toBeVisible();
+  await expect(details).not.toBeVisible();
+
+  const filterControls = await Promise.all(
+    [
+      main.getByLabel('Search'),
+      main.getByLabel('Status'),
+      main.getByLabel('Framework'),
+      main.getByLabel('Subject'),
+      main.getByLabel('Grade band'),
+    ].map((control) => control.boundingBox()),
+  );
+
+  for (const box of filterControls) expect(box).not.toBeNull();
+  const firstTop = filterControls[0]!.y;
+  for (const box of filterControls.slice(1)) {
+    expect(Math.abs(box!.y - firstTop)).toBeLessThanOrEqual(2);
+  }
+
+  const clearBox = await clearFilters.boundingBox();
+  expect(clearBox).not.toBeNull();
+  expect(clearBox!.width).toBeLessThan(240);
+
+  const filtersBox = await filters.boundingBox();
+  const resultsBox = await results.boundingBox();
+  expect(filtersBox).not.toBeNull();
+  expect(resultsBox).not.toBeNull();
+  expect(Math.abs(resultsBox!.width - filtersBox!.width)).toBeLessThanOrEqual(2);
+
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+});
