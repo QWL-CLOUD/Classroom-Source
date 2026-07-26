@@ -133,6 +133,9 @@ export const standardSchema = z
     parentStandardId: idSchema.optional(),
     sortOrder: z.number().int().nonnegative().default(0),
     status: standardStatusSchema.default('active'),
+    sourceName: z.string().trim().min(1).max(500).optional(),
+    importNote: z.string().trim().max(5_000).optional(),
+    importBatchId: idSchema.optional(),
     createdAt: timestampSchema,
     updatedAt: timestampSchema,
     archivedAt: timestampSchema.optional(),
@@ -157,6 +160,33 @@ export const standardSchema = z
         code: 'custom',
         message: 'An archived Standard requires archivedAt.',
         path: ['archivedAt'],
+      });
+    }
+  });
+
+export const standardImportBatchSchema = z
+  .object({
+    id: idSchema,
+    sourceName: z.string().trim().min(1).max(500),
+    issuingOrganization: z.string().trim().min(1).max(240),
+    frameworkTitle: z.string().trim().min(1).max(500),
+    jurisdiction: z.string().trim().max(240).optional(),
+    version: z.string().trim().max(120).optional(),
+    importNote: z.string().trim().max(5_000).optional(),
+    worksheetName: z.string().trim().min(1).max(240),
+    fileKind: z.enum(['csv', 'xlsx']),
+    totalRows: z.number().int().nonnegative().max(50_000),
+    createdCount: z.number().int().nonnegative().max(50_000),
+    updatedCount: z.number().int().nonnegative().max(50_000),
+    duplicateCount: z.number().int().nonnegative().max(50_000),
+    createdAt: timestampSchema,
+  })
+  .superRefine((value, context) => {
+    if (value.createdCount + value.updatedCount + value.duplicateCount !== value.totalRows) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Standard import batch counts must equal totalRows.',
+        path: ['totalRows'],
       });
     }
   });
@@ -809,6 +839,7 @@ export type TaskStatus = z.infer<typeof taskStatusSchema>;
 export type Task = z.infer<typeof taskSchema>;
 export type StandardStatus = z.infer<typeof standardStatusSchema>;
 export type Standard = z.infer<typeof standardSchema>;
+export type StandardImportBatch = z.infer<typeof standardImportBatchSchema>;
 export type StandardAlignmentTargetType = z.infer<typeof standardAlignmentTargetTypeSchema>;
 export type StandardAlignment = z.infer<typeof standardAlignmentSchema>;
 export type LibraryCatalogType = z.infer<typeof libraryCatalogTypeSchema>;

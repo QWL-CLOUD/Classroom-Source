@@ -404,3 +404,7 @@
     width: 100%;
   }
 }
+
+.metadataWide {
+  grid-column: 1 / -1;
+}

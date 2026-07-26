@@ -2,10 +2,12 @@ import { z } from 'zod';
 
 import {
   standardAlignmentSchema,
+  standardImportBatchSchema,
   standardSchema,
   type ChangeLog,
   type Standard,
   type StandardAlignment,
+  type StandardImportBatch,
 } from '@/domain/models/entities';
 
 export const STANDARD_COMMAND_PREFIX = 'standard.';
@@ -18,6 +20,18 @@ const putStandardOperationSchema = z.object({
 
 const deleteStandardOperationSchema = z.object({
   table: z.literal('standards'),
+  action: z.literal('delete'),
+  id: z.string().min(1),
+});
+
+const putStandardImportBatchOperationSchema = z.object({
+  table: z.literal('standardImportBatches'),
+  action: z.literal('put'),
+  record: standardImportBatchSchema,
+});
+
+const deleteStandardImportBatchOperationSchema = z.object({
+  table: z.literal('standardImportBatches'),
   action: z.literal('delete'),
   id: z.string().min(1),
 });
@@ -43,6 +57,8 @@ export const standardOperationSchema = z.union([
   putStandardOperationSchema,
   deleteStandardOperationSchema,
   standardAlignmentOperationSchema,
+  putStandardImportBatchOperationSchema,
+  deleteStandardImportBatchOperationSchema,
 ]);
 
 export const standardCommandSchema = z.object({
@@ -69,6 +85,22 @@ export function putStandardOperation(record: Standard): StandardOperation {
 export function deleteStandardOperation(id: string): StandardOperation {
   return standardOperationSchema.parse({
     table: 'standards',
+    action: 'delete',
+    id,
+  });
+}
+
+export function putStandardImportBatchOperation(record: StandardImportBatch): StandardOperation {
+  return standardOperationSchema.parse({
+    table: 'standardImportBatches',
+    action: 'put',
+    record,
+  });
+}
+
+export function deleteStandardImportBatchOperation(id: string): StandardOperation {
+  return standardOperationSchema.parse({
+    table: 'standardImportBatches',
     action: 'delete',
     id,
   });

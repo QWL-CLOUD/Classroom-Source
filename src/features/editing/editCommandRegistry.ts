@@ -15,6 +15,7 @@ import {
   parseLessonTemplateCommand,
   type LessonTemplateCommand,
 } from '@/features/lessonTemplates/lessonTemplateCommands';
+import { applyStandardOperations } from '@/features/standards/applyStandardOperations';
 import {
   parseStandardCommand,
   STANDARD_COMMAND_PREFIX,
@@ -289,16 +290,7 @@ export async function applySupportedEditCommand(
   }
 
   if (parsed.entity === 'standard') {
-    for (const operation of parsed.command.operations) {
-      if (operation.table === 'standards') {
-        if (operation.action === 'put') await db.standards.put(operation.record);
-        else await db.standards.delete(operation.id);
-      } else if (operation.action === 'put') {
-        await db.standardAlignments.put(operation.record);
-      } else {
-        await db.standardAlignments.delete(operation.id);
-      }
-    }
+    await applyStandardOperations(db, parsed.command.operations);
     return;
   }
 

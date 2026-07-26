@@ -23,6 +23,7 @@ import type {
   SessionOccurrence,
   Standard,
   StandardAlignment,
+  StandardImportBatch,
   Task,
 } from '@/domain/models/entities';
 
@@ -43,6 +44,7 @@ export class ClassroomDatabase extends Dexie {
   lessonTemplates!: EntityTable<LessonTemplate, 'id'>;
   standards!: EntityTable<Standard, 'id'>;
   standardAlignments!: EntityTable<StandardAlignment, 'id'>;
+  standardImportBatches!: EntityTable<StandardImportBatch, 'id'>;
   sessionOccurrences!: EntityTable<SessionOccurrence, 'id'>;
   tasks!: EntityTable<Task, 'id'>;
   quickCaptures!: EntityTable<QuickCapture, 'id'>;
@@ -254,6 +256,40 @@ export class ClassroomDatabase extends Dexie {
         'id, status, frameworkKey, normalizedCode, &[frameworkKey+normalizedCode], parentStandardId, subject, gradeBand, updatedAt',
       standardAlignments:
         'id, standardId, [targetType+targetId], targetType, targetId, lessonFlowStepId, scopeKey, &[standardId+scopeKey]',
+    });
+
+    this.version(9).stores({
+      schoolYears: 'id, active, startsOn, endsOn',
+      learnerContexts: 'id, kind, schoolYearId, status, name',
+      learnerNotices: 'id, contextId, kind, status, noticeDate, updatedAt',
+      contextMemberships: 'id, containerContextId, memberContextId',
+      scheduleBlocks: 'id, parentId, contextId, *weekdays, effectiveFrom, effectiveTo, sortOrder',
+      scheduleExceptions: 'id, date, scheduleBlockId, action',
+      calendarEvents: 'id, startDate, endDate, category, contextId',
+      categoryValues:
+        'id, familyId, &[familyId+normalizedName], [familyId+lifecycleState], [familyId+sortOrder], lifecycleState, isDefault, mergedIntoId, *normalizedAliases',
+      categoryAssignments:
+        'id, categoryValueId, [entityType+entityId], [familyId+entityType+entityId], &[categoryValueId+entityType+entityId], entityType, entityId',
+      lessonSeries: 'id, contextId, subject',
+      lessonPlans: 'id, contextId, workflowState, seriesId, preferredScheduleBlockId, updatedAt',
+      lessonTemplates: 'id, status, updatedAt, title',
+      sessionOccurrences: 'id, date, lessonPlanId, contextId, scheduleBlockId, deliveryState',
+      tasks: 'id, status, scheduledDate, dueDate, contextId, order, updatedAt',
+      quickCaptures: 'id, capturedOn, createdAt',
+      reminders:
+        'id, [sourceType+sourceId], sourceType, sourceId, status, remindDate, remindMinute, updatedAt',
+      migrationRuns: 'id, status, startedAt',
+      quarantineRecords: 'id, migrationRunId, entityType, legacyStoreKey, createdAt',
+      changeLog: 'id, createdAt, undoneAt, commandType',
+      appSettings: 'key, updatedAt',
+      learnerServiceOccurrences:
+        'id, &[learnerNoticeId+date], learnerNoticeId, date, status, updatedAt',
+      libraryItems: 'id, catalogType, status, updatedAt, *tags',
+      standards:
+        'id, status, frameworkKey, normalizedCode, &[frameworkKey+normalizedCode], parentStandardId, importBatchId, subject, gradeBand, updatedAt',
+      standardAlignments:
+        'id, standardId, [targetType+targetId], targetType, targetId, lessonFlowStepId, scopeKey, &[standardId+scopeKey]',
+      standardImportBatches: 'id, createdAt, sourceName, issuingOrganization, frameworkTitle',
     });
   }
 }

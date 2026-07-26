@@ -13,7 +13,7 @@ export interface LiveHealthCheck {
   tone: HealthCheckTone;
 }
 
-export const EXPECTED_SCHEMA_VERSION = 8;
+export const EXPECTED_SCHEMA_VERSION = 9;
 
 export function buildLiveHealthChecks(
   summaryState: WorkspaceReadState<WorkspaceDataSummary>,
