@@ -22,7 +22,7 @@ describe('System Health live checks', () => {
         status: 'ready',
         data: { activeSchoolYear: null, activeSchoolYearCount: 0, counts: emptyCounts },
       },
-      8,
+      9,
     );
 
     expect(checks.find((check) => check.id === 'active-school-year')).toMatchObject({
@@ -47,7 +47,7 @@ describe('System Health live checks', () => {
           counts: emptyCounts,
         },
       },
-      8,
+      9,
     );
 
     expect(checks.find((check) => check.id === 'active-school-year')).toMatchObject({
@@ -60,7 +60,7 @@ describe('System Health live checks', () => {
   });
 
   it('does not present an unexpected schema as passing', () => {
-    expect(buildLiveHealthChecks({ status: 'loading' }, 9)[1]).toMatchObject({
+    expect(buildLiveHealthChecks({ status: 'loading' }, 10)[1]).toMatchObject({
       statusLabel: 'Needs review',
       tone: 'attention',
     });

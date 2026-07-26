@@ -17,6 +17,7 @@ import {
   type StandardCommandPair,
   type StandardOperation,
 } from './standardCommands';
+import { applyStandardOperations } from './applyStandardOperations';
 import { parseStandardEditorValues, type StandardEditorValues } from './standardModel';
 
 export interface StandardMutationDependencies {
@@ -203,16 +204,7 @@ export class StandardMutationService {
 
   private async commit(operations: readonly StandardOperation[], log: ChangeLog): Promise<void> {
     await clearSupportedRedoBranch(this.db);
-    for (const operation of operations) {
-      if (operation.table === 'standards') {
-        if (operation.action === 'put') await this.db.standards.put(operation.record);
-        else await this.db.standards.delete(operation.id);
-      } else if (operation.action === 'put') {
-        await this.db.standardAlignments.put(operation.record);
-      } else {
-        await this.db.standardAlignments.delete(operation.id);
-      }
-    }
+    await applyStandardOperations(this.db, operations);
     await this.db.changeLog.put(log);
   }
 

@@ -5,7 +5,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { classroomDb } from '@/data/db/ClassroomDatabase';
 import {
   standardAlignmentSchema,
+  standardImportBatchSchema,
   standardSchema,
+  type StandardImportBatch,
   type StandardStatus,
 } from '@/domain/models/entities';
 import { StandardEditor } from '@/features/standards/StandardEditor';
@@ -27,16 +29,19 @@ function uniqueSorted(values: readonly (string | undefined)[]): string[] {
 
 export function StandardsRoute() {
   const data = useLiveQuery(async () => {
-    const [standardValues, alignmentValues] = await Promise.all([
+    const [standardValues, alignmentValues, batchValues] = await Promise.all([
       classroomDb.standards.toArray(),
       classroomDb.standardAlignments.toArray(),
+      classroomDb.standardImportBatches.toArray(),
     ]);
     const standards = standardValues.map((value) => standardSchema.parse(value));
     const alignments = alignmentValues.map((value) => standardAlignmentSchema.parse(value));
+    const batches = batchValues.map((value) => standardImportBatchSchema.parse(value));
     const views = buildStandardViews(standards, alignments);
     return {
       standards,
       views,
+      batchesById: new Map(batches.map((batch) => [batch.id, batch])),
       frameworks: [
         ...new Map(views.map((value) => [value.frameworkKey, value.frameworkLabel])).entries(),
       ]
@@ -303,6 +308,9 @@ export function StandardsRoute() {
             <StandardDetails
               standard={selected}
               standards={data?.views ?? []}
+              importBatch={
+                selected.importBatchId ? data?.batchesById.get(selected.importBatchId) : undefined
+              }
               busy={busy}
               onEdit={() => setEditing(true)}
               onArchive={() => void run(() => standardMutationService.archive(selected.id))}
@@ -318,6 +326,7 @@ export function StandardsRoute() {
 function StandardDetails({
   standard,
   standards,
+  importBatch,
   busy,
   onEdit,
   onArchive,
@@ -325,6 +334,7 @@ function StandardDetails({
 }: {
   standard: StandardView;
   standards: readonly StandardView[];
+  importBatch?: StandardImportBatch;
   busy: boolean;
   onEdit: () => void;
   onArchive: () => void;
@@ -399,6 +409,24 @@ function StandardDetails({
           <dt>Explicit alignments</dt>
           <dd>{standard.alignmentCount}</dd>
         </div>
+        <div>
+          <dt>Source</dt>
+          <dd>{standard.sourceName ?? 'Created in Classroom'}</dd>
+        </div>
+        <div>
+          <dt>Imported</dt>
+          <dd>
+            {importBatch
+              ? `${new Date(importBatch.createdAt).toLocaleString('en-US')} · ${importBatch.worksheetName}`
+              : 'Not imported'}
+          </dd>
+        </div>
+        {standard.importNote ? (
+          <div className={styles.metadataWide}>
+            <dt>Source note</dt>
+            <dd>{standard.importNote}</dd>
+          </div>
+        ) : null}
       </dl>
 
       <section className={styles.hierarchy} aria-label="Standard hierarchy">

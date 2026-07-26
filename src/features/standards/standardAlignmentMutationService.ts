@@ -11,13 +11,13 @@ import {
 import { clearSupportedRedoBranch } from '@/features/editing/editCommandRegistry';
 import { notifyEditHistoryChanged } from '@/features/editing/editHistorySignal';
 
+import { applyStandardOperations } from './applyStandardOperations';
 import {
   createStandardCommand,
   deleteStandardAlignmentOperation,
   putStandardAlignmentOperation,
   serializeStandardCommand,
   type StandardCommandPair,
-  type StandardOperation,
 } from './standardCommands';
 import {
   listDesiredStandardAlignmentScopes,
@@ -128,7 +128,7 @@ export class StandardAlignmentMutationService {
           createdAt: now,
         });
         await clearSupportedRedoBranch(this.db);
-        await this.applyOperations(commands.forward.operations);
+        await applyStandardOperations(this.db, commands.forward.operations);
         await this.db.changeLog.put(log);
         const values = existing
           .filter((value) => !removed.some((removedValue) => removedValue.id === value.id))
@@ -168,19 +168,6 @@ export class StandardAlignmentMutationService {
     for (const stepId of validStepIds) {
       if (!persistedStepIds.has(stepId)) {
         throw new Error('Save the Template changes before aligning a new Lesson Flow step.');
-      }
-    }
-  }
-
-  private async applyOperations(operations: readonly StandardOperation[]): Promise<void> {
-    for (const operation of operations) {
-      if (operation.table === 'standards') {
-        if (operation.action === 'put') await this.db.standards.put(operation.record);
-        else await this.db.standards.delete(operation.id);
-      } else if (operation.action === 'put') {
-        await this.db.standardAlignments.put(operation.record);
-      } else {
-        await this.db.standardAlignments.delete(operation.id);
       }
     }
   }

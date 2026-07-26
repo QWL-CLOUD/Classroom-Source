@@ -12,7 +12,7 @@ afterEach(async () => {
 });
 
 describe('ClassroomDatabase schema upgrades', () => {
-  it('upgrades legacy data to schema v8 and adds Standards stores without losing Tasks', async () => {
+  it('upgrades legacy data to schema v9 and adds Standards stores without losing Tasks', async () => {
     const name = `classroom-v20-upgrade-${crypto.randomUUID()}`;
     names.push(name);
     const legacy = new Dexie(name);
@@ -33,7 +33,7 @@ describe('ClassroomDatabase schema upgrades', () => {
     const upgraded = new ClassroomDatabase(name);
     await upgraded.open();
 
-    expect(upgraded.verno).toBe(8);
+    expect(upgraded.verno).toBe(9);
     expect(await upgraded.tasks.get('legacy-task')).toBeDefined();
     await upgraded.reminders.put({
       id: 'reminder-1',
@@ -128,6 +128,22 @@ describe('ClassroomDatabase schema upgrades', () => {
     });
     expect(await upgraded.standards.count()).toBe(1);
     expect(await upgraded.standardAlignments.count()).toBe(1);
+
+    await upgraded.standardImportBatches.put({
+      id: 'batch-1',
+      sourceName: 'Synthetic standards source',
+      issuingOrganization: 'Synthetic organization',
+      frameworkTitle: 'Synthetic framework',
+      version: '2026',
+      worksheetName: 'Standards',
+      fileKind: 'xlsx',
+      totalRows: 1,
+      createdCount: 1,
+      updatedCount: 0,
+      duplicateCount: 0,
+      createdAt: '2026-07-24T00:00:00.000Z',
+    });
+    expect(await upgraded.standardImportBatches.count()).toBe(1);
 
     upgraded.close();
   });
