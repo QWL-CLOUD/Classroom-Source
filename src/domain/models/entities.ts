@@ -797,7 +797,7 @@ export const quarantineRecordSchema = z.object({
 
 export const backupSnapshotSchema = z.object({
   id: idSchema,
-  kind: z.literal('pre-restore'),
+  kind: z.enum(['pre-restore', 'pre-rollover']),
   sourceFormat: z.string().min(1),
   databaseSchemaVersion: z.number().int().positive(),
   recordCount: z.number().int().nonnegative(),

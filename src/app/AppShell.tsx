@@ -109,6 +109,9 @@ function getRoutePresentation(pathname: string): { title: string; layout: Conten
   if (pathname.startsWith('/import')) return { title: 'Import Center', layout: 'standard' };
   if (pathname.startsWith('/migration')) return { title: 'Migration', layout: 'reading' };
   if (pathname.startsWith('/export')) return { title: 'Export & Backup', layout: 'reading' };
+  if (pathname.startsWith('/settings/rollover')) {
+    return { title: 'Advanced rollover', layout: 'reading' };
+  }
   if (pathname.startsWith('/settings')) return { title: 'School Years', layout: 'reading' };
   if (pathname.startsWith('/system-health')) {
     return { title: 'System Health', layout: 'reading' };

@@ -229,7 +229,9 @@ export function ExportRoute() {
             <History size={20} aria-hidden="true" />
             <div>
               <h2 id="safety-heading">Automatic safety backups</h2>
-              <p>The five most recent pre-restore snapshots stay in this browser.</p>
+              <p>
+                The five most recent pre-restore or pre-rollover snapshots stay in this browser.
+              </p>
             </div>
           </div>
           {safetySnapshots === undefined ? (
@@ -243,7 +245,10 @@ export function ExportRoute() {
               {safetySnapshots.map((snapshot) => (
                 <article key={snapshot.id} className={styles.snapshotRow}>
                   <div>
-                    <strong>{readableTimestamp(snapshot.createdAt)}</strong>
+                    <strong>
+                      {snapshot.kind === 'pre-rollover' ? 'Pre-rollover' : 'Pre-restore'} ·{' '}
+                      {readableTimestamp(snapshot.createdAt)}
+                    </strong>
                     <span>{snapshot.recordCount} records</span>
                   </div>
                   <div className={styles.inlineActions}>
