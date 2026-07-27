@@ -107,7 +107,7 @@ test('Library and Standards keep long catalog labels inside responsive controls'
   await page.reload();
 
   const libraryMain = page.locator('#main-content');
-  await expect(libraryMain.getByRole('link', { name: /Open Standards/ })).toBeVisible();
+  await expect(libraryMain.getByRole('link', { name: /Open Standards/ })).toHaveCount(0);
   await libraryMain.getByRole('button', { name: 'Activities', exact: true }).click();
   await expect(
     libraryMain.getByRole('button', { name: 'Activities', exact: true }),
@@ -122,10 +122,10 @@ test('Library and Standards keep long catalog labels inside responsive controls'
     await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
   ).toBe(true);
 
-  await libraryMain.getByRole('link', { name: /Open Standards/ }).click();
+  await page.goto('./#/standards');
   const standardsMain = page.locator('#main-content');
   await expect(standardsMain.getByRole('heading', { level: 1, name: 'Standards' })).toBeVisible();
-  await expect(standardsMain.getByRole('link', { name: 'Open Library' })).toBeVisible();
+  await expect(standardsMain.getByRole('link', { name: 'Open Library' })).toHaveCount(0);
 
   const standardItem = standardsMain.getByRole('button', {
     name: /3\.NF\.REASONING\.COMMUNICATION\.EXTENDED\.1/,
@@ -157,7 +157,7 @@ test('Library and Standards keep long catalog labels inside responsive controls'
   ).toEqual([]);
 });
 
-test('Standards keeps header actions and filters inside the desktop workspace', async ({
+test('Standards keeps its header action and filters inside the desktop workspace', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 820 });
@@ -173,11 +173,10 @@ test('Standards keeps header actions and filters inside the desktop workspace', 
 
   const main = page.locator('#main-content');
   const filters = main.getByRole('region', { name: 'Standard filters' });
-  const openLibrary = main.getByRole('link', { name: 'Open Library' });
   const newStandard = main.getByRole('button', { name: 'New Standard' });
 
   await expect(filters).toBeVisible();
-  await expect(openLibrary).toBeVisible();
+  await expect(main.getByRole('link', { name: 'Open Library' })).toHaveCount(0);
   await expect(newStandard).toBeVisible();
 
   expect(
@@ -197,17 +196,14 @@ test('Standards keeps header actions and filters inside the desktop workspace', 
   ).toBe(true);
 
   const mainBox = await main.boundingBox();
-  const openLibraryBox = await openLibrary.boundingBox();
   const newStandardBox = await newStandard.boundingBox();
 
   expect(mainBox).not.toBeNull();
-  expect(openLibraryBox).not.toBeNull();
   expect(newStandardBox).not.toBeNull();
-
-  for (const actionBox of [openLibraryBox!, newStandardBox!]) {
-    expect(actionBox.x).toBeGreaterThanOrEqual(mainBox!.x - 1);
-    expect(actionBox.x + actionBox.width).toBeLessThanOrEqual(mainBox!.x + mainBox!.width + 1);
-  }
+  expect(newStandardBox!.x).toBeGreaterThanOrEqual(mainBox!.x - 1);
+  expect(newStandardBox!.x + newStandardBox!.width).toBeLessThanOrEqual(
+    mainBox!.x + mainBox!.width + 1,
+  );
 
   const standardItem = main.getByRole('button', {
     name: /3\.NF\.REASONING\.COMMUNICATION\.EXTENDED\.1/,

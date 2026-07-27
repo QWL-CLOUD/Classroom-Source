@@ -1,6 +1,5 @@
 import {
   Archive,
-  ArrowRight,
   BookOpen,
   Boxes,
   ClipboardCheck,
@@ -159,10 +158,6 @@ export function LibraryRoute() {
           </p>
         </div>
         <div className={styles.headerActions}>
-          <a className="button" href="#/standards">
-            <BookOpen size={17} aria-hidden="true" /> Open Standards
-            <ArrowRight size={15} aria-hidden="true" />
-          </a>
           <button
             className="button button-primary"
             type="button"
