@@ -2,11 +2,14 @@ import type { Table } from 'dexie';
 
 import { classroomDb, type ClassroomDatabase } from '@/data/db/ClassroomDatabase';
 import {
+  categoryAssignmentSchema,
   changeLogSchema,
-  contextMembershipSchema,
   learnerContextSchema,
+  lessonPlanSchema,
+  lessonSeriesSchema,
   scheduleBlockSchema,
   schoolYearSchema,
+  standardAlignmentSchema,
   type BackupSnapshot,
   type ChangeLog,
 } from '@/domain/models/entities';
@@ -21,18 +24,25 @@ import { notifyEditHistoryChanged } from '@/features/editing/editHistorySignal';
 import { applySchoolYearRolloverOperations } from './applySchoolYearRolloverOperations';
 import {
   createSchoolYearRolloverCommand,
-  deleteRolloverContextMembership,
+  deleteRolloverCategoryAssignment,
   deleteRolloverLearnerContext,
+  deleteRolloverLessonPlan,
+  deleteRolloverLessonSeries,
   deleteRolloverScheduleBlock,
-  putRolloverContextMembership,
+  deleteRolloverStandardAlignment,
+  putRolloverCategoryAssignment,
   putRolloverLearnerContext,
+  putRolloverLessonPlan,
+  putRolloverLessonSeries,
   putRolloverScheduleBlock,
+  putRolloverStandardAlignment,
   serializeSchoolYearRolloverCommand,
   type SchoolYearRolloverCommandPair,
 } from './schoolYearRolloverCommands';
 import {
   buildSchoolYearRolloverPreview,
   rolloverBaselineHash,
+  schoolYearDatesUnchanged,
   type SchoolYearRolloverData,
   type SchoolYearRolloverPreview,
   type SchoolYearRolloverRequest,
@@ -47,8 +57,11 @@ export interface SchoolYearRolloverCommitResult {
   safetySnapshot: BackupSnapshot;
   changeLog: ChangeLog;
   createdContextCount: number;
-  createdMembershipCount: number;
+  createdSeriesCount: number;
+  createdPlanCount: number;
   createdScheduleBlockCount: number;
+  createdStandardAlignmentCount: number;
+  createdCategoryAssignmentCount: number;
 }
 
 function tableFor(db: ClassroomDatabase, tableName: BackupTableName): Table<unknown, string> {
@@ -58,7 +71,7 @@ function tableFor(db: ClassroomDatabase, tableName: BackupTableName): Table<unkn
 export function schoolYearRolloverError(cause: unknown): string {
   return cause instanceof Error
     ? cause.message
-    : 'The school year rollover could not be completed.';
+    : 'The instructional rollover could not be completed.';
 }
 
 export class SchoolYearRolloverService {
@@ -74,17 +87,34 @@ export class SchoolYearRolloverService {
   }
 
   async loadData(): Promise<SchoolYearRolloverData> {
-    const [schoolYears, learnerContexts, contextMemberships, scheduleBlocks] = await Promise.all([
+    const [
+      schoolYears,
+      learnerContexts,
+      scheduleBlocks,
+      lessonSeries,
+      lessonPlans,
+      standardAlignments,
+      categoryAssignments,
+    ] = await Promise.all([
       this.db.schoolYears.toArray(),
       this.db.learnerContexts.toArray(),
-      this.db.contextMemberships.toArray(),
       this.db.scheduleBlocks.toArray(),
+      this.db.lessonSeries.toArray(),
+      this.db.lessonPlans.toArray(),
+      this.db.standardAlignments.toArray(),
+      this.db.categoryAssignments.toArray(),
     ]);
+
     return {
       schoolYears: schoolYears.map((value) => schoolYearSchema.parse(value)),
       learnerContexts: learnerContexts.map((value) => learnerContextSchema.parse(value)),
-      contextMemberships: contextMemberships.map((value) => contextMembershipSchema.parse(value)),
       scheduleBlocks: scheduleBlocks.map((value) => scheduleBlockSchema.parse(value)),
+      lessonSeries: lessonSeries.map((value) => lessonSeriesSchema.parse(value)),
+      lessonPlans: lessonPlans.map((value) => lessonPlanSchema.parse(value)),
+      standardAlignments: standardAlignments.map((value) => standardAlignmentSchema.parse(value)),
+      categoryAssignments: categoryAssignments.map((value) =>
+        categoryAssignmentSchema.parse(value),
+      ),
     };
   }
 
@@ -94,18 +124,25 @@ export class SchoolYearRolloverService {
       [
         this.db.schoolYears,
         this.db.learnerContexts,
-        this.db.contextMemberships,
         this.db.scheduleBlocks,
+        this.db.lessonSeries,
+        this.db.lessonPlans,
+        this.db.standardAlignments,
+        this.db.categoryAssignments,
       ],
       () => this.loadData(),
     );
-    return buildSchoolYearRolloverPreview(request, data, { createId: this.createId });
+    return buildSchoolYearRolloverPreview(request, data, {
+      createId: this.createId,
+      now: this.now,
+    });
   }
 
   async commit(preview: SchoolYearRolloverPreview): Promise<SchoolYearRolloverCommitResult> {
     if (!preview.canCommit) {
       throw new Error('Resolve every rollover issue and generate a new reviewed preview first.');
     }
+
     const transactionTables = [
       ...BACKUP_TABLE_NAMES.map((tableName) => tableFor(this.db, tableName)),
       this.db.backupSnapshots,
@@ -114,37 +151,43 @@ export class SchoolYearRolloverService {
     const result = await this.db.transaction('rw', transactionTables, async () => {
       const currentData = await this.loadData();
       if (rolloverBaselineHash(currentData) !== preview.baselineHash) {
-        throw new Error('School-year, learner, or Schedule data changed. Generate a new preview.');
+        throw new Error('School-year or instructional data changed. Generate a new preview.');
       }
-      const sourceYear = currentData.schoolYears.find(
-        (schoolYear) => schoolYear.id === preview.sourceSchoolYear.id,
-      );
-      const targetYear = currentData.schoolYears.find(
-        (schoolYear) => schoolYear.id === preview.targetSchoolYear.id,
-      );
-      if (!sourceYear || !targetYear) throw new Error('A selected school year no longer exists.');
-      if (sourceYear.lifecycleState === 'archived' || targetYear.lifecycleState === 'archived') {
-        throw new Error('Restore both school years before committing rollover.');
+      if (!schoolYearDatesUnchanged(preview, currentData.schoolYears)) {
+        throw new Error('School year dates or activation changed. Generate a new preview.');
       }
 
       const commands: SchoolYearRolloverCommandPair = {
         forward: createSchoolYearRolloverCommand([
           ...preview.createdContexts.map(putRolloverLearnerContext),
-          ...preview.createdMemberships.map(putRolloverContextMembership),
+          ...preview.createdSeries.map(putRolloverLessonSeries),
           ...preview.createdScheduleBlocks.map(putRolloverScheduleBlock),
+          ...preview.createdPlans.map(putRolloverLessonPlan),
+          ...preview.createdStandardAlignments.map(putRolloverStandardAlignment),
+          ...preview.createdCategoryAssignments.map(putRolloverCategoryAssignment),
         ]),
         inverse: createSchoolYearRolloverCommand([
+          ...[...preview.createdCategoryAssignments]
+            .reverse()
+            .map((record) => deleteRolloverCategoryAssignment(record.id)),
+          ...[...preview.createdStandardAlignments]
+            .reverse()
+            .map((record) => deleteRolloverStandardAlignment(record.id)),
+          ...[...preview.createdPlans]
+            .reverse()
+            .map((record) => deleteRolloverLessonPlan(record.id)),
           ...[...preview.createdScheduleBlocks]
             .reverse()
-            .map((block) => deleteRolloverScheduleBlock(block.id)),
-          ...[...preview.createdMemberships]
+            .map((record) => deleteRolloverScheduleBlock(record.id)),
+          ...[...preview.createdSeries]
             .reverse()
-            .map((membership) => deleteRolloverContextMembership(membership.id)),
+            .map((record) => deleteRolloverLessonSeries(record.id)),
           ...[...preview.createdContexts]
             .reverse()
-            .map((context) => deleteRolloverLearnerContext(context.id)),
+            .map((record) => deleteRolloverLearnerContext(record.id)),
         ]),
       };
+
       const createdAt = this.now();
       const safetySnapshot = await createSafetySnapshotRecord(this.db, {
         kind: 'pre-rollover',
@@ -153,10 +196,10 @@ export class SchoolYearRolloverService {
       });
       const changeLog = changeLogSchema.parse({
         id: this.createId(),
-        label: `Roll over ${preview.contextRows.length} learner context${
-          preview.contextRows.length === 1 ? '' : 's'
+        label: `Roll over ${preview.createdPlans.length} Lesson Plan${
+          preview.createdPlans.length === 1 ? '' : 's'
         } from ${preview.sourceSchoolYear.label} to ${preview.targetSchoolYear.label}`,
-        commandType: 'school-year-rollover.commit',
+        commandType: 'school-year-rollover.instructional-commit',
         forwardJson: serializeSchoolYearRolloverCommand(commands.forward),
         inverseJson: serializeSchoolYearRolloverCommand(commands.inverse),
         createdAt,
@@ -165,6 +208,17 @@ export class SchoolYearRolloverService {
       await this.db.backupSnapshots.put(safetySnapshot);
       await clearSupportedRedoBranch(this.db);
       await applySchoolYearRolloverOperations(this.db, commands.forward.operations);
+
+      const yearsAfterWrite = await this.db.schoolYears.toArray();
+      if (
+        !schoolYearDatesUnchanged(
+          preview,
+          yearsAfterWrite.map((value) => schoolYearSchema.parse(value)),
+        )
+      ) {
+        throw new Error('Rollover attempted to change School Year boundaries.');
+      }
+
       await this.db.changeLog.put(changeLog);
       await pruneSafetySnapshots(this.db);
 
@@ -172,8 +226,11 @@ export class SchoolYearRolloverService {
         safetySnapshot,
         changeLog,
         createdContextCount: preview.createdContexts.length,
-        createdMembershipCount: preview.createdMemberships.length,
+        createdSeriesCount: preview.createdSeries.length,
+        createdPlanCount: preview.createdPlans.length,
         createdScheduleBlockCount: preview.createdScheduleBlocks.length,
+        createdStandardAlignmentCount: preview.createdStandardAlignments.length,
+        createdCategoryAssignmentCount: preview.createdCategoryAssignments.length,
       };
     });
 

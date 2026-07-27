@@ -113,6 +113,8 @@ export const lessonSeriesSchema = z.object({
   lifecycleState: z.enum(['active', 'archived']).default('active'),
   archivedAt: timestampSchema.optional(),
   updatedAt: timestampSchema.optional(),
+  rolledOverFromSeriesId: idSchema.optional(),
+  rolledOverFromSchoolYearId: idSchema.optional(),
 });
 
 export const standardStatusSchema = z.enum(['active', 'archived']);
@@ -446,6 +448,8 @@ export const lessonPlanSchema = z.object({
   libraryLinks: libraryApplicationLinkListSchema.optional(),
   lessonFlow: z.array(lessonFlowStepSchema).optional(),
   templateApplication: lessonTemplateApplicationSchema.optional(),
+  rolledOverFromPlanId: idSchema.optional(),
+  rolledOverFromSchoolYearId: idSchema.optional(),
   createdAt: timestampSchema,
   updatedAt: timestampSchema,
 });

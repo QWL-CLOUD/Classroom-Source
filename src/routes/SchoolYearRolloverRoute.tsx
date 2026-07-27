@@ -1,19 +1,11 @@
-import {
-  AlertTriangle,
-  ArrowLeft,
-  CalendarClock,
-  CheckCircle2,
-  Copy,
-  RefreshCw,
-  ShieldCheck,
-  Users,
-} from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Copy, ShieldCheck } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 
-import type { LearnerContext, ScheduleBlock, SchoolYear } from '@/domain/models/entities';
+import type { ScheduleBlock, SchoolYear } from '@/domain/models/entities';
 import {
+  listInstructionalRolloverCandidates,
   listRolloverScheduleCandidates,
   type SchoolYearRolloverPreview,
 } from '@/features/schoolYearRollover/schoolYearRolloverModel';
@@ -25,35 +17,11 @@ import {
 
 import styles from './SchoolYearRolloverRoute.module.css';
 
-function kindLabel(kind: LearnerContext['kind']): string {
-  if (kind === 'class') return 'Class';
-  if (kind === 'group') return 'Group';
-  return 'Individual';
-}
-
-function scheduleTime(block: ScheduleBlock): string {
-  const format = (minute: number) => {
-    const hour = Math.floor(minute / 60);
-    const displayHour = hour % 12 || 12;
-    const suffix = hour < 12 ? 'AM' : 'PM';
-    return `${displayHour}:${String(minute % 60).padStart(2, '0')} ${suffix}`;
-  };
-  return `${format(block.startMinute)}–${format(block.endMinute)}`;
-}
-
-function weekdayLabel(values: readonly number[]): string {
-  const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  return values
-    .map((value) => labels[value - 1])
-    .filter(Boolean)
-    .join(', ');
-}
-
 function initialSourceYear(years: readonly SchoolYear[]): SchoolYear | undefined {
   return (
-    years.find((year) => year.active && year.lifecycleState === 'active') ??
+    years.find((year) => year.active && year.lifecycleState !== 'archived') ??
     [...years]
-      .filter((year) => year.lifecycleState === 'active')
+      .filter((year) => year.lifecycleState !== 'archived')
       .sort((first, second) => second.startsOn.localeCompare(first.startsOn))[0]
   );
 }
@@ -62,17 +30,30 @@ function initialTargetYear(
   years: readonly SchoolYear[],
   source: SchoolYear | undefined,
 ): SchoolYear | undefined {
-  const activeYears = years
-    .filter((year) => year.lifecycleState === 'active' && year.id !== source?.id)
+  const values = years
+    .filter((year) => year.lifecycleState !== 'archived' && year.id !== source?.id)
     .sort((first, second) => first.startsOn.localeCompare(second.startsOn));
-  return activeYears.find((year) => !source || year.startsOn > source.startsOn) ?? activeYears[0];
+  return values.find((year) => !source || year.startsOn > source.startsOn) ?? values[0];
+}
+
+function scheduleLabel(block: ScheduleBlock): string {
+  const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const days = block.weekdays
+    .map((day) => weekdays[day - 1])
+    .filter(Boolean)
+    .join(', ');
+  const format = (minute: number) => {
+    const hour = Math.floor(minute / 60);
+    return `${hour % 12 || 12}:${String(minute % 60).padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`;
+  };
+  return `${block.title} · ${days} · ${format(block.startMinute)}–${format(block.endMinute)}`;
 }
 
 export function SchoolYearRolloverRoute() {
   const data = useLiveQuery(() => schoolYearRolloverService.loadData(), []);
   const [sourceSchoolYearId, setSourceSchoolYearId] = useState('');
   const [targetSchoolYearId, setTargetSchoolYearId] = useState('');
-  const [selectedContextIds, setSelectedContextIds] = useState<Set<string>>(new Set());
+  const [selectedPlanIds, setSelectedPlanIds] = useState<Set<string>>(new Set());
   const [copySchedule, setCopySchedule] = useState(false);
   const [selectedScheduleBlockIds, setSelectedScheduleBlockIds] = useState<Set<string>>(new Set());
   const [preview, setPreview] = useState<SchoolYearRolloverPreview | null>(null);
@@ -92,22 +73,19 @@ export function SchoolYearRolloverRoute() {
 
   const sourceYear = data?.schoolYears.find((year) => year.id === sourceSchoolYearId);
   const targetYear = data?.schoolYears.find((year) => year.id === targetSchoolYearId);
-  const sourceContexts = useMemo(
+  const candidates = useMemo(
     () =>
-      (data?.learnerContexts ?? [])
-        .filter(
-          (context) => context.schoolYearId === sourceSchoolYearId && context.status === 'active',
-        )
-        .sort(
-          (first, second) =>
-            first.kind.localeCompare(second.kind) || first.name.localeCompare(second.name),
-        ),
+      data && sourceSchoolYearId
+        ? listInstructionalRolloverCandidates(sourceSchoolYearId, data)
+        : [],
     [data, sourceSchoolYearId],
   );
   const scheduleCandidates = useMemo(
     () =>
-      data && sourceSchoolYearId ? listRolloverScheduleCandidates(sourceSchoolYearId, data) : [],
-    [data, sourceSchoolYearId],
+      data && sourceSchoolYearId
+        ? listRolloverScheduleCandidates(sourceSchoolYearId, [...selectedPlanIds], data)
+        : [],
+    [data, sourceSchoolYearId, selectedPlanIds],
   );
 
   function clearReview(): void {
@@ -120,23 +98,25 @@ export function SchoolYearRolloverRoute() {
 
   function changeSource(value: string): void {
     setSourceSchoolYearId(value);
-    setSelectedContextIds(new Set());
+    setSelectedPlanIds(new Set());
     setSelectedScheduleBlockIds(new Set());
     clearReview();
   }
 
-  function changeTarget(value: string): void {
-    setTargetSchoolYearId(value);
-    clearReview();
-  }
-
-  function toggleContext(id: string): void {
-    setSelectedContextIds((current) => {
+  function togglePlan(id: string): void {
+    setSelectedPlanIds((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
+    setSelectedScheduleBlockIds(new Set());
+    clearReview();
+  }
+
+  function selectAllPlans(): void {
+    setSelectedPlanIds(new Set(candidates.map((candidate) => candidate.plan.id)));
+    setSelectedScheduleBlockIds(new Set());
     clearReview();
   }
 
@@ -150,30 +130,20 @@ export function SchoolYearRolloverRoute() {
     clearReview();
   }
 
-  function selectAllContexts(): void {
-    setSelectedContextIds(new Set(sourceContexts.map((context) => context.id)));
-    clearReview();
-  }
-
-  function selectAllSchedules(): void {
-    setSelectedScheduleBlockIds(new Set(scheduleCandidates.map((block) => block.id)));
-    clearReview();
-  }
-
   async function generatePreview(): Promise<void> {
     if (busy) return;
     setBusy(true);
     setError(null);
     setResult(null);
     try {
-      const nextPreview = await schoolYearRolloverService.preview({
+      const next = await schoolYearRolloverService.preview({
         sourceSchoolYearId,
         targetSchoolYearId,
-        selectedContextIds: [...selectedContextIds],
+        selectedPlanIds: [...selectedPlanIds],
         copySchedule,
         selectedScheduleBlockIds: copySchedule ? [...selectedScheduleBlockIds] : [],
       });
-      setPreview(nextPreview);
+      setPreview(next);
       setReviewedPreview(false);
       setAcceptedBoundaries(false);
     } catch (cause) {
@@ -185,19 +155,12 @@ export function SchoolYearRolloverRoute() {
   }
 
   async function commit(): Promise<void> {
-    if (!preview || !preview.canCommit || !reviewedPreview || !acceptedBoundaries || busy) return;
-    if (
-      !window.confirm(
-        `Commit the reviewed rollover from “${preview.sourceSchoolYear.label}” to “${preview.targetSchoolYear.label}”?\n\nA pre-rollover safety backup will be saved first. The target year will not be activated.`,
-      )
-    ) {
-      return;
-    }
+    if (!preview?.canCommit || !reviewedPreview || !acceptedBoundaries || busy) return;
     setBusy(true);
     setError(null);
     try {
-      const nextResult = await schoolYearRolloverService.commit(preview);
-      setResult(nextResult);
+      const next = await schoolYearRolloverService.commit(preview);
+      setResult(next);
       setPreview(null);
       setReviewedPreview(false);
       setAcceptedBoundaries(false);
@@ -210,125 +173,116 @@ export function SchoolYearRolloverRoute() {
 
   if (!data) {
     return (
-      <section>
-        <div className="card" role="status">
-          Reading school-year rollover data…
-        </div>
-      </section>
+      <div className={styles.page}>
+        <p>Loading instructional rollover…</p>
+      </div>
     );
   }
 
-  const availableYears = data.schoolYears
-    .filter((year) => year.lifecycleState === 'active')
-    .sort((first, second) => first.startsOn.localeCompare(second.startsOn));
-
   return (
-    <section className={styles.page}>
-      <header className="page-header">
+    <div className={styles.page}>
+      <header className={styles.hero}>
         <div>
-          <p className="page-eyebrow">Settings &amp; Data</p>
-          <h1 className="page-title">Advanced school-year rollover</h1>
-          <p className="page-subtitle">
-            Continue selected learner contexts and placements, optionally copy their Schedule, and
-            review every change before one protected transaction.
+          <p className={styles.eyebrow}>School Year continuity</p>
+          <h1>Instructional rollover</h1>
+          <p>
+            Copy reusable Lesson Series and Lesson Plans into a new school year. Student
+            memberships, Sessions, completion history, Tasks, and Reminders stay in the original
+            year.
           </p>
         </div>
-        <Link className="button" to="/settings">
-          <ArrowLeft size={17} aria-hidden="true" /> School Years
+        <Link className="button secondary" to="/settings">
+          Back to School Years
         </Link>
       </header>
 
-      <aside className={styles.boundaryNote} aria-label="Rollover boundaries">
-        <ShieldCheck size={22} aria-hidden="true" />
+      <section className={`card ${styles.boundaryNote}`} aria-label="School Year date protection">
+        <ShieldCheck aria-hidden="true" />
         <div>
-          <strong>Deliberately limited migration</strong>
+          <strong>School Year dates are protected</strong>
           <p>
-            This workflow does not copy Plans, Sessions, Tasks, notices, reflections, completion, or
-            teaching history. It never activates the target school year automatically.
+            Rollover does not edit start dates, end dates, or active status. It only creates new
+            instructional copies and an automatic pre-rollover safety backup.
           </p>
         </div>
-      </aside>
+      </section>
 
-      <section className={`card ${styles.section}`} aria-labelledby="years-heading">
+      <section className={`card ${styles.section}`}>
         <div className={styles.sectionHeader}>
           <div>
-            <h2 id="years-heading">1. Choose school years</h2>
-            <p>
-              The target container must already exist and remain inactive unless you activate it
-              later.
-            </p>
+            <h2>1. Choose source and target years</h2>
+            <p>Existing year boundaries are displayed exactly as stored.</p>
           </div>
         </div>
         <div className={styles.yearGrid}>
           <label>
-            <span>Source school year</span>
+            Source school year
             <select
-              className="input"
               value={sourceSchoolYearId}
               onChange={(event) => changeSource(event.target.value)}
             >
-              <option value="">Choose source</option>
-              {availableYears.map((year) => (
-                <option key={year.id} value={year.id}>
-                  {year.label}
-                  {year.active ? ' · active' : ''}
-                </option>
-              ))}
+              {data.schoolYears
+                .filter((year) => year.lifecycleState !== 'archived')
+                .map((year) => (
+                  <option key={year.id} value={year.id}>
+                    {year.label} · {year.startsOn} through {year.endsOn}
+                  </option>
+                ))}
             </select>
           </label>
           <label>
-            <span>Target school year</span>
+            Target school year
             <select
-              className="input"
               value={targetSchoolYearId}
-              onChange={(event) => changeTarget(event.target.value)}
+              onChange={(event) => {
+                setTargetSchoolYearId(event.target.value);
+                clearReview();
+              }}
             >
-              <option value="">Choose target</option>
-              {availableYears
-                .filter((year) => year.id !== sourceSchoolYearId)
+              {data.schoolYears
+                .filter(
+                  (year) => year.lifecycleState !== 'archived' && year.id !== sourceSchoolYearId,
+                )
                 .map((year) => (
                   <option key={year.id} value={year.id}>
-                    {year.label}
-                    {year.active ? ' · active' : ''}
+                    {year.label} · {year.startsOn} through {year.endsOn}
                   </option>
                 ))}
             </select>
           </label>
         </div>
-        {sourceYear && targetYear ? (
-          <p className={styles.metaLine}>
-            {sourceYear.label}: {sourceYear.startsOn}–{sourceYear.endsOn} → {targetYear.label}:{' '}
-            {targetYear.startsOn}–{targetYear.endsOn}
-          </p>
-        ) : null}
       </section>
 
-      <section className={`card ${styles.section}`} aria-labelledby="contexts-heading">
+      <section className={`card ${styles.section}`}>
         <div className={styles.sectionHeader}>
           <div>
-            <h2 id="contexts-heading">2. Continue learner contexts</h2>
-            <p>Select every Class, Group, and Individual that should exist in the target year.</p>
+            <h2>2. Select reusable Lesson Plans</h2>
+            <p>
+              Class and Group plans are copied as editable Drafts. Empty matching Class or Group
+              shells are created only when needed; no student memberships are copied.
+            </p>
           </div>
-          <button className="button" type="button" onClick={selectAllContexts}>
-            <Users size={16} aria-hidden="true" /> Select all active
+          <button type="button" className="button secondary" onClick={selectAllPlans}>
+            Select all plans
           </button>
         </div>
-        {sourceContexts.length === 0 ? (
-          <p className={styles.empty}>
-            No active learner contexts are available in this source year.
-          </p>
+        {candidates.length === 0 ? (
+          <p>No active Class or Group Lesson Plans are available in this source year.</p>
         ) : (
-          <div className={styles.choiceGrid} aria-label="Learner contexts to continue">
-            {sourceContexts.map((context) => (
-              <label key={context.id} className={styles.choiceCard}>
+          <div className={styles.choiceList}>
+            {candidates.map((candidate) => (
+              <label className={styles.choiceCard} key={candidate.plan.id}>
                 <input
                   type="checkbox"
-                  checked={selectedContextIds.has(context.id)}
-                  onChange={() => toggleContext(context.id)}
+                  checked={selectedPlanIds.has(candidate.plan.id)}
+                  onChange={() => togglePlan(candidate.plan.id)}
                 />
                 <span>
-                  <strong>{context.name}</strong>
-                  <small>{kindLabel(context.kind)}</small>
+                  <strong>{candidate.plan.title}</strong>
+                  <small>
+                    {candidate.context.name}
+                    {candidate.series ? ` · ${candidate.series.title}` : ' · Standalone plan'}
+                  </small>
                 </span>
               </label>
             ))}
@@ -336,209 +290,163 @@ export function SchoolYearRolloverRoute() {
         )}
       </section>
 
-      <section className={`card ${styles.section}`} aria-labelledby="schedule-heading">
+      <section className={`card ${styles.section}`}>
         <div className={styles.sectionHeader}>
           <div>
-            <h2 id="schedule-heading">3. Optional Schedule copy</h2>
+            <h2>3. Optional Schedule starting point</h2>
             <p>
-              Dates shift relative to the target-year start. Parent blocks are included
-              automatically.
+              Copied plans remain unscheduled unless their preferred block is also copied. Conflicts
+              are warnings, so you can adjust the new Schedule after rollover.
             </p>
           </div>
-          <label className={styles.switchChoice}>
-            <input
-              type="checkbox"
-              checked={copySchedule}
-              onChange={(event) => {
-                setCopySchedule(event.target.checked);
-                if (!event.target.checked) setSelectedScheduleBlockIds(new Set());
-                clearReview();
-              }}
-            />
-            <span>Copy selected Schedule Blocks</span>
-          </label>
         </div>
-        {copySchedule ? (
-          <>
-            <div className={styles.inlineActions}>
-              <button className="button" type="button" onClick={selectAllSchedules}>
-                <CalendarClock size={16} aria-hidden="true" /> Select all available
-              </button>
-            </div>
-            <div className={styles.scheduleList} aria-label="Schedule Blocks to copy">
-              {scheduleCandidates.map((block) => (
-                <label key={block.id} className={styles.scheduleRow}>
-                  <input
-                    type="checkbox"
-                    checked={selectedScheduleBlockIds.has(block.id)}
-                    onChange={() => toggleSchedule(block.id)}
-                  />
-                  <span>
-                    <strong>{block.title}</strong>
-                    <small>
-                      {block.kind} · {weekdayLabel(block.weekdays)} · {scheduleTime(block)}
-                    </small>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </>
-        ) : (
-          <p className={styles.empty}>
-            Schedule copy is off. Existing target Schedule Blocks stay unchanged.
-          </p>
+        <label className={styles.toggleRow}>
+          <input
+            type="checkbox"
+            checked={copySchedule}
+            onChange={(event) => {
+              setCopySchedule(event.target.checked);
+              if (!event.target.checked) setSelectedScheduleBlockIds(new Set());
+              clearReview();
+            }}
+          />
+          <span>Copy selected Schedule Blocks as an editable starting point</span>
+        </label>
+        {copySchedule && (
+          <div className={styles.choiceList}>
+            {scheduleCandidates.map((block) => (
+              <label className={styles.choiceCard} key={block.id}>
+                <input
+                  type="checkbox"
+                  checked={selectedScheduleBlockIds.has(block.id)}
+                  onChange={() => toggleSchedule(block.id)}
+                />
+                <span>
+                  <strong>{scheduleLabel(block)}</strong>
+                  <small>
+                    {block.effectiveFrom ?? 'Open start'} through {block.effectiveTo ?? 'Open end'}
+                  </small>
+                </span>
+              </label>
+            ))}
+          </div>
         )}
       </section>
 
       <div className={styles.previewAction}>
         <button
-          className="button button-primary"
           type="button"
-          disabled={busy || !sourceSchoolYearId || !targetSchoolYearId}
+          className="button primary"
+          disabled={
+            busy || !sourceSchoolYearId || !targetSchoolYearId || selectedPlanIds.size === 0
+          }
           onClick={() => void generatePreview()}
         >
-          <RefreshCw size={17} aria-hidden="true" />
-          {busy ? 'Preparing preview…' : 'Generate reviewed preview'}
+          Generate reviewed preview
         </button>
-        <span>No database writes occur while generating the preview.</span>
+        <span>Preview creates no database records.</span>
       </div>
 
-      {error ? (
+      {error && (
         <div className={styles.error} role="alert">
           {error}
         </div>
-      ) : null}
+      )}
 
-      {preview ? (
-        <section className={`card ${styles.preview}`} aria-labelledby="preview-heading">
+      {preview && (
+        <section className={`card ${styles.preview}`} aria-labelledby="rollover-preview-heading">
           <div className={styles.sectionHeader}>
             <div>
-              <p className="page-eyebrow">Reviewed transaction</p>
-              <h2 id="preview-heading">Rollover preview</h2>
+              <p className={styles.eyebrow}>No writes yet</p>
+              <h2 id="rollover-preview-heading">Instructional rollover preview</h2>
               <p>
-                {preview.sourceSchoolYear.label} → {preview.targetSchoolYear.label}
+                {preview.sourceSchoolYear.label}: {preview.sourceSchoolYear.startsOn} through{' '}
+                {preview.sourceSchoolYear.endsOn} → {preview.targetSchoolYear.label}:{' '}
+                {preview.targetSchoolYear.startsOn} through {preview.targetSchoolYear.endsOn}
               </p>
             </div>
-            <span className={preview.canCommit ? styles.readyBadge : styles.blockedBadge}>
-              {preview.canCommit ? 'Ready to commit' : 'Blocked'}
-            </span>
           </div>
 
-          <div className={styles.summaryGrid} aria-label="Rollover preview summary">
+          <div className={styles.summary} aria-label="Instructional rollover summary">
             <article>
-              <strong>{preview.createdContexts.length}</strong>
-              <span>Contexts created</span>
+              <strong>{preview.createdPlans.length}</strong>
+              <span>Lesson Plans</span>
             </article>
             <article>
-              <strong>{preview.createdMemberships.length}</strong>
-              <span>Placements created</span>
+              <strong>{preview.createdSeries.length}</strong>
+              <span>Lesson Series</span>
+            </article>
+            <article>
+              <strong>{preview.createdStandardAlignments.length}</strong>
+              <span>Standards links</span>
             </article>
             <article>
               <strong>{preview.createdScheduleBlocks.length}</strong>
-              <span>Schedule Blocks created</span>
-            </article>
-            <article>
-              <strong>{preview.conflicts.length}</strong>
-              <span>Schedule conflicts</span>
+              <span>Schedule Blocks</span>
             </article>
           </div>
 
-          <div className={styles.previewColumns}>
-            <section aria-labelledby="context-preview-heading">
-              <h3 id="context-preview-heading">Learner continuation</h3>
-              <ul>
-                {preview.contextRows.map((row) => (
-                  <li key={row.source.id}>
-                    <strong>{row.source.name}</strong> —{' '}
-                    {row.action === 'create' ? 'create' : 'reuse'} {kindLabel(row.source.kind)}
-                  </li>
-                ))}
-              </ul>
-            </section>
-            <section aria-labelledby="placement-preview-heading">
-              <h3 id="placement-preview-heading">Class and group placement</h3>
-              {preview.membershipRows.length ? (
+          {preview.blockingIssues.length > 0 && (
+            <div className={styles.blocking} role="alert">
+              <AlertTriangle aria-hidden="true" />
+              <div>
+                <strong>Resolve before committing</strong>
                 <ul>
-                  {preview.membershipRows.map((row) => (
-                    <li key={row.source.id}>
-                      {row.memberName} → {row.containerName} ({row.action})
-                    </li>
+                  {preview.blockingIssues.map((issue) => (
+                    <li key={issue}>{issue}</li>
                   ))}
                 </ul>
-              ) : (
-                <p>No selected placements will be created.</p>
-              )}
-            </section>
-          </div>
-
-          {preview.scheduleRows.length ? (
-            <section
-              className={styles.reviewTableSection}
-              aria-labelledby="schedule-review-heading"
-            >
-              <h3 id="schedule-review-heading">Schedule date and conflict review</h3>
-              <div
-                className={styles.tableScroller}
-                tabIndex={0}
-                aria-label="Scrollable rollover Schedule preview"
-              >
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Block</th>
-                      <th>Target dates</th>
-                      <th>Weekdays / time</th>
-                      <th>Review</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {preview.scheduleRows.map((row) => (
-                      <tr key={row.source.id}>
-                        <td>
-                          <strong>{row.target.title}</strong>
-                          <small>{row.target.kind}</small>
-                        </td>
-                        <td>
-                          {row.target.effectiveFrom}–{row.target.effectiveTo}
-                        </td>
-                        <td>
-                          {weekdayLabel(row.target.weekdays)} · {scheduleTime(row.target)}
-                        </td>
-                        <td>
-                          {row.conflicts.length
-                            ? `${row.conflicts.length} conflict(s)`
-                            : 'No conflict'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
-            </section>
-          ) : null}
+            </div>
+          )}
 
-          {preview.blockingIssues.length ? (
-            <section className={styles.issuePanel} aria-labelledby="blocking-heading">
-              <h3 id="blocking-heading">
-                <AlertTriangle size={18} aria-hidden="true" /> Resolve before commit
-              </h3>
-              <ul>
-                {preview.blockingIssues.map((issue) => (
-                  <li key={issue}>{issue}</li>
+          {preview.warnings.length > 0 && (
+            <div className={styles.warning}>
+              <AlertTriangle aria-hidden="true" />
+              <div>
+                <strong>Review warnings</strong>
+                <ul>
+                  {preview.warnings.map((warning) => (
+                    <li key={warning}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+
+          <div
+            className={styles.tableScroller}
+            tabIndex={0}
+            aria-label="Scrollable instructional rollover preview"
+          >
+            <table>
+              <thead>
+                <tr>
+                  <th>Class / Group</th>
+                  <th>Series</th>
+                  <th>Lesson Plan</th>
+                  <th>New state</th>
+                </tr>
+              </thead>
+              <tbody>
+                {preview.planRows.map((row) => (
+                  <tr key={row.target.id}>
+                    <td>{row.contextName}</td>
+                    <td>{row.seriesTitle ?? 'Standalone'}</td>
+                    <td>
+                      <strong>{row.target.title}</strong>
+                    </td>
+                    <td>
+                      Draft
+                      {row.target.preferredScheduleBlockId
+                        ? ' · Schedule mapped'
+                        : ' · Unscheduled'}
+                    </td>
+                  </tr>
                 ))}
-              </ul>
-            </section>
-          ) : null}
-          {preview.warnings.length ? (
-            <section className={styles.warningPanel} aria-labelledby="warning-heading">
-              <h3 id="warning-heading">Review notes</h3>
-              <ul>
-                {preview.warnings.map((warning) => (
-                  <li key={warning}>{warning}</li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
+              </tbody>
+            </table>
+          </div>
 
           <div className={styles.confirmations}>
             <label>
@@ -547,7 +455,10 @@ export function SchoolYearRolloverRoute() {
                 checked={reviewedPreview}
                 onChange={(event) => setReviewedPreview(event.target.checked)}
               />
-              <span>I reviewed the learner, placement, date, and conflict preview.</span>
+              <span>
+                I reviewed the copied Lesson Series, Plans, Flow, Standards, categories, and
+                optional Schedule.
+              </span>
             </label>
             <label>
               <input
@@ -556,35 +467,45 @@ export function SchoolYearRolloverRoute() {
                 onChange={(event) => setAcceptedBoundaries(event.target.checked)}
               />
               <span>
-                I understand that Plans, Sessions, Tasks, notices, history, and target-year
-                activation are excluded.
+                I understand that School Year dates and activation will not change, and that
+                Sessions, student memberships, completion history, Tasks, and Reminders are not
+                copied.
               </span>
             </label>
           </div>
+
           <button
-            className="button button-primary"
             type="button"
+            className="button primary"
             disabled={!preview.canCommit || !reviewedPreview || !acceptedBoundaries || busy}
             onClick={() => void commit()}
           >
-            <Copy size={17} aria-hidden="true" /> Commit protected rollover
+            <Copy aria-hidden="true" />
+            Commit instructional rollover
           </button>
         </section>
-      ) : null}
+      )}
 
-      {result ? (
-        <section className={`card ${styles.success}`} aria-labelledby="rollover-complete-heading">
-          <CheckCircle2 size={24} aria-hidden="true" />
+      {result && (
+        <section className={`card ${styles.success}`} aria-live="polite">
+          <CheckCircle2 aria-hidden="true" />
           <div>
-            <h2 id="rollover-complete-heading">Rollover committed safely</h2>
+            <h2>Instructional rollover committed</h2>
             <p>
-              Created {result.createdContextCount} contexts, {result.createdMembershipCount}{' '}
-              placements, and {result.createdScheduleBlockCount} Schedule Blocks. A pre-rollover
-              safety backup was saved, and the complete change is globally undoable.
+              Created {result.createdPlanCount} Lesson Plan
+              {result.createdPlanCount === 1 ? '' : 's'} and a pre-rollover safety backup. Use
+              global Undo to remove the new copies without changing either School Year.
             </p>
           </div>
         </section>
-      ) : null}
-    </section>
+      )}
+
+      {sourceYear && targetYear && (
+        <p className={styles.footerNote}>
+          Current boundaries: {sourceYear.startsOn}–{sourceYear.endsOn} and {targetYear.startsOn}–
+          {targetYear.endsOn}. These values are read-only in this workflow.
+        </p>
+      )}
+    </div>
   );
 }
