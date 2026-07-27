@@ -126,7 +126,7 @@ test('Phase 2.1 preserves Week view and focus while keeping time labels readable
   await page.reload();
   await expect(page.getByLabel('View')).toHaveValue('everything');
   await expect(focusedSession).toHaveAttribute('aria-current', 'true');
-
+  await expect(focusedSession).toBeFocused();
   const weekGrid = page.getByRole('region', { name: /Week of/ });
   const requestedScrollLeft = await weekGrid.evaluate((element) => {
     const target = Math.min(180, element.scrollWidth - element.clientWidth);

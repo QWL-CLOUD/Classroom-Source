@@ -18,6 +18,7 @@ import type {
   QuarantineRecord,
   QuickCapture,
   Reminder,
+  RosterMembership,
   RestoreQuarantineRecord,
   RestoreRun,
   ScheduleBlock,
@@ -27,6 +28,7 @@ import type {
   Standard,
   StandardAlignment,
   StandardImportBatch,
+  StudentRecord,
   Task,
 } from '@/domain/models/entities';
 
@@ -36,6 +38,8 @@ export class ClassroomDatabase extends Dexie {
   learnerNotices!: EntityTable<LearnerNotice, 'id'>;
   learnerServiceOccurrences!: EntityTable<LearnerServiceOccurrence, 'id'>;
   contextMemberships!: EntityTable<ContextMembership, 'id'>;
+  studentRecords!: EntityTable<StudentRecord, 'id'>;
+  rosterMemberships!: EntityTable<RosterMembership, 'id'>;
   scheduleBlocks!: EntityTable<ScheduleBlock, 'id'>;
   scheduleExceptions!: EntityTable<ScheduleException, 'id'>;
   calendarEvents!: EntityTable<CalendarEvent, 'id'>;
@@ -303,6 +307,44 @@ export class ClassroomDatabase extends Dexie {
       learnerContexts: 'id, kind, schoolYearId, status, name',
       learnerNotices: 'id, contextId, kind, status, noticeDate, updatedAt',
       contextMemberships: 'id, containerContextId, memberContextId',
+      scheduleBlocks: 'id, parentId, contextId, *weekdays, effectiveFrom, effectiveTo, sortOrder',
+      scheduleExceptions: 'id, date, scheduleBlockId, action',
+      calendarEvents: 'id, startDate, endDate, category, contextId',
+      categoryValues:
+        'id, familyId, &[familyId+normalizedName], [familyId+lifecycleState], [familyId+sortOrder], lifecycleState, isDefault, mergedIntoId, *normalizedAliases',
+      categoryAssignments:
+        'id, categoryValueId, [entityType+entityId], [familyId+entityType+entityId], &[categoryValueId+entityType+entityId], entityType, entityId',
+      lessonSeries: 'id, contextId, subject',
+      lessonPlans: 'id, contextId, workflowState, seriesId, preferredScheduleBlockId, updatedAt',
+      lessonTemplates: 'id, status, updatedAt, title',
+      sessionOccurrences: 'id, date, lessonPlanId, contextId, scheduleBlockId, deliveryState',
+      tasks: 'id, status, scheduledDate, dueDate, contextId, order, updatedAt',
+      quickCaptures: 'id, capturedOn, createdAt',
+      reminders:
+        'id, [sourceType+sourceId], sourceType, sourceId, status, remindDate, remindMinute, updatedAt',
+      migrationRuns: 'id, status, startedAt',
+      quarantineRecords: 'id, migrationRunId, entityType, legacyStoreKey, createdAt',
+      changeLog: 'id, createdAt, undoneAt, commandType',
+      appSettings: 'key, updatedAt',
+      learnerServiceOccurrences:
+        'id, &[learnerNoticeId+date], learnerNoticeId, date, status, updatedAt',
+      libraryItems: 'id, catalogType, status, updatedAt, *tags',
+      standards:
+        'id, status, frameworkKey, normalizedCode, &[frameworkKey+normalizedCode], parentStandardId, importBatchId, subject, gradeBand, updatedAt',
+      standardAlignments:
+        'id, standardId, [targetType+targetId], targetType, targetId, lessonFlowStepId, scopeKey, &[standardId+scopeKey]',
+      standardImportBatches: 'id, createdAt, sourceName, issuingOrganization, frameworkTitle',
+      backupSnapshots: 'id, kind, createdAt',
+      restoreRuns: 'id, status, startedAt, completedAt, safetySnapshotId',
+      restoreQuarantineRecords: 'id, restoreRunId, tableName, createdAt',
+    });
+    this.version(11).stores({
+      schoolYears: 'id, active, startsOn, endsOn',
+      learnerContexts: 'id, kind, schoolYearId, status, name, linkedStudentId',
+      learnerNotices: 'id, contextId, kind, status, noticeDate, updatedAt',
+      contextMemberships: 'id, containerContextId, memberContextId',
+      studentRecords: 'id, status, name, updatedAt',
+      rosterMemberships: 'id, contextId, studentId, &[contextId+studentId], createdAt',
       scheduleBlocks: 'id, parentId, contextId, *weekdays, effectiveFrom, effectiveTo, sortOrder',
       scheduleExceptions: 'id, date, scheduleBlockId, action',
       calendarEvents: 'id, startDate, endDate, category, contextId',

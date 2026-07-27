@@ -8,6 +8,7 @@ import {
   changeLogSchema,
   contextMembershipSchema,
   learnerContextSchema,
+  rosterMembershipSchema,
   learnerNoticeSchema,
   learnerServiceOccurrenceSchema,
   lessonPlanSchema,
@@ -25,11 +26,13 @@ import {
   standardAlignmentSchema,
   standardImportBatchSchema,
   standardSchema,
+  studentRecordSchema,
   taskSchema,
 } from '@/domain/models/entities';
 
 export const CLASSROOM_BACKUP_FORMAT = 'classroom-v20-backup-v1' as const;
-export const CLASSROOM_DATABASE_SCHEMA_VERSION = 10;
+export const CLASSROOM_DATABASE_SCHEMA_VERSION = 11;
+const LEGACY_ROSTERLESS_SCHEMA_VERSION = 10;
 export const CLASSROOM_APP_VERSION = '20.0.0-alpha.0';
 export const MAX_BACKUP_FILE_BYTES = 100 * 1024 * 1024;
 
@@ -39,6 +42,8 @@ export const BACKUP_TABLE_NAMES = [
   'learnerNotices',
   'learnerServiceOccurrences',
   'contextMemberships',
+  'studentRecords',
+  'rosterMemberships',
   'scheduleBlocks',
   'scheduleExceptions',
   'calendarEvents',
@@ -70,6 +75,8 @@ const backupSchemas: Record<BackupTableName, ZodType> = {
   learnerNotices: learnerNoticeSchema,
   learnerServiceOccurrences: learnerServiceOccurrenceSchema,
   contextMemberships: contextMembershipSchema,
+  studentRecords: studentRecordSchema,
+  rosterMemberships: rosterMembershipSchema,
   scheduleBlocks: scheduleBlockSchema,
   scheduleExceptions: scheduleExceptionSchema,
   calendarEvents: calendarEventSchema,
@@ -248,9 +255,12 @@ export function buildRestorePreview(rawText: string): RestorePreview {
   if (parsed.format !== CLASSROOM_BACKUP_FORMAT) {
     throw new Error('The selected file is not a supported Classroom v20 backup.');
   }
-  if (parsed.databaseSchemaVersion !== CLASSROOM_DATABASE_SCHEMA_VERSION) {
+  if (
+    parsed.databaseSchemaVersion !== CLASSROOM_DATABASE_SCHEMA_VERSION &&
+    parsed.databaseSchemaVersion !== LEGACY_ROSTERLESS_SCHEMA_VERSION
+  ) {
     throw new Error(
-      `This backup uses database schema ${String(parsed.databaseSchemaVersion)}. Classroom currently requires schema ${CLASSROOM_DATABASE_SCHEMA_VERSION}.`,
+      `This backup uses database schema ${String(parsed.databaseSchemaVersion)}. Classroom supports schemas ${LEGACY_ROSTERLESS_SCHEMA_VERSION} and ${CLASSROOM_DATABASE_SCHEMA_VERSION}.`,
     );
   }
   if (
@@ -301,9 +311,23 @@ export function buildRestorePreview(rawText: string): RestorePreview {
     }
   }
 
+  const legacyMissingRosterTables = new Set<BackupTableName>(
+    parsed.databaseSchemaVersion === LEGACY_ROSTERLESS_SCHEMA_VERSION
+      ? ['studentRecords', 'rosterMemberships']
+      : [],
+  );
   for (const tableName of BACKUP_TABLE_NAMES) {
     const source = parsed.tables[tableName];
     if (!Array.isArray(source)) {
+      if (legacyMissingRosterTables.has(tableName)) {
+        tableSummaries.push({
+          tableName,
+          sourceCount: 0,
+          validCount: 0,
+          quarantinedCount: 0,
+        });
+        continue;
+      }
       throw new Error(`The backup is missing the required ${tableName} table.`);
     }
     const expectedCount = parsed.tableCounts[tableName];
@@ -358,6 +382,11 @@ export function buildRestorePreview(rawText: string): RestorePreview {
   }
 
   const warnings: string[] = [];
+  if (parsed.databaseSchemaVersion === LEGACY_ROSTERLESS_SCHEMA_VERSION) {
+    warnings.push(
+      'This backup predates independent Student and roster records. Those new tables will be restored empty.',
+    );
+  }
   if (quarantined.length > 0) {
     warnings.push(
       `${quarantined.length} record${quarantined.length === 1 ? '' : 's'} will be isolated instead of restored into active tables.`,
