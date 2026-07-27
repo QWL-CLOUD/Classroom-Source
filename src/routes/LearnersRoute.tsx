@@ -37,6 +37,7 @@ import type {
 } from '@/features/learners/learnerReadModel';
 import { formatLessonSeriesPositionLabel } from '@/features/planning/lessonSeriesPresentation';
 import { planningMutationService } from '@/features/planning/planningMutationService';
+import { RosterWorkspacePanel } from '@/features/rosters/RosterWorkspacePanel';
 import {
   buildLearnersPageReadModel,
   getLearnerKindLabel,
@@ -975,11 +976,29 @@ function emptyPlanningMessage(view: LearnerPlanningView): string {
   return 'No unscheduled lesson plans for this learner context.';
 }
 
-type LearnerWorkspaceView = 'planning' | 'support' | 'details';
+type LearnerWorkspaceView = 'planning' | 'roster' | 'support' | 'details';
 type LearnerDirectoryKind = 'all' | LearnerContext['kind'];
 
 function isWorkspaceView(value: string | null): value is LearnerWorkspaceView {
-  return value === 'planning' || value === 'support' || value === 'details';
+  return value === 'planning' || value === 'roster' || value === 'support' || value === 'details';
+}
+
+function getWorkspaceTabs(
+  kind: LearnerContext['kind'],
+): ReadonlyArray<readonly [LearnerWorkspaceView, string]> {
+  if (kind === 'individual') {
+    return [
+      ['planning', 'Planning'],
+      ['support', 'Support & Notices'],
+      ['details', 'Details'],
+    ];
+  }
+  return [
+    ['planning', 'Planning'],
+    ['roster', 'Roster'],
+    ['support', 'Support & Notices'],
+    ['details', 'Details'],
+  ];
 }
 
 function contextMatchesQuery(context: LearnerContext, query: string): boolean {
@@ -1042,6 +1061,10 @@ export function LearnersRoute() {
         : null,
     [anchorDate, contextStatus, state],
   );
+  const visibleWorkspaceView: LearnerWorkspaceView =
+    model?.selectedContext?.kind === 'individual' && workspaceView === 'roster'
+      ? 'planning'
+      : workspaceView;
 
   function updateSearchParam(name: string, value: string): void {
     const nextParams = new URLSearchParams(searchParams);
@@ -1488,25 +1511,21 @@ export function LearnersRoute() {
                 </section>
 
                 <div className={styles.workspaceTabs} role="tablist" aria-label="Learner workspace">
-                  {(
-                    [
-                      ['planning', 'Planning'],
-                      ['support', 'Support & Notices'],
-                      ['details', 'Details'],
-                    ] as const
-                  ).map(([view, label]) => (
+                  {getWorkspaceTabs(model.selectedContext.kind).map(([view, label]) => (
                     <button
                       key={view}
                       id={`learner-workspace-tab-${view}`}
                       type="button"
                       role="tab"
-                      aria-selected={workspaceView === view}
+                      aria-selected={visibleWorkspaceView === view}
                       aria-controls={`learner-workspace-panel-${view}`}
-                      className={workspaceView === view ? styles.activeWorkspaceTab : ''}
+                      className={visibleWorkspaceView === view ? styles.activeWorkspaceTab : ''}
                       onClick={() => selectWorkspace(view)}
                     >
                       {view === 'planning' ? (
                         <CalendarDays aria-hidden="true" size={17} />
+                      ) : view === 'roster' ? (
+                        <Users aria-hidden="true" size={17} />
                       ) : view === 'support' ? (
                         <BookOpen aria-hidden="true" size={17} />
                       ) : (
@@ -1519,7 +1538,7 @@ export function LearnersRoute() {
 
                 <section
                   id="learner-workspace-panel-planning"
-                  hidden={workspaceView !== 'planning'}
+                  hidden={visibleWorkspaceView !== 'planning'}
                   className={`card ${styles.planningWorkspace}`}
                   role="tabpanel"
                   aria-labelledby="learner-workspace-tab-planning"
@@ -1632,9 +1651,19 @@ export function LearnersRoute() {
                   </div>
                 </section>
 
+                {model.selectedContext.kind !== 'individual' ? (
+                  <div
+                    id="learner-workspace-panel-roster"
+                    hidden={visibleWorkspaceView !== 'roster'}
+                    role="tabpanel"
+                    aria-labelledby="learner-workspace-tab-roster"
+                  >
+                    <RosterWorkspacePanel context={model.selectedContext} />
+                  </div>
+                ) : null}
                 <div
                   id="learner-workspace-panel-support"
-                  hidden={workspaceView !== 'support'}
+                  hidden={visibleWorkspaceView !== 'support'}
                   role="tabpanel"
                   aria-labelledby="learner-workspace-tab-support"
                 >
@@ -1643,7 +1672,7 @@ export function LearnersRoute() {
 
                 <div
                   id="learner-workspace-panel-details"
-                  hidden={workspaceView !== 'details'}
+                  hidden={visibleWorkspaceView !== 'details'}
                   role="tabpanel"
                   aria-labelledby="learner-workspace-tab-details"
                 >

@@ -105,6 +105,82 @@ export class RosterMutationService {
     return result.value;
   }
 
+  async createStudentAndAddToRoster(
+    contextId: string,
+    values: StudentRecordValues,
+    role?: string,
+  ): Promise<{ student: StudentRecord; membership: RosterMembership }> {
+    const profile = studentRecordValuesSchema.parse(values);
+    const parsedRole = optionalTrimmedString(200).parse(role);
+
+    const result = await this.db.transaction(
+      'rw',
+      [
+        this.db.learnerContexts,
+        this.db.studentRecords,
+        this.db.rosterMemberships,
+        this.db.changeLog,
+      ],
+      async (): Promise<
+        CommitResult<{
+          student: StudentRecord;
+          membership: RosterMembership;
+        }>
+      > => {
+        const context = await this.requireContext(contextId);
+        if (context.kind === 'individual') {
+          throw new Error('Individual contexts do not have rosters.');
+        }
+        if (context.status !== 'active') {
+          throw new Error('Restore the Class or Group before adding students.');
+        }
+
+        const createdAt = this.now();
+        const student = studentRecordSchema.parse({
+          id: this.createId(),
+          ...profile,
+          status: 'active',
+          createdAt,
+          updatedAt: createdAt,
+        });
+        const membership = rosterMembershipSchema.parse({
+          id: this.createId(),
+          contextId: context.id,
+          studentId: student.id,
+          role: parsedRole,
+          createdAt,
+        });
+
+        const commands: RosterCommandPair = {
+          forward: createRosterCommand([
+            putStudentRecordOperation(student),
+            putRosterMembershipOperation(membership),
+          ]),
+          inverse: createRosterCommand([
+            deleteRosterMembershipOperation(membership.id),
+            deleteStudentRecordOperation(student.id),
+          ]),
+        };
+        const log = this.createChangeLog(
+          'roster.student-create-and-add',
+          `Create student “${student.name}” and add to ${context.name}`,
+          commands,
+        );
+
+        await clearSupportedRedoBranch(this.db);
+        await applyRosterOperations(this.db, commands.forward.operations);
+        await this.db.changeLog.put(log);
+        return {
+          value: { student, membership },
+          log,
+        };
+      },
+    );
+
+    this.notifyNewChange(result.log);
+    return result.value;
+  }
+
   async updateStudent(id: string, values: StudentRecordValues): Promise<StudentRecord> {
     const profile = studentRecordValuesSchema.parse(values);
     const result = await this.db.transaction(
