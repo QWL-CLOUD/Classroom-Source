@@ -12,7 +12,14 @@
 .memberBadges,
 .removeActions,
 .archivedWarning,
-.readError {
+.readError,
+.headerActions,
+.importHeader,
+.templateActions,
+.previewSummary,
+.previewStatus,
+.importFooter,
+.searchControl {
   display: flex;
   align-items: center;
 }
@@ -30,6 +37,7 @@
 
 .rosterHeader h2,
 .addCard h3,
+.importPanel h3,
 .memberCard h3,
 .emptyRoster h3 {
   margin: 0;
@@ -38,6 +46,7 @@
 
 .rosterHeader > div > p:last-child,
 .addCard p,
+.importPanel p,
 .studentIdentity p,
 .emptyRoster p {
   margin: 6px 0 0;
@@ -62,6 +71,12 @@
   text-align: center;
 }
 
+.headerActions,
+.templateActions {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .archivedRestriction {
   max-width: 280px;
   color: #6b5543;
@@ -80,7 +95,8 @@
   background: #f5f8f6;
 }
 
-.addCard {
+.addCard,
+.importPanel {
   min-width: 0;
   display: grid;
   gap: 12px;
@@ -91,7 +107,20 @@
   background: var(--surface);
 }
 
-.addCard label {
+.importPanel {
+  border-radius: 15px;
+  background: #f5f8f6;
+}
+
+.importHeader {
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.addCard label,
+.previewDecision {
   min-width: 0;
   display: grid;
   gap: 6px;
@@ -103,7 +132,8 @@
 .addCard input,
 .addCard select,
 .addCard textarea,
-.rosterTools input {
+.previewDecision select,
+.searchControl input {
   width: 100%;
   min-width: 0;
   padding: 9px 10px;
@@ -121,7 +151,8 @@
 .addCard input:focus,
 .addCard select:focus,
 .addCard textarea:focus,
-.rosterTools input:focus {
+.previewDecision select:focus,
+.searchControl input:focus {
   outline: 3px solid rgb(53 95 84 / 22%);
   border-color: var(--accent-strong);
 }
@@ -137,6 +168,7 @@
 }
 
 .error,
+.success,
 .archivedWarning,
 .readError {
   margin: 0;
@@ -150,6 +182,13 @@
   border: 1px solid #c98981;
   color: #6e302b;
   background: #fff7f5;
+}
+
+.success {
+  padding: 10px 12px;
+  border: 1px solid #9ab6a6;
+  color: #2f574b;
+  background: #eef7f1;
 }
 
 .archivedWarning {
@@ -168,16 +207,152 @@
   background: #fff7f5;
 }
 
+.filePicker {
+  position: relative;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 11px;
+  align-items: center;
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  color: #355f54;
+  background: #fff;
+  cursor: pointer;
+}
+
+.filePicker:hover {
+  border-color: var(--accent-strong);
+}
+
+.filePicker span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.filePicker small {
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.filePicker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.filePicker:focus-within {
+  outline: 3px solid rgb(53 95 84 / 22%);
+  outline-offset: 2px;
+}
+
+.previewSummary {
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  color: #355f54;
+  background: #e8f1eb;
+  font-size: 12px;
+}
+
+.previewList {
+  min-width: 0;
+  max-height: 430px;
+  display: grid;
+  gap: 8px;
+  overflow: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.previewRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto minmax(160px, auto);
+  gap: 10px;
+  align-items: center;
+  padding: 11px;
+  border: 1px solid var(--border-soft);
+  border-radius: 11px;
+  background: #fff;
+}
+
+.previewRowNumber {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  color: var(--text-secondary);
+  background: #f0f3f1;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.previewIdentity {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.previewIdentity strong,
+.previewIdentity span,
+.previewIdentity small {
+  overflow-wrap: anywhere;
+}
+
+.previewIdentity span,
+.previewIdentity small {
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.previewStatus {
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.previewStatusReady {
+  color: #2f574b;
+  background: #e8f1eb;
+}
+
+.previewStatusMuted {
+  color: #6a4e2a;
+  background: #fff2d8;
+}
+
+.importFooter {
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.importFooter p {
+  margin: 0;
+}
+
 .rosterTools {
   flex-wrap: wrap;
   gap: 12px;
   justify-content: space-between;
 }
 
-.rosterTools label {
-  min-width: min(100%, 300px);
+.searchControl {
+  min-width: min(100%, 340px);
   display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
+  grid-template-columns: 18px minmax(0, 1fr) auto;
   gap: 7px;
   align-items: center;
   padding-left: 10px;
@@ -186,15 +361,42 @@
   background: #fff;
 }
 
-.rosterTools label:focus-within {
+.searchControl label {
+  min-width: 0;
+}
+
+.searchControl:focus-within {
   outline: 3px solid rgb(53 95 84 / 22%);
   border-color: var(--accent-strong);
 }
 
-.rosterTools input {
+.searchControl input {
   border: 0;
   outline: 0;
   padding-left: 0;
+}
+
+.clearSearch {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.clearSearch:hover {
+  color: var(--text-primary);
+  background: #eef2ef;
+}
+
+.clearSearch:focus-visible {
+  outline: 3px solid rgb(53 95 84 / 22%);
+  outline-offset: 1px;
 }
 
 .rosterTools > span {
@@ -326,9 +528,17 @@
   text-align: center;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   .addGrid {
     grid-template-columns: 1fr;
+  }
+
+  .previewRow {
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+  }
+
+  .previewDecision {
+    grid-column: 2 / -1;
   }
 
   .memberCard {
@@ -348,21 +558,37 @@
   }
 
   .rosterHeader,
-  .rosterHeader > button,
+  .headerActions,
+  .headerActions > button,
   .rosterTools,
-  .rosterTools label,
-  .addCard > button {
+  .searchControl,
+  .addCard > button,
+  .templateActions,
+  .templateActions > button,
+  .importFooter > button {
     width: 100%;
   }
 
-  .rosterHeader {
+  .rosterHeader,
+  .importHeader,
+  .rosterTools,
+  .importFooter {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .rosterTools {
-    align-items: stretch;
-    flex-direction: column;
+  .previewRow {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .previewStatus,
+  .previewDecision {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .previewDecision {
+    width: 100%;
   }
 
   .memberCard {

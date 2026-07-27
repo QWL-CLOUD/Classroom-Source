@@ -24,6 +24,7 @@ import {
   putStudentRecordOperation,
   serializeRosterCommand,
   type RosterCommandPair,
+  type RosterOperation,
 } from './rosterCommands';
 
 const optionalTrimmedString = (maximum: number) =>
@@ -47,6 +48,27 @@ export const rosterMembershipValuesSchema = z.object({
 
 export type StudentRecordValues = z.input<typeof studentRecordValuesSchema>;
 export type RosterMembershipValues = z.input<typeof rosterMembershipValuesSchema>;
+
+const rosterImportItemSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('existing'),
+    studentId: z.string().min(1),
+    role: optionalTrimmedString(200),
+  }),
+  z.object({
+    kind: z.literal('new'),
+    student: studentRecordValuesSchema,
+    role: optionalTrimmedString(200),
+  }),
+]);
+
+export type RosterImportItem = z.input<typeof rosterImportItemSchema>;
+
+export interface RosterImportResult {
+  memberships: RosterMembership[];
+  createdStudents: number;
+  reusedStudents: number;
+}
 
 export interface RosterMutationDependencies {
   createId?: () => string;
@@ -277,6 +299,109 @@ export class RosterMutationService {
         await applyRosterOperations(this.db, commands.forward.operations);
         await this.db.changeLog.put(log);
         return { value: membership, log };
+      },
+    );
+
+    this.notifyNewChange(result.log);
+    return result.value;
+  }
+
+  async importRoster(
+    contextId: string,
+    values: readonly RosterImportItem[],
+  ): Promise<RosterImportResult> {
+    const items = z.array(rosterImportItemSchema).min(1).max(500).parse(values);
+    const result = await this.db.transaction(
+      'rw',
+      [
+        this.db.learnerContexts,
+        this.db.studentRecords,
+        this.db.rosterMemberships,
+        this.db.changeLog,
+      ],
+      async (): Promise<CommitResult<RosterImportResult>> => {
+        const context = await this.requireContext(contextId);
+        if (context.kind === 'individual') {
+          throw new Error('Individual contexts do not have rosters.');
+        }
+        if (context.status !== 'active') {
+          throw new Error('Restore the Class or Group before importing students.');
+        }
+
+        const existingMemberships = await this.db.rosterMemberships
+          .where('contextId')
+          .equals(context.id)
+          .toArray();
+        const memberStudentIds = new Set(
+          existingMemberships.map((membership) => membership.studentId),
+        );
+        const requestedStudentIds = new Set<string>();
+        const forwardOperations: RosterOperation[] = [];
+        const inverseMembershipOperations: RosterOperation[] = [];
+        const inverseStudentOperations: RosterOperation[] = [];
+        const memberships: RosterMembership[] = [];
+        let createdStudents = 0;
+        let reusedStudents = 0;
+
+        for (const item of items) {
+          let student: StudentRecord;
+          if (item.kind === 'existing') {
+            student = await this.requireStudent(item.studentId);
+            if (student.status !== 'active') {
+              throw new Error(`Restore ${student.name} before importing them to a roster.`);
+            }
+            reusedStudents += 1;
+          } else {
+            const profile = studentRecordValuesSchema.parse(item.student);
+            const createdAt = this.now();
+            student = studentRecordSchema.parse({
+              id: this.createId(),
+              ...profile,
+              status: 'active',
+              createdAt,
+              updatedAt: createdAt,
+            });
+            forwardOperations.push(putStudentRecordOperation(student));
+            inverseStudentOperations.unshift(deleteStudentRecordOperation(student.id));
+            createdStudents += 1;
+          }
+
+          if (memberStudentIds.has(student.id) || requestedStudentIds.has(student.id)) {
+            throw new Error(`${student.name} is already included in this import.`);
+          }
+          requestedStudentIds.add(student.id);
+
+          const membership = rosterMembershipSchema.parse({
+            id: this.createId(),
+            contextId: context.id,
+            studentId: student.id,
+            role: item.role,
+            createdAt: this.now(),
+          });
+          memberships.push(membership);
+          forwardOperations.push(putRosterMembershipOperation(membership));
+          inverseMembershipOperations.unshift(deleteRosterMembershipOperation(membership.id));
+        }
+
+        const commands: RosterCommandPair = {
+          forward: createRosterCommand(forwardOperations),
+          inverse: createRosterCommand([
+            ...inverseMembershipOperations,
+            ...inverseStudentOperations,
+          ]),
+        };
+        const label = `Import ${memberships.length} student${
+          memberships.length === 1 ? '' : 's'
+        } to ${context.name}`;
+        const log = this.createChangeLog('roster.membership-import', label, commands);
+
+        await clearSupportedRedoBranch(this.db);
+        await applyRosterOperations(this.db, commands.forward.operations);
+        await this.db.changeLog.put(log);
+        return {
+          value: { memberships, createdStudents, reusedStudents },
+          log,
+        };
       },
     );
 
