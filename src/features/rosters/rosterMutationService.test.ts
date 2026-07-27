@@ -101,6 +101,52 @@ describe('Student and roster foundation', () => {
     expect(await database.rosterMemberships.get('membership-new')).toBeDefined();
   });
 
+  it('imports new and existing Students as one atomic persistent Undo action', async () => {
+    await database.studentRecords.put({
+      id: 'student-existing',
+      name: 'Amy Chen',
+      status: 'active',
+      createdAt: '2026-07-27T11:00:00.000Z',
+      updatedAt: '2026-07-27T11:00:00.000Z',
+    });
+    ids = ['membership-existing', 'student-new', 'membership-new', 'log-import'];
+
+    const result = await mutation.importRoster('class-1', [
+      {
+        kind: 'existing',
+        studentId: 'student-existing',
+        role: 'Student',
+      },
+      {
+        kind: 'new',
+        student: {
+          name: 'Elena Park',
+          preferredName: 'Ellie',
+          notes: 'Imported Student',
+        },
+        role: 'Student',
+      },
+    ]);
+
+    expect(result).toMatchObject({
+      createdStudents: 1,
+      reusedStudents: 1,
+    });
+    expect(result.memberships).toHaveLength(2);
+    expect(await database.studentRecords.get('student-existing')).toBeDefined();
+    expect(await database.studentRecords.get('student-new')).toBeDefined();
+    expect(await database.rosterMemberships.count()).toBe(2);
+
+    await history.undo();
+    expect(await database.studentRecords.get('student-existing')).toBeDefined();
+    expect(await database.studentRecords.get('student-new')).toBeUndefined();
+    expect(await database.rosterMemberships.count()).toBe(0);
+
+    await history.redo();
+    expect(await database.studentRecords.get('student-new')).toBeDefined();
+    expect(await database.rosterMemberships.count()).toBe(2);
+  });
+
   it('keeps Class, Group, and Individual as peer contexts with independent roster rules', async () => {
     ids = [
       'student-1',

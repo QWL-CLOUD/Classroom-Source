@@ -9,18 +9,32 @@ import { rosterReadService, type ContextRosterSnapshot } from './rosterReadServi
 export interface RosterWorkspaceData {
   snapshot: ContextRosterSnapshot;
   activeStudents: StudentRecord[];
+  allStudents: StudentRecord[];
+}
+
+function compareStudents(first: StudentRecord, second: StudentRecord): number {
+  return (
+    (first.preferredName ?? first.name).localeCompare(second.preferredName ?? second.name) ||
+    first.name.localeCompare(second.name) ||
+    first.id.localeCompare(second.id)
+  );
 }
 
 export function useRosterWorkspace(contextId: string): WorkspaceReadState<RosterWorkspaceData> {
   const state = useLiveQuery(async (): Promise<WorkspaceReadState<RosterWorkspaceData>> => {
     try {
-      const [snapshot, activeStudents] = await Promise.all([
+      const [snapshot, activeStudents, archivedStudents] = await Promise.all([
         rosterReadService.loadContextRoster(contextId),
         rosterReadService.listStudents('active'),
+        rosterReadService.listStudents('archived'),
       ]);
       return {
         status: 'ready',
-        data: { snapshot, activeStudents },
+        data: {
+          snapshot,
+          activeStudents,
+          allStudents: [...activeStudents, ...archivedStudents].sort(compareStudents),
+        },
       };
     } catch (error) {
       return { status: 'error', message: toReadErrorMessage(error) };

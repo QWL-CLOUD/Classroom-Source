@@ -1,9 +1,19 @@
-import { AlertTriangle, Archive, Plus, Search, UserPlus, Users, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  Archive,
+  FileSpreadsheet,
+  Plus,
+  Search,
+  UserPlus,
+  Users,
+  X,
+} from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { ZodError } from 'zod';
 
 import type { LearnerContext, StudentRecord } from '@/domain/models/entities';
 
+import { RosterImportPanel } from './RosterImportPanel';
 import { rosterMutationService, type StudentRecordValues } from './rosterMutationService';
 import { useRosterWorkspace } from './useRosterWorkspace';
 import styles from './RosterWorkspacePanel.module.css';
@@ -37,12 +47,23 @@ function ExistingStudentForm({
   onDone,
 }: ExistingStudentFormProps) {
   const [studentId, setStudentId] = useState('');
+  const [studentQuery, setStudentQuery] = useState('');
   const [role, setRole] = useState('');
+  const normalizedQuery = studentQuery.trim().toLocaleLowerCase('en');
+  const filteredStudents = useMemo(
+    () =>
+      students.filter((student) =>
+        [student.name, student.preferredName, student.notes]
+          .filter((value): value is string => Boolean(value))
+          .some((value) => value.toLocaleLowerCase('en').includes(normalizedQuery)),
+      ),
+    [normalizedQuery, students],
+  );
 
   useEffect(() => {
-    if (students.some((student) => student.id === studentId)) return;
+    if (filteredStudents.some((student) => student.id === studentId)) return;
     setStudentId('');
-  }, [studentId, students]);
+  }, [filteredStudents, studentId]);
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -57,6 +78,7 @@ function ExistingStudentForm({
         role,
       });
       setStudentId('');
+      setStudentQuery('');
       setRole('');
       onDone();
     } catch (cause) {
@@ -72,19 +94,28 @@ function ExistingStudentForm({
         <p className="page-eyebrow">Existing student</p>
         <h3>Add from Student records</h3>
         <p>
-          A Student may belong to this {context.kind} and other peer Classes or Groups
-          independently.
+          Search all active Student records, then add one to this independent {context.kind} roster.
         </p>
       </div>
+      <label>
+        <span>Search all Student records</span>
+        <input
+          value={studentQuery}
+          type="search"
+          disabled={busy || students.length === 0}
+          placeholder="Name, preferred name, or notes"
+          onChange={(event) => setStudentQuery(event.target.value)}
+        />
+      </label>
       <label>
         <span>Student *</span>
         <select
           value={studentId}
-          disabled={busy || students.length === 0}
+          disabled={busy || filteredStudents.length === 0}
           onChange={(event) => setStudentId(event.target.value)}
         >
           <option value="">Select a student</option>
-          {students.map((student) => (
+          {filteredStudents.map((student) => (
             <option key={student.id} value={student.id}>
               {displayStudentName(student)}
               {student.preferredName ? ` · ${student.name}` : ''}
@@ -107,6 +138,8 @@ function ExistingStudentForm({
           Every active Student is already in this roster, or no Student records have been created
           yet.
         </p>
+      ) : filteredStudents.length === 0 ? (
+        <p className={styles.formNotice}>No active Student records match.</p>
       ) : null}
       <button className="button button-primary" type="submit" disabled={busy || !studentId}>
         <UserPlus aria-hidden="true" size={16} />
@@ -232,19 +265,23 @@ function CreateStudentForm({
   );
 }
 
+type RosterTool = 'add' | 'import' | null;
+
 export function RosterWorkspacePanel({ context }: { context: LearnerContext }) {
   const state = useRosterWorkspace(context.id);
   const [query, setQuery] = useState('');
-  const [adding, setAdding] = useState(false);
+  const [activeTool, setActiveTool] = useState<RosterTool>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [removeArmedId, setRemoveArmedId] = useState<string | null>(null);
 
   useEffect(() => {
     setQuery('');
-    setAdding(false);
+    setActiveTool(null);
     setBusy(false);
     setError(null);
+    setSuccess(null);
     setRemoveArmedId(null);
   }, [context.id]);
 
@@ -282,6 +319,7 @@ export function RosterWorkspacePanel({ context }: { context: LearnerContext }) {
 
     setBusy(true);
     setError(null);
+    setSuccess(null);
     try {
       await rosterMutationService.removeFromRoster(membershipId);
       setRemoveArmedId(null);
@@ -290,6 +328,12 @@ export function RosterWorkspacePanel({ context }: { context: LearnerContext }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  function toggleTool(tool: Exclude<RosterTool, null>): void {
+    setActiveTool((current) => (current === tool ? null : tool));
+    setError(null);
+    setSuccess(null);
   }
 
   if (context.kind === 'individual') return null;
@@ -311,22 +355,34 @@ export function RosterWorkspacePanel({ context }: { context: LearnerContext }) {
           </p>
         </div>
         {canEdit ? (
-          <button
-            className={adding ? 'button' : 'button button-primary'}
-            type="button"
-            aria-expanded={adding}
-            onClick={() => {
-              setAdding((current) => !current);
-              setError(null);
-            }}
-          >
-            {adding ? (
-              <X aria-hidden="true" size={16} />
-            ) : (
-              <UserPlus aria-hidden="true" size={16} />
-            )}
-            {adding ? 'Close add forms' : 'Add students'}
-          </button>
+          <div className={styles.headerActions}>
+            <button
+              className={activeTool === 'add' ? 'button' : 'button button-primary'}
+              type="button"
+              aria-expanded={activeTool === 'add'}
+              onClick={() => toggleTool('add')}
+            >
+              {activeTool === 'add' ? (
+                <X aria-hidden="true" size={16} />
+              ) : (
+                <UserPlus aria-hidden="true" size={16} />
+              )}
+              {activeTool === 'add' ? 'Close add forms' : 'Add students'}
+            </button>
+            <button
+              className="button"
+              type="button"
+              aria-expanded={activeTool === 'import'}
+              onClick={() => toggleTool('import')}
+            >
+              {activeTool === 'import' ? (
+                <X aria-hidden="true" size={16} />
+              ) : (
+                <FileSpreadsheet aria-hidden="true" size={16} />
+              )}
+              {activeTool === 'import' ? 'Close import' : 'Import'}
+            </button>
+          </div>
         ) : (
           <span className={styles.archivedRestriction}>
             Restore this {context.kind} to change its roster.
@@ -334,7 +390,7 @@ export function RosterWorkspacePanel({ context }: { context: LearnerContext }) {
         )}
       </div>
 
-      {adding && canEdit && data ? (
+      {activeTool === 'add' && canEdit && data ? (
         <div className={styles.addGrid} aria-label="Add students to roster">
           <ExistingStudentForm
             context={context}
@@ -342,21 +398,41 @@ export function RosterWorkspacePanel({ context }: { context: LearnerContext }) {
             busy={busy}
             onBusyChange={setBusy}
             onError={setError}
-            onDone={() => setAdding(false)}
+            onDone={() => setActiveTool(null)}
           />
           <CreateStudentForm
             context={context}
             busy={busy}
             onBusyChange={setBusy}
             onError={setError}
-            onDone={() => setAdding(false)}
+            onDone={() => setActiveTool(null)}
           />
         </div>
+      ) : null}
+
+      {activeTool === 'import' && canEdit && data ? (
+        <RosterImportPanel
+          context={context}
+          students={data.allStudents}
+          memberStudentIds={memberStudentIds}
+          busy={busy}
+          onBusyChange={setBusy}
+          onError={setError}
+          onDone={(message) => {
+            setSuccess(message);
+            setActiveTool(null);
+          }}
+        />
       ) : null}
 
       {error ? (
         <p className={styles.error} role="alert">
           {error}
+        </p>
+      ) : null}
+      {success ? (
+        <p className={styles.success} role="status">
+          {success}
         </p>
       ) : null}
 
@@ -372,17 +448,29 @@ export function RosterWorkspacePanel({ context }: { context: LearnerContext }) {
       ) : null}
 
       <div className={styles.rosterTools}>
-        <label>
+        <div className={styles.searchControl}>
           <Search aria-hidden="true" size={16} />
-          <span className="visually-hidden">Search roster</span>
-          <input
-            value={query}
-            type="search"
-            placeholder="Search roster"
-            aria-label="Search roster"
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
+          <label>
+            <span className="visually-hidden">Search this roster</span>
+            <input
+              value={query}
+              type="search"
+              placeholder="Search this roster"
+              aria-label="Search this roster"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+          {query ? (
+            <button
+              className={styles.clearSearch}
+              type="button"
+              aria-label="Clear roster search"
+              onClick={() => setQuery('')}
+            >
+              <X aria-hidden="true" size={15} />
+            </button>
+          ) : null}
+        </div>
         <span role="status">
           Showing {filteredMembers.length} of {data?.snapshot.members.length ?? 0}
         </span>
@@ -460,10 +548,7 @@ export function RosterWorkspacePanel({ context }: { context: LearnerContext }) {
           <Users aria-hidden="true" size={26} />
           <div>
             <h3>No students in this roster</h3>
-            <p>
-              Add an existing Student record or create a new Student. This roster remains
-              independent from every other Class and Group.
-            </p>
+            <p>Add an existing Student record, create one, or import a CSV or Excel roster.</p>
           </div>
         </div>
       ) : (
@@ -471,7 +556,7 @@ export function RosterWorkspacePanel({ context }: { context: LearnerContext }) {
           <Search aria-hidden="true" size={24} />
           <div>
             <h3>No matching students</h3>
-            <p>Change or clear the roster search.</p>
+            <p>Change the search or clear it to show the full roster.</p>
           </div>
         </div>
       )}

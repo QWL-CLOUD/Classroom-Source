@@ -152,10 +152,10 @@ test('Class and Group manage independent Student rosters with global Undo', asyn
   await expect(classList.getByLabel('Ben Lee, archived student')).toBeVisible();
   await expect(classRoster.getByText(/1 archived Student/)).toBeVisible();
 
-  await classRoster.getByLabel('Search roster').fill('Amy');
+  await classRoster.getByLabel('Search this roster').fill('Amy');
   await expect(classList.getByLabel('Amy, active student')).toBeVisible();
   await expect(classList.getByText('Ben Lee')).toHaveCount(0);
-  await classRoster.getByLabel('Search roster').fill('');
+  await classRoster.getByLabel('Search this roster').fill('');
 
   await classRoster.getByRole('button', { name: 'Add students' }).click();
   await classRoster.getByLabel('Student *').selectOption('student-carlos');
