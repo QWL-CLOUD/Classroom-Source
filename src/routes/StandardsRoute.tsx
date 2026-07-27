@@ -1,4 +1,4 @@
-import { Archive, BookCheck, Boxes, Pencil, Plus, RotateCcw, Search, X } from 'lucide-react';
+import { Archive, BookCheck, Pencil, Plus, RotateCcw, Search, X } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -114,9 +114,6 @@ export function StandardsRoute() {
           </p>
         </div>
         <div className={styles.headerActions}>
-          <a className="button" href="#/library">
-            <Boxes size={17} aria-hidden="true" /> Open Library
-          </a>
           <button
             className="button button-primary"
             type="button"
