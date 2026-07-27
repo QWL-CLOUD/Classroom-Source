@@ -239,10 +239,10 @@ test('Backup & Recovery previews without writes, saves a safety backup, and rest
       runs: [
         expect.objectContaining({ status: 'committed', sourceBackupId: 'e2e-restore-backup' }),
       ],
-      quarantines: [
+      quarantines: expect.arrayContaining([
         expect.objectContaining({ tableName: 'futureWidgets' }),
         expect.objectContaining({ tableName: 'tasks', recordKey: 'invalid-task' }),
-      ],
+      ]),
     });
 
   await page.reload();

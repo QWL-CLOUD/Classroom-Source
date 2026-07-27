@@ -26,6 +26,12 @@ export interface BackupRecoveryDependencies {
   now?: () => string;
 }
 
+export interface SafetySnapshotOptions {
+  kind: BackupSnapshot['kind'];
+  createId: () => string;
+  createdAt: string;
+}
+
 export interface RestoreCommitResult {
   run: RestoreRun;
   safetySnapshot: BackupSnapshot;
@@ -43,6 +49,36 @@ async function readBackupTables(db: ClassroomDatabase): Promise<BackupTableData>
     tables[tableName] = await tableFor(db, tableName).toArray();
   }
   return tables;
+}
+
+export async function createSafetySnapshotRecord(
+  db: ClassroomDatabase,
+  options: SafetySnapshotOptions,
+): Promise<BackupSnapshot> {
+  const envelope = createBackupEnvelope(await readBackupTables(db), {
+    backupId: options.createId(),
+    exportedAt: options.createdAt,
+  });
+  return backupSnapshotSchema.parse({
+    id: options.createId(),
+    kind: options.kind,
+    sourceFormat: CLASSROOM_BACKUP_FORMAT,
+    databaseSchemaVersion: envelope.databaseSchemaVersion,
+    recordCount: Object.values(envelope.tableCounts).reduce((total, value) => total + value, 0),
+    payloadJson: serializeBackupEnvelope(envelope),
+    createdAt: options.createdAt,
+  });
+}
+
+export async function pruneSafetySnapshots(db: ClassroomDatabase, limit = 5): Promise<void> {
+  const staleSnapshots = await db.backupSnapshots
+    .orderBy('createdAt')
+    .reverse()
+    .offset(limit)
+    .toArray();
+  if (staleSnapshots.length > 0) {
+    await db.backupSnapshots.bulkDelete(staleSnapshots.map((snapshot) => snapshot.id));
+  }
 }
 
 export class BackupRecoveryService {
@@ -87,20 +123,9 @@ export class BackupRecoveryService {
     ];
 
     return this.db.transaction('rw', transactionTables, async () => {
-      const safetyEnvelope = createBackupEnvelope(await readBackupTables(this.db), {
-        backupId: this.createId(),
-        exportedAt: startedAt,
-      });
-      const safetySnapshot = backupSnapshotSchema.parse({
-        id: this.createId(),
+      const safetySnapshot = await createSafetySnapshotRecord(this.db, {
         kind: 'pre-restore',
-        sourceFormat: CLASSROOM_BACKUP_FORMAT,
-        databaseSchemaVersion: safetyEnvelope.databaseSchemaVersion,
-        recordCount: Object.values(safetyEnvelope.tableCounts).reduce(
-          (total, value) => total + value,
-          0,
-        ),
-        payloadJson: serializeBackupEnvelope(safetyEnvelope),
+        createId: this.createId,
         createdAt: startedAt,
       });
       await this.db.backupSnapshots.put(safetySnapshot);
@@ -148,14 +173,7 @@ export class BackupRecoveryService {
         );
       }
 
-      const staleSnapshots = await this.db.backupSnapshots
-        .orderBy('createdAt')
-        .reverse()
-        .offset(5)
-        .toArray();
-      if (staleSnapshots.length > 0) {
-        await this.db.backupSnapshots.bulkDelete(staleSnapshots.map((snapshot) => snapshot.id));
-      }
+      await pruneSafetySnapshots(this.db);
 
       return {
         run,

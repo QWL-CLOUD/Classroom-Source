@@ -51,6 +51,12 @@ import {
   SCHOOL_YEAR_COMMAND_PREFIX,
   type SchoolYearCommand,
 } from '@/features/schoolYears/schoolYearCommands';
+import { applySchoolYearRolloverOperations } from '@/features/schoolYearRollover/applySchoolYearRolloverOperations';
+import {
+  parseSchoolYearRolloverCommand,
+  SCHOOL_YEAR_ROLLOVER_COMMAND_PREFIX,
+  type SchoolYearRolloverCommand,
+} from '@/features/schoolYearRollover/schoolYearRolloverCommands';
 import {
   parseTaskCommand,
   TASK_COMMAND_PREFIX,
@@ -81,7 +87,8 @@ export type SupportedEditCommand =
   | { entity: 'standard'; command: StandardCommand }
   | { entity: 'task'; command: TaskCommand }
   | { entity: 'reminder'; command: ReminderCommand }
-  | { entity: 'school-year'; command: SchoolYearCommand };
+  | { entity: 'school-year'; command: SchoolYearCommand }
+  | { entity: 'school-year-rollover'; command: SchoolYearRolloverCommand };
 
 export function isSupportedEditChangeLog(log: ChangeLog): boolean {
   return (
@@ -97,6 +104,7 @@ export function isSupportedEditChangeLog(log: ChangeLog): boolean {
     log.commandType.startsWith(STANDARD_COMMAND_PREFIX) ||
     log.commandType.startsWith(TASK_COMMAND_PREFIX) ||
     log.commandType.startsWith(REMINDER_COMMAND_PREFIX) ||
+    log.commandType.startsWith(SCHOOL_YEAR_ROLLOVER_COMMAND_PREFIX) ||
     log.commandType.startsWith(SCHOOL_YEAR_COMMAND_PREFIX)
   );
 }
@@ -166,6 +174,12 @@ export function parseSupportedEditCommand(commandType: string, json: string): Su
     return {
       entity: 'reminder',
       command: parseReminderCommand(json),
+    };
+  }
+  if (commandType.startsWith(SCHOOL_YEAR_ROLLOVER_COMMAND_PREFIX)) {
+    return {
+      entity: 'school-year-rollover',
+      command: parseSchoolYearRolloverCommand(json),
     };
   }
   if (commandType.startsWith(SCHOOL_YEAR_COMMAND_PREFIX)) {
@@ -321,6 +335,11 @@ export async function applySupportedEditCommand(
       if (operation.action === 'put') await db.schoolYears.put(operation.record);
       else await db.schoolYears.delete(operation.id);
     }
+    return;
+  }
+
+  if (parsed.entity === 'school-year-rollover') {
+    await applySchoolYearRolloverOperations(db, parsed.command.operations);
     return;
   }
 

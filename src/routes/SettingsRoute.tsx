@@ -10,6 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import type { SchoolYear } from '@/domain/models/entities';
 import {
@@ -252,14 +253,19 @@ export function SettingsRoute() {
               <h2>Rollover readiness</h2>
               <p>{state.data.rolloverMessage}</p>
               <p className={styles.sectionIntro}>
-                Preparing a year only creates the school-year container. Learner continuation, class
-                placement, and schedule copying remain future preview-based workflows.
+                Preparing a year only creates the school-year container. Use Advanced rollover to
+                review learner continuation, class and group placement, and optional Schedule copy.
               </p>
             </div>
             {state.data.activeSchoolYear ? (
-              <button className="button" type="button" onClick={openRollover}>
-                Prepare next year
-              </button>
+              <div className={styles.rolloverActions}>
+                <button className="button" type="button" onClick={openRollover}>
+                  Prepare next year
+                </button>
+                <Link className="button button-primary" to="/settings/rollover">
+                  Advanced rollover
+                </Link>
+              </div>
             ) : (
               <button className="button" type="button" onClick={openCreate}>
                 Create first year
