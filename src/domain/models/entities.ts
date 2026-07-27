@@ -33,21 +33,68 @@ export const schoolYearSchema = z
     }
   });
 
-export const learnerContextSchema = z.object({
-  id: idSchema,
-  kind: z.enum(['class', 'group', 'individual']),
-  name: z.string().min(1),
-  preferredName: z.string().optional(),
-  schoolYearId: idSchema,
-  status: z.enum(['active', 'archived']).default('active'),
-  notes: z.string().optional(),
-});
+export const learnerContextSchema = z
+  .object({
+    id: idSchema,
+    kind: z.enum(['class', 'group', 'individual']),
+    name: z.string().min(1),
+    preferredName: z.string().optional(),
+    schoolYearId: idSchema,
+    status: z.enum(['active', 'archived']).default('active'),
+    notes: z.string().optional(),
+    linkedStudentId: idSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.kind !== 'individual' && value.linkedStudentId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Only an Individual context can link to a student record.',
+        path: ['linkedStudentId'],
+      });
+    }
+  });
 
 export const contextMembershipSchema = z.object({
   id: idSchema,
   containerContextId: idSchema,
   memberContextId: idSchema,
   role: z.string().optional(),
+});
+
+export const studentRecordSchema = z
+  .object({
+    id: idSchema,
+    name: z.string().trim().min(1).max(200),
+    preferredName: z.string().trim().max(200).optional(),
+    status: z.enum(['active', 'archived']).default('active'),
+    notes: z.string().max(5000).optional(),
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+    archivedAt: timestampSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.status === 'active' && value.archivedAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An active student cannot contain archivedAt.',
+        path: ['archivedAt'],
+      });
+    }
+    if (value.status === 'archived' && !value.archivedAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An archived student requires archivedAt.',
+        path: ['archivedAt'],
+      });
+    }
+  });
+
+export const rosterMembershipSchema = z.object({
+  id: idSchema,
+  contextId: idSchema,
+  studentId: idSchema,
+  role: z.string().trim().max(200).optional(),
+  createdAt: timestampSchema,
 });
 
 export const scheduleBlockSchema = z
@@ -850,6 +897,8 @@ export const appSettingSchema = z.object({
 export type SchoolYear = z.infer<typeof schoolYearSchema>;
 export type LearnerContext = z.infer<typeof learnerContextSchema>;
 export type ContextMembership = z.infer<typeof contextMembershipSchema>;
+export type StudentRecord = z.infer<typeof studentRecordSchema>;
+export type RosterMembership = z.infer<typeof rosterMembershipSchema>;
 export type ScheduleBlock = z.infer<typeof scheduleBlockSchema>;
 export type ScheduleException = z.infer<typeof scheduleExceptionSchema>;
 export type CalendarEvent = z.infer<typeof calendarEventSchema>;

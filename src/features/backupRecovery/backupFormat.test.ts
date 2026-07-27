@@ -46,7 +46,32 @@ describe('Classroom backup format', () => {
     expect(preview.validRecordCount).toBe(1);
     expect(preview.quarantineCount).toBe(0);
     expect(preview.validTables.tasks).toEqual([task('task-1')]);
-    expect(preview.tableSummaries).toHaveLength(25);
+    expect(preview.tableSummaries).toHaveLength(27);
+  });
+
+  it('restores a schema v10 backup with the new Student and roster tables empty', () => {
+    const current = createBackupEnvelope(emptyBackupTables(), {
+      backupId: 'legacy-backup',
+      exportedAt: now,
+    });
+    const legacyTables = { ...current.tables } as Record<string, unknown[]>;
+    const legacyCounts = { ...current.tableCounts } as Record<string, number>;
+    delete legacyTables.studentRecords;
+    delete legacyTables.rosterMemberships;
+    delete legacyCounts.studentRecords;
+    delete legacyCounts.rosterMemberships;
+    const legacyEnvelope = {
+      ...current,
+      databaseSchemaVersion: 10,
+      tables: legacyTables,
+      tableCounts: legacyCounts,
+    } as unknown as ClassroomBackupEnvelope;
+
+    const preview = buildRestorePreview(resign(legacyEnvelope));
+
+    expect(preview.validTables.studentRecords).toEqual([]);
+    expect(preview.validTables.rosterMemberships).toEqual([]);
+    expect(preview.warnings.join(' ')).toMatch(/predates independent Student/);
   });
 
   it('rejects a backup whose content no longer matches its integrity hash', () => {

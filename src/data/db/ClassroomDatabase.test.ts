@@ -12,7 +12,7 @@ afterEach(async () => {
 });
 
 describe('ClassroomDatabase schema upgrades', () => {
-  it('upgrades legacy data to schema v10 and adds Backup & Recovery stores without losing Tasks', async () => {
+  it('upgrades legacy data to schema v11 and adds independent Student and roster stores without losing Tasks', async () => {
     const name = `classroom-v20-upgrade-${crypto.randomUUID()}`;
     names.push(name);
     const legacy = new Dexie(name);
@@ -33,8 +33,30 @@ describe('ClassroomDatabase schema upgrades', () => {
     const upgraded = new ClassroomDatabase(name);
     await upgraded.open();
 
-    expect(upgraded.verno).toBe(10);
+    expect(upgraded.verno).toBe(11);
     expect(await upgraded.tasks.get('legacy-task')).toBeDefined();
+    await upgraded.learnerContexts.put({
+      id: 'class-1',
+      kind: 'class',
+      name: 'Grade 3',
+      schoolYearId: 'year-1',
+      status: 'active',
+    });
+    await upgraded.studentRecords.put({
+      id: 'student-1',
+      name: 'Synthetic student',
+      status: 'active',
+      createdAt: '2026-07-27T12:00:00.000Z',
+      updatedAt: '2026-07-27T12:00:00.000Z',
+    });
+    await upgraded.rosterMemberships.put({
+      id: 'roster-1',
+      contextId: 'class-1',
+      studentId: 'student-1',
+      createdAt: '2026-07-27T12:00:00.000Z',
+    });
+    expect(await upgraded.studentRecords.count()).toBe(1);
+    expect(await upgraded.rosterMemberships.count()).toBe(1);
     await upgraded.reminders.put({
       id: 'reminder-1',
       sourceType: 'task',
@@ -149,7 +171,7 @@ describe('ClassroomDatabase schema upgrades', () => {
       id: 'snapshot-1',
       kind: 'pre-restore',
       sourceFormat: 'classroom-v20-backup-v1',
-      databaseSchemaVersion: 10,
+      databaseSchemaVersion: 11,
       recordCount: 1,
       payloadJson: '{}',
       createdAt: '2026-07-27T12:00:00.000Z',

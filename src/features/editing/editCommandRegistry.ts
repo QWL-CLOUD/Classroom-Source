@@ -31,6 +31,12 @@ import {
   parseLearnerContextCommand,
   type LearnerContextCommand,
 } from '@/features/learners/learnerContextCommands';
+import { applyRosterOperations } from '@/features/rosters/applyRosterOperations';
+import {
+  parseRosterCommand,
+  ROSTER_COMMAND_PREFIX,
+  type RosterCommand,
+} from '@/features/rosters/rosterCommands';
 import {
   parsePlanningCommand,
   PLANNING_COMMAND_PREFIX,
@@ -81,6 +87,7 @@ export type SupportedEditCommand =
   | { entity: 'schedule-exception'; command: ScheduleExceptionCommand }
   | { entity: 'planning'; command: PlanningCommand }
   | { entity: 'learner-context'; command: LearnerContextCommand }
+  | { entity: 'roster'; command: RosterCommand }
   | { entity: 'learner-notice'; command: LearnerNoticeCommand }
   | { entity: 'library-catalog'; command: LibraryCatalogCommand }
   | { entity: 'lesson-template'; command: LessonTemplateCommand }
@@ -98,6 +105,7 @@ export function isSupportedEditChangeLog(log: ChangeLog): boolean {
     log.commandType.startsWith(SCHEDULE_EXCEPTION_COMMAND_PREFIX) ||
     log.commandType.startsWith(PLANNING_COMMAND_PREFIX) ||
     log.commandType.startsWith(LEARNER_CONTEXT_COMMAND_PREFIX) ||
+    log.commandType.startsWith(ROSTER_COMMAND_PREFIX) ||
     log.commandType.startsWith(LEARNER_NOTICE_COMMAND_PREFIX) ||
     log.commandType.startsWith(LIBRARY_CATALOG_COMMAND_PREFIX) ||
     log.commandType.startsWith(LESSON_TEMPLATE_COMMAND_PREFIX) ||
@@ -138,6 +146,12 @@ export function parseSupportedEditCommand(commandType: string, json: string): Su
     return {
       entity: 'learner-context',
       command: parseLearnerContextCommand(json),
+    };
+  }
+  if (commandType.startsWith(ROSTER_COMMAND_PREFIX)) {
+    return {
+      entity: 'roster',
+      command: parseRosterCommand(json),
     };
   }
   if (commandType.startsWith(LEARNER_NOTICE_COMMAND_PREFIX)) {
@@ -237,6 +251,10 @@ export async function applySupportedEditCommand(
         await db.contextMemberships.delete(operation.id);
       }
     }
+    return;
+  }
+  if (parsed.entity === 'roster') {
+    await applyRosterOperations(db, parsed.command.operations);
     return;
   }
 
