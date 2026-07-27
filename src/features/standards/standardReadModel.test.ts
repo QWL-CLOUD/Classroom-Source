@@ -6,6 +6,21 @@ import { buildStandardViews, filterStandards } from './standardReadModel';
 
 const timestamp = '2026-07-24T03:00:00.000Z';
 
+function standard(overrides: Partial<Standard> & Pick<Standard, 'id' | 'code'>): Standard {
+  return {
+    issuingOrganization: 'Organization',
+    frameworkTitle: 'Framework',
+    frameworkKey: 'organization|framework',
+    normalizedCode: overrides.code.toLocaleLowerCase('en'),
+    statement: `Statement for ${overrides.code}`,
+    sortOrder: 0,
+    status: 'active',
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    ...overrides,
+  };
+}
+
 const standards: Standard[] = [
   {
     id: 'parent',
@@ -81,5 +96,34 @@ describe('standard read models', () => {
         gradeBand: '3',
       }).map((value) => value.id),
     ).toEqual(['child']);
+  });
+
+  it('filters Standards with unspecified subject or grade band explicitly', () => {
+    const views = buildStandardViews(
+      [
+        standard({ id: 'specified', code: 'A.1', subject: 'Math', gradeBand: '3' }),
+        standard({ id: 'unspecified', code: 'A.2', subject: undefined, gradeBand: undefined }),
+      ],
+      [],
+    );
+
+    expect(
+      filterStandards(views, {
+        query: '',
+        status: 'active',
+        frameworkKey: '',
+        subject: '__not-specified__',
+        gradeBand: '',
+      }).map((value) => value.id),
+    ).toEqual(['unspecified']);
+    expect(
+      filterStandards(views, {
+        query: '',
+        status: 'active',
+        frameworkKey: '',
+        subject: '',
+        gradeBand: '__not-specified__',
+      }).map((value) => value.id),
+    ).toEqual(['unspecified']);
   });
 });

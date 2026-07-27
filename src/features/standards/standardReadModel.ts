@@ -78,8 +78,20 @@ export function filterStandards(
     .filter((standard) => {
       if (filters.status !== 'all' && standard.status !== filters.status) return false;
       if (filters.frameworkKey && standard.frameworkKey !== filters.frameworkKey) return false;
-      if (filters.subject && standard.subject !== filters.subject) return false;
-      if (filters.gradeBand && standard.gradeBand !== filters.gradeBand) return false;
+      if (filters.subject === '__not-specified__' && standard.subject) return false;
+      if (
+        filters.subject &&
+        filters.subject !== '__not-specified__' &&
+        standard.subject !== filters.subject
+      )
+        return false;
+      if (filters.gradeBand === '__not-specified__' && standard.gradeBand) return false;
+      if (
+        filters.gradeBand &&
+        filters.gradeBand !== '__not-specified__' &&
+        standard.gradeBand !== filters.gradeBand
+      )
+        return false;
       return !query || searchableText(standard).includes(query);
     })
     .sort(

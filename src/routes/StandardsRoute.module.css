@@ -52,6 +52,38 @@
   max-width: 100%;
 }
 
+.viewTabs {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.viewTabs button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 9px;
+  padding: 7px 12px;
+  color: var(--text-muted);
+  background: transparent;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.viewTabs button[aria-pressed='true'] {
+  color: var(--heading);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-soft);
+}
+
+.viewTabs button:focus-visible {
+  outline: 3px solid var(--focus-ring, #355f54);
+  outline-offset: 2px;
+}
+
 .filters {
   min-width: 0;
   padding: 16px;

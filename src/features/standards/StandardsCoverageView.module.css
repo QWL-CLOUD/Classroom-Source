@@ -1,0 +1,312 @@
+.coverage {
+  display: grid;
+  min-width: 0;
+  gap: 18px;
+}
+
+.loading,
+.overview,
+.entitySummary,
+.breakdown,
+.alignmentRecords,
+.unaligned,
+.unalignedStandards {
+  min-width: 0;
+  padding: 18px;
+}
+
+.sectionHeading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sectionHeading > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.sectionHeading h2,
+.sectionHeading p {
+  margin: 0;
+}
+
+.sectionHeading h2 {
+  color: var(--heading);
+}
+
+.sectionHeading p,
+.empty,
+.unalignedGrid p {
+  color: var(--text-secondary);
+}
+
+.metrics,
+.entityCards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0 0;
+}
+
+.metrics > div,
+.entityCards > div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.metrics dt,
+.entityCards dt {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.metrics dd,
+.entityCards dd {
+  margin: 0;
+  color: var(--heading);
+  font-size: clamp(1.45rem, 3vw, 2rem);
+  font-weight: 850;
+}
+
+.entityCards {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dimensionField {
+  display: grid;
+  min-width: min(100%, 190px);
+  gap: 5px;
+}
+
+.dimensionField label {
+  color: var(--heading);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.dimensionField select {
+  width: 100%;
+  min-width: 0;
+}
+
+.tableScroller {
+  max-width: 100%;
+  margin-top: 14px;
+  overflow: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+}
+
+.tableScroller:focus-visible {
+  outline: 3px solid var(--focus-ring, #355f54);
+  outline-offset: 2px;
+}
+
+.tableScroller table {
+  width: 100%;
+  min-width: 840px;
+  border-collapse: collapse;
+}
+
+.tableScroller th,
+.tableScroller td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--border-soft);
+  text-align: left;
+  vertical-align: top;
+}
+
+.tableScroller thead th {
+  color: var(--text-muted);
+  background: var(--surface-soft);
+  font-size: 0.75rem;
+  font-weight: 850;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.tableScroller tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.tableScroller tbody th {
+  min-width: 210px;
+  color: var(--heading);
+}
+
+.tableScroller tbody th small,
+.tableScroller tbody td small {
+  display: block;
+  max-width: 46rem;
+  margin-top: 3px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.tableScroller a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 750;
+}
+
+.textButton {
+  border: 0;
+  padding: 0;
+  color: var(--accent-strong);
+  background: transparent;
+  font: inherit;
+  font-weight: 850;
+  text-align: left;
+  cursor: pointer;
+}
+
+.textButton:hover {
+  text-decoration: underline;
+}
+
+.countBadge {
+  display: inline-flex;
+  min-width: 2rem;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  color: var(--heading);
+  background: var(--surface-soft);
+  font-weight: 850;
+}
+
+.unalignedGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.unalignedGrid > section {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+}
+
+.unalignedGrid h3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 10px;
+  color: var(--heading);
+  font-size: 0.95rem;
+}
+
+.unalignedGrid h3 span {
+  min-width: 1.7rem;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.unalignedGrid ul,
+.standardList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.unalignedGrid li a {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 8px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  color: var(--text-primary);
+  background: var(--surface-soft);
+  text-decoration: none;
+}
+
+.unalignedGrid li a:hover {
+  background: var(--routine);
+}
+
+.unalignedGrid li small {
+  grid-column: 1;
+  color: var(--text-muted);
+}
+
+.standardList {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 14px;
+}
+
+.standardList button {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 4px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 12px;
+  color: var(--text-primary);
+  background: var(--surface-card);
+  text-align: left;
+  cursor: pointer;
+}
+
+.standardList button:hover {
+  background: var(--routine);
+}
+
+.standardList strong {
+  color: var(--heading);
+}
+
+.standardList span {
+  color: var(--text-secondary);
+}
+
+@media (max-width: 900px) {
+  .metrics,
+  .entityCards,
+  .unalignedGrid,
+  .standardList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .sectionHeading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .metrics,
+  .entityCards,
+  .unalignedGrid,
+  .standardList {
+    grid-template-columns: 1fr;
+  }
+
+  .dimensionField {
+    width: 100%;
+  }
+}

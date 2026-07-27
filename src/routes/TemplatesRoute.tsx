@@ -1,5 +1,6 @@
 import { Archive, LayoutTemplate, Pencil, Plus, RotateCcw, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 
 import { classroomDb } from '@/data/db/ClassroomDatabase';
@@ -32,6 +33,8 @@ function labels(values: readonly string[]): string {
 }
 
 export function TemplatesRoute() {
+  const [searchParams] = useSearchParams();
+  const requestedTemplateId = searchParams.get('template');
   const data = useLiveQuery(async () => {
     const [
       templateValues,
@@ -77,7 +80,7 @@ export function TemplatesRoute() {
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<'all' | LessonTemplateStatus>('active');
   const [templateFormatId, setTemplateFormatId] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(requestedTemplateId);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -94,6 +97,13 @@ export function TemplatesRoute() {
   );
   const selected =
     (data?.views ?? []).find((template) => template.id === selectedId) ?? visible[0] ?? null;
+
+  useEffect(() => {
+    if (!requestedTemplateId) return;
+    setSelectedId(requestedTemplateId);
+    setCreating(false);
+    setEditing(false);
+  }, [requestedTemplateId]);
 
   useEffect(() => {
     if (creating) return;
