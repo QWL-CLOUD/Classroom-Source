@@ -1,59 +1,47 @@
 import { z } from 'zod';
 
 import {
+  categoryAssignmentSchema,
   contextMembershipSchema,
   learnerContextSchema,
+  lessonPlanSchema,
+  lessonSeriesSchema,
   scheduleBlockSchema,
+  standardAlignmentSchema,
+  type CategoryAssignment,
   type ContextMembership,
   type LearnerContext,
+  type LessonPlan,
+  type LessonSeries,
   type ScheduleBlock,
+  type StandardAlignment,
 } from '@/domain/models/entities';
 
 export const SCHOOL_YEAR_ROLLOVER_COMMAND_PREFIX = 'school-year-rollover.';
 
-const putLearnerContextOperationSchema = z.object({
-  table: z.literal('learnerContexts'),
-  action: z.literal('put'),
-  record: learnerContextSchema,
-});
+function putSchema<T extends z.ZodTypeAny>(table: string, record: T) {
+  return z.object({ table: z.literal(table), action: z.literal('put'), record });
+}
 
-const deleteLearnerContextOperationSchema = z.object({
-  table: z.literal('learnerContexts'),
-  action: z.literal('delete'),
-  id: z.string().min(1),
-});
-
-const putContextMembershipOperationSchema = z.object({
-  table: z.literal('contextMemberships'),
-  action: z.literal('put'),
-  record: contextMembershipSchema,
-});
-
-const deleteContextMembershipOperationSchema = z.object({
-  table: z.literal('contextMemberships'),
-  action: z.literal('delete'),
-  id: z.string().min(1),
-});
-
-const putScheduleBlockOperationSchema = z.object({
-  table: z.literal('scheduleBlocks'),
-  action: z.literal('put'),
-  record: scheduleBlockSchema,
-});
-
-const deleteScheduleBlockOperationSchema = z.object({
-  table: z.literal('scheduleBlocks'),
-  action: z.literal('delete'),
-  id: z.string().min(1),
-});
+function deleteSchema(table: string) {
+  return z.object({ table: z.literal(table), action: z.literal('delete'), id: z.string().min(1) });
+}
 
 export const schoolYearRolloverOperationSchema = z.union([
-  putLearnerContextOperationSchema,
-  deleteLearnerContextOperationSchema,
-  putContextMembershipOperationSchema,
-  deleteContextMembershipOperationSchema,
-  putScheduleBlockOperationSchema,
-  deleteScheduleBlockOperationSchema,
+  putSchema('learnerContexts', learnerContextSchema),
+  deleteSchema('learnerContexts'),
+  putSchema('contextMemberships', contextMembershipSchema),
+  deleteSchema('contextMemberships'),
+  putSchema('scheduleBlocks', scheduleBlockSchema),
+  deleteSchema('scheduleBlocks'),
+  putSchema('lessonSeries', lessonSeriesSchema),
+  deleteSchema('lessonSeries'),
+  putSchema('lessonPlans', lessonPlanSchema),
+  deleteSchema('lessonPlans'),
+  putSchema('standardAlignments', standardAlignmentSchema),
+  deleteSchema('standardAlignments'),
+  putSchema('categoryAssignments', categoryAssignmentSchema),
+  deleteSchema('categoryAssignments'),
 ]);
 
 export const schoolYearRolloverCommandSchema = z.object({
@@ -68,55 +56,43 @@ export interface SchoolYearRolloverCommandPair {
   inverse: SchoolYearRolloverCommand;
 }
 
-export function putRolloverLearnerContext(record: LearnerContext): SchoolYearRolloverOperation {
-  return schoolYearRolloverOperationSchema.parse({
-    table: 'learnerContexts',
-    action: 'put',
-    record,
-  });
-}
-
-export function deleteRolloverLearnerContext(id: string): SchoolYearRolloverOperation {
-  return schoolYearRolloverOperationSchema.parse({
-    table: 'learnerContexts',
-    action: 'delete',
-    id,
-  });
-}
-
-export function putRolloverContextMembership(
-  record: ContextMembership,
+function put(
+  table: SchoolYearRolloverOperation['table'],
+  record: unknown,
 ): SchoolYearRolloverOperation {
-  return schoolYearRolloverOperationSchema.parse({
-    table: 'contextMemberships',
-    action: 'put',
-    record,
-  });
+  return schoolYearRolloverOperationSchema.parse({ table, action: 'put', record });
 }
 
-export function deleteRolloverContextMembership(id: string): SchoolYearRolloverOperation {
-  return schoolYearRolloverOperationSchema.parse({
-    table: 'contextMemberships',
-    action: 'delete',
-    id,
-  });
+function remove(
+  table: SchoolYearRolloverOperation['table'],
+  id: string,
+): SchoolYearRolloverOperation {
+  return schoolYearRolloverOperationSchema.parse({ table, action: 'delete', id });
 }
 
-export function putRolloverScheduleBlock(record: ScheduleBlock): SchoolYearRolloverOperation {
-  return schoolYearRolloverOperationSchema.parse({
-    table: 'scheduleBlocks',
-    action: 'put',
-    record,
-  });
-}
+export const putRolloverLearnerContext = (record: LearnerContext) => put('learnerContexts', record);
+export const deleteRolloverLearnerContext = (id: string) => remove('learnerContexts', id);
 
-export function deleteRolloverScheduleBlock(id: string): SchoolYearRolloverOperation {
-  return schoolYearRolloverOperationSchema.parse({
-    table: 'scheduleBlocks',
-    action: 'delete',
-    id,
-  });
-}
+export const putRolloverContextMembership = (record: ContextMembership) =>
+  put('contextMemberships', record);
+export const deleteRolloverContextMembership = (id: string) => remove('contextMemberships', id);
+
+export const putRolloverScheduleBlock = (record: ScheduleBlock) => put('scheduleBlocks', record);
+export const deleteRolloverScheduleBlock = (id: string) => remove('scheduleBlocks', id);
+
+export const putRolloverLessonSeries = (record: LessonSeries) => put('lessonSeries', record);
+export const deleteRolloverLessonSeries = (id: string) => remove('lessonSeries', id);
+
+export const putRolloverLessonPlan = (record: LessonPlan) => put('lessonPlans', record);
+export const deleteRolloverLessonPlan = (id: string) => remove('lessonPlans', id);
+
+export const putRolloverStandardAlignment = (record: StandardAlignment) =>
+  put('standardAlignments', record);
+export const deleteRolloverStandardAlignment = (id: string) => remove('standardAlignments', id);
+
+export const putRolloverCategoryAssignment = (record: CategoryAssignment) =>
+  put('categoryAssignments', record);
+export const deleteRolloverCategoryAssignment = (id: string) => remove('categoryAssignments', id);
 
 export function createSchoolYearRolloverCommand(
   operations: readonly SchoolYearRolloverOperation[],

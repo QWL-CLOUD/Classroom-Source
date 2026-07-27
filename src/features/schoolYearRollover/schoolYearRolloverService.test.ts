@@ -10,31 +10,32 @@ import { SchoolYearRolloverService } from './schoolYearRolloverService';
 let database: ClassroomDatabase;
 let service: SchoolYearRolloverService;
 let history: EditHistoryService;
-let idQueue: string[];
+let ids: string[];
 
 beforeEach(async () => {
-  database = new ClassroomDatabase(`advanced-rollover-${crypto.randomUUID()}`);
+  database = new ClassroomDatabase(`instructional-rollover-${crypto.randomUUID()}`);
   await database.open();
-  idQueue = [];
+  ids = [];
   service = new SchoolYearRolloverService(database, {
-    createId: () => idQueue.shift() ?? crypto.randomUUID(),
-    now: () => '2026-07-27T18:00:00.000Z',
+    createId: () => ids.shift() ?? crypto.randomUUID(),
+    now: () => '2027-07-01T12:00:00.000Z',
   });
-  history = new EditHistoryService(database, { now: () => '2026-07-27T19:00:00.000Z' });
+  history = new EditHistoryService(database, { now: () => '2027-07-01T13:00:00.000Z' });
+
   await database.schoolYears.bulkPut([
     {
       id: 'source-year',
       label: '2026–2027',
-      startsOn: '2026-07-01',
-      endsOn: '2027-06-30',
+      startsOn: '2026-08-24',
+      endsOn: '2027-06-18',
       active: true,
       lifecycleState: 'active',
     },
     {
       id: 'target-year',
       label: '2027–2028',
-      startsOn: '2027-07-01',
-      endsOn: '2028-06-30',
+      startsOn: '2027-08-23',
+      endsOn: '2028-06-16',
       active: false,
       lifecycleState: 'active',
     },
@@ -48,9 +49,9 @@ beforeEach(async () => {
       status: 'active',
     },
     {
-      id: 'source-learner',
+      id: 'source-student',
       kind: 'individual',
-      name: 'Avery',
+      name: 'Student A',
       schoolYearId: 'source-year',
       status: 'active',
     },
@@ -58,24 +59,45 @@ beforeEach(async () => {
   await database.contextMemberships.put({
     id: 'source-membership',
     containerContextId: 'source-class',
-    memberContextId: 'source-learner',
+    memberContextId: 'source-student',
   });
-  await database.scheduleBlocks.put({
-    id: 'source-schedule',
+  await database.lessonSeries.put({
+    id: 'source-series',
     contextId: 'source-class',
-    title: 'Math',
-    subject: 'Math',
-    category: 'Teaching',
-    kind: 'teachable',
-    weekdays: [1],
+    title: 'Unit 1',
+    subject: 'Chinese',
+    lifecycleState: 'active',
+  });
+  await database.lessonPlans.put({
+    id: 'source-plan',
+    contextId: 'source-class',
+    title: 'Lesson 1',
+    subject: 'Chinese',
+    workflowState: 'ready',
+    seriesId: 'source-series',
+    sequence: 0,
+    lessonFlow: [{ id: 'source-step', title: 'Opening', phase: 'opening' }],
+    createdAt: '2026-07-01T12:00:00.000Z',
+    updatedAt: '2026-07-01T12:00:00.000Z',
+  });
+  await database.sessionOccurrences.put({
+    id: 'source-session',
+    lessonPlanId: 'source-plan',
+    contextId: 'source-class',
+    date: '2026-09-01',
     startMinute: 540,
     endMinute: 600,
-    effectiveFrom: '2026-07-01',
-    effectiveTo: '2027-06-30',
-    planningEnabled: true,
-    bumpEnabled: true,
-    showInWeek: true,
-    sortOrder: 0,
+    deliveryState: 'completed',
+    completedAt: '2026-09-01T15:00:00.000Z',
+  });
+  await database.standardAlignments.put({
+    id: 'source-alignment',
+    standardId: 'standard-1',
+    targetType: 'lesson-plan',
+    targetId: 'source-plan',
+    lessonFlowStepId: 'source-step',
+    scopeKey: 'lesson-plan:source-plan:step:source-step',
+    createdAt: '2026-07-01T12:00:00.000Z',
   });
 });
 
@@ -83,13 +105,86 @@ afterEach(async () => {
   await database.delete();
 });
 
-describe('SchoolYearRolloverService', () => {
-  it('commits one protected transaction and remains globally undoable and redoable', async () => {
-    idQueue = [
+describe('SchoolYearRolloverService instructional repair', () => {
+  it('copies instructional content, protects dates, excludes memberships and remains undoable', async () => {
+    ids = [
       'target-class',
-      'target-learner',
-      'target-membership',
-      'target-schedule',
+      'target-series',
+      'target-step',
+      'target-plan',
+      'target-alignment',
+      'snapshot-id',
+      'snapshot-backup-id',
+      'log-id',
+    ];
+    const beforeYears = await database.schoolYears.toArray();
+    const preview = await service.preview({
+      sourceSchoolYearId: 'source-year',
+      targetSchoolYearId: 'target-year',
+      selectedPlanIds: ['source-plan'],
+      copySchedule: false,
+      selectedScheduleBlockIds: [],
+    });
+    const result = await service.commit(preview);
+
+    expect(result).toMatchObject({
+      createdContextCount: 1,
+      createdSeriesCount: 1,
+      createdPlanCount: 1,
+      createdStandardAlignmentCount: 1,
+      safetySnapshot: { kind: 'pre-rollover' },
+    });
+    expect(await database.lessonPlans.get('target-plan')).toMatchObject({
+      contextId: 'target-class',
+      seriesId: 'target-series',
+      workflowState: 'draft',
+      rolledOverFromPlanId: 'source-plan',
+    });
+    expect(await database.standardAlignments.get('target-alignment')).toMatchObject({
+      targetId: 'target-plan',
+      lessonFlowStepId: 'target-step',
+    });
+    expect(await database.contextMemberships.count()).toBe(1);
+    expect(await database.sessionOccurrences.count()).toBe(1);
+    expect(await database.schoolYears.toArray()).toEqual(beforeYears);
+
+    await history.undo();
+    expect(await database.lessonPlans.get('target-plan')).toBeUndefined();
+    expect(await database.lessonSeries.get('target-series')).toBeUndefined();
+    expect(await database.learnerContexts.get('target-class')).toBeUndefined();
+    expect(await database.contextMemberships.count()).toBe(1);
+    expect(await database.sessionOccurrences.count()).toBe(1);
+    expect(await database.schoolYears.toArray()).toEqual(beforeYears);
+
+    await history.redo();
+    expect(await database.lessonPlans.get('target-plan')).toBeDefined();
+    expect(await database.schoolYears.toArray()).toEqual(beforeYears);
+  });
+
+  it('rejects a stale preview before creating a safety snapshot', async () => {
+    ids = ['target-class', 'target-series', 'target-step', 'target-plan', 'target-alignment'];
+    const preview = await service.preview({
+      sourceSchoolYearId: 'source-year',
+      targetSchoolYearId: 'target-year',
+      selectedPlanIds: ['source-plan'],
+      copySchedule: false,
+      selectedScheduleBlockIds: [],
+    });
+    await database.schoolYears.update('source-year', { startsOn: '2026-08-25' });
+    await expect(service.commit(preview)).rejects.toThrow(/Generate a new preview/);
+    expect(await database.backupSnapshots.count()).toBe(0);
+    expect(
+      (await database.lessonPlans.toArray()).filter((plan) => plan.contextId !== 'source-class'),
+    ).toEqual([]);
+  });
+
+  it('rolls back the safety snapshot and copied records if a plan write fails', async () => {
+    ids = [
+      'target-class',
+      'target-series',
+      'target-step',
+      'target-plan',
+      'target-alignment',
       'snapshot-id',
       'snapshot-backup-id',
       'log-id',
@@ -97,85 +192,20 @@ describe('SchoolYearRolloverService', () => {
     const preview = await service.preview({
       sourceSchoolYearId: 'source-year',
       targetSchoolYearId: 'target-year',
-      selectedContextIds: ['source-class', 'source-learner'],
-      copySchedule: true,
-      selectedScheduleBlockIds: ['source-schedule'],
-    });
-
-    const result = await service.commit(preview);
-
-    expect(result).toMatchObject({
-      createdContextCount: 2,
-      createdMembershipCount: 1,
-      createdScheduleBlockCount: 1,
-      safetySnapshot: { kind: 'pre-rollover' },
-    });
-    expect(await database.learnerContexts.get('target-class')).toMatchObject({
-      schoolYearId: 'target-year',
-    });
-    expect(await database.contextMemberships.get('target-membership')).toMatchObject({
-      containerContextId: 'target-class',
-      memberContextId: 'target-learner',
-    });
-    expect(await database.scheduleBlocks.get('target-schedule')).toMatchObject({
-      contextId: 'target-class',
-      effectiveFrom: '2027-07-01',
-      effectiveTo: '2028-06-30',
-    });
-    expect(await database.schoolYears.get('target-year')).toMatchObject({ active: false });
-
-    await history.undo();
-    expect(await database.learnerContexts.get('target-class')).toBeUndefined();
-    expect(await database.contextMemberships.get('target-membership')).toBeUndefined();
-    expect(await database.scheduleBlocks.get('target-schedule')).toBeUndefined();
-    expect(await database.backupSnapshots.get(result.safetySnapshot.id)).toBeDefined();
-
-    await history.redo();
-    expect(await database.learnerContexts.get('target-class')).toBeDefined();
-    expect(await database.scheduleBlocks.get('target-schedule')).toBeDefined();
-  });
-
-  it('rejects a stale preview before creating a safety snapshot or user records', async () => {
-    idQueue = ['target-class'];
-    const preview = await service.preview({
-      sourceSchoolYearId: 'source-year',
-      targetSchoolYearId: 'target-year',
-      selectedContextIds: ['source-class'],
+      selectedPlanIds: ['source-plan'],
       copySchedule: false,
       selectedScheduleBlockIds: [],
     });
-    await database.learnerContexts.update('source-class', { name: 'Grade 3 updated' });
-
-    await expect(service.commit(preview)).rejects.toThrow(/Generate a new preview/);
-    expect(await database.backupSnapshots.count()).toBe(0);
-    expect(
-      (await database.learnerContexts.toArray()).filter(
-        (value) => value.schoolYearId === 'target-year',
-      ),
-    ).toEqual([]);
-  });
-
-  it('rolls back the safety snapshot and copied records if a rollover write fails', async () => {
-    idQueue = ['target-class', 'snapshot-id', 'snapshot-backup-id', 'log-id'];
-    const preview = await service.preview({
-      sourceSchoolYearId: 'source-year',
-      targetSchoolYearId: 'target-year',
-      selectedContextIds: ['source-class'],
-      copySchedule: false,
-      selectedScheduleBlockIds: [],
+    database.lessonPlans.hook('creating', () => {
+      throw new Error('Synthetic instructional rollover failure');
     });
-    database.learnerContexts.hook('creating', (primaryKey, record) => {
-      void primaryKey;
-      if (record.schoolYearId === 'target-year') throw new Error('Synthetic rollover failure');
-    });
-
-    await expect(service.commit(preview)).rejects.toThrow(/Synthetic rollover failure/);
+    await expect(service.commit(preview)).rejects.toThrow(
+      /Synthetic instructional rollover failure/,
+    );
     expect(await database.backupSnapshots.count()).toBe(0);
     expect(await database.changeLog.count()).toBe(0);
-    expect(
-      (await database.learnerContexts.toArray()).filter(
-        (value) => value.schoolYearId === 'target-year',
-      ),
-    ).toEqual([]);
+    expect(await database.lessonPlans.count()).toBe(1);
+    expect(await database.lessonSeries.count()).toBe(1);
+    expect(await database.learnerContexts.count()).toBe(2);
   });
 });

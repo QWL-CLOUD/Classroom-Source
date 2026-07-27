@@ -7,16 +7,8 @@ export async function applySchoolYearRolloverOperations(
   operations: readonly SchoolYearRolloverOperation[],
 ): Promise<void> {
   for (const operation of operations) {
-    if (operation.table === 'learnerContexts') {
-      if (operation.action === 'put') await db.learnerContexts.put(operation.record);
-      else await db.learnerContexts.delete(operation.id);
-    } else if (operation.table === 'contextMemberships') {
-      if (operation.action === 'put') await db.contextMemberships.put(operation.record);
-      else await db.contextMemberships.delete(operation.id);
-    } else if (operation.action === 'put') {
-      await db.scheduleBlocks.put(operation.record);
-    } else {
-      await db.scheduleBlocks.delete(operation.id);
-    }
+    const table = db.table(operation.table);
+    if (operation.action === 'put') await table.put(operation.record);
+    else await table.delete(operation.id);
   }
 }
