@@ -65,6 +65,42 @@ afterEach(async () => {
 });
 
 describe('Student and roster foundation', () => {
+  it('creates a Student and roster membership as one atomic undoable action', async () => {
+    ids = ['student-new', 'membership-new', 'log-create-and-add'];
+
+    const result = await mutation.createStudentAndAddToRoster(
+      'group-1',
+      {
+        name: 'Elena Park',
+        preferredName: 'Ellie',
+        notes: 'Created from the Group roster.',
+      },
+      'Student',
+    );
+
+    expect(result.student).toMatchObject({
+      id: 'student-new',
+      name: 'Elena Park',
+      preferredName: 'Ellie',
+    });
+    expect(result.membership).toMatchObject({
+      id: 'membership-new',
+      contextId: 'group-1',
+      studentId: 'student-new',
+      role: 'Student',
+    });
+    expect(await database.studentRecords.count()).toBe(1);
+    expect(await database.rosterMemberships.count()).toBe(1);
+
+    await history.undo();
+    expect(await database.studentRecords.get('student-new')).toBeUndefined();
+    expect(await database.rosterMemberships.get('membership-new')).toBeUndefined();
+
+    await history.redo();
+    expect(await database.studentRecords.get('student-new')).toBeDefined();
+    expect(await database.rosterMemberships.get('membership-new')).toBeDefined();
+  });
+
   it('keeps Class, Group, and Individual as peer contexts with independent roster rules', async () => {
     ids = [
       'student-1',
