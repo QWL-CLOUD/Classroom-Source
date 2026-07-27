@@ -1,0 +1,126 @@
+import 'fake-indexeddb/auto';
+
+import Dexie from 'dexie';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { ClassroomDatabase } from '@/data/db/ClassroomDatabase';
+
+import {
+  buildRestorePreview,
+  createBackupEnvelope,
+  emptyBackupTables,
+  serializeBackupEnvelope,
+} from './backupFormat';
+import { BackupRecoveryService } from './backupService';
+
+const names: string[] = [];
+const firstTime = '2026-07-27T12:00:00.000Z';
+const secondTime = '2026-07-27T12:00:01.000Z';
+let database: ClassroomDatabase;
+
+function task(id: string, title: string) {
+  return {
+    id,
+    title,
+    status: 'active' as const,
+    order: 0,
+    createdAt: firstTime,
+    updatedAt: firstTime,
+  };
+}
+
+beforeEach(async () => {
+  const name = `backup-recovery-${crypto.randomUUID()}`;
+  names.push(name);
+  database = new ClassroomDatabase(name);
+  await database.open();
+});
+
+afterEach(async () => {
+  database.close();
+  await Promise.all(names.splice(0).map((name) => Dexie.delete(name)));
+});
+
+describe('BackupRecoveryService', () => {
+  it('exports all user tables while excluding internal recovery tables', async () => {
+    await database.tasks.put(task('current-task', 'Current task'));
+    await database.backupSnapshots.put({
+      id: 'internal-snapshot',
+      kind: 'pre-restore',
+      sourceFormat: 'classroom-v20-backup-v1',
+      databaseSchemaVersion: 10,
+      recordCount: 0,
+      payloadJson: '{}',
+      createdAt: firstTime,
+    });
+    const service = new BackupRecoveryService(database, {
+      createId: () => 'manual-backup',
+      now: () => firstTime,
+    });
+
+    const envelope = await service.createBackup();
+
+    expect(envelope.tables.tasks).toEqual([task('current-task', 'Current task')]);
+    expect(envelope.tables).not.toHaveProperty('backupSnapshots');
+    expect(envelope.tableCounts.tasks).toBe(1);
+  });
+
+  it('creates a safety backup, replaces data atomically, and preserves quarantine evidence', async () => {
+    await database.tasks.put(task('old-task', 'Before restore'));
+    const incoming = emptyBackupTables();
+    incoming.tasks.push(task('new-task', 'After restore'));
+    const preview = buildRestorePreview(
+      serializeBackupEnvelope(
+        createBackupEnvelope(incoming, { backupId: 'incoming-backup', exportedAt: firstTime }),
+      ),
+    );
+    preview.quarantined.push({
+      tableName: 'futureWidgets',
+      recordKey: 'future-1',
+      reason: 'Unknown future table.',
+      rawJson: '{"id":"future-1"}',
+    });
+    preview.quarantineCount = 1;
+    const ids = ['safety-backup', 'snapshot-1', 'run-1', 'quarantine-1'];
+    const times = [firstTime, secondTime];
+    const service = new BackupRecoveryService(database, {
+      createId: () => ids.shift() ?? crypto.randomUUID(),
+      now: () => times.shift() ?? secondTime,
+    });
+
+    const result = await service.restore(preview);
+
+    expect(await database.tasks.toArray()).toEqual([task('new-task', 'After restore')]);
+    expect(await database.backupSnapshots.count()).toBe(1);
+    expect(await database.restoreRuns.count()).toBe(1);
+    expect(await database.restoreQuarantineRecords.count()).toBe(1);
+    expect(result.safetySnapshot.id).toBe('snapshot-1');
+    const safetyPreview = buildRestorePreview(result.safetySnapshot.payloadJson);
+    expect(safetyPreview.validTables.tasks).toEqual([task('old-task', 'Before restore')]);
+  });
+
+  it('rolls back the safety snapshot and every table change if restore writing fails', async () => {
+    await database.tasks.put(task('old-task', 'Before failed restore'));
+    const incoming = emptyBackupTables();
+    incoming.tasks.push(task('new-task', 'Should not persist'));
+    const preview = buildRestorePreview(
+      serializeBackupEnvelope(
+        createBackupEnvelope(incoming, { backupId: 'failing-backup', exportedAt: firstTime }),
+      ),
+    );
+    const service = new BackupRecoveryService(database, {
+      createId: () => crypto.randomUUID(),
+      now: () => firstTime,
+    });
+    database.tasks.hook('creating', () => {
+      throw new Error('Synthetic write failure');
+    });
+
+    await expect(service.restore(preview)).rejects.toThrow(/Synthetic write failure/);
+
+    expect(await database.tasks.toArray()).toEqual([task('old-task', 'Before failed restore')]);
+    expect(await database.backupSnapshots.count()).toBe(0);
+    expect(await database.restoreRuns.count()).toBe(0);
+    expect(await database.restoreQuarantineRecords.count()).toBe(0);
+  });
+});

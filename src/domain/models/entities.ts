@@ -795,6 +795,38 @@ export const quarantineRecordSchema = z.object({
   createdAt: timestampSchema,
 });
 
+export const backupSnapshotSchema = z.object({
+  id: idSchema,
+  kind: z.literal('pre-restore'),
+  sourceFormat: z.string().min(1),
+  databaseSchemaVersion: z.number().int().positive(),
+  recordCount: z.number().int().nonnegative(),
+  payloadJson: z.string().min(1),
+  createdAt: timestampSchema,
+});
+
+export const restoreRunSchema = z.object({
+  id: idSchema,
+  sourceFormat: z.string().min(1),
+  sourceAppVersion: z.string().optional(),
+  sourceBackupId: idSchema,
+  startedAt: timestampSchema,
+  completedAt: timestampSchema.optional(),
+  status: z.enum(['committed', 'failed']),
+  safetySnapshotId: idSchema.optional(),
+  summaryJson: z.string(),
+});
+
+export const restoreQuarantineRecordSchema = z.object({
+  id: idSchema,
+  restoreRunId: idSchema,
+  tableName: z.string().min(1),
+  recordKey: z.string().optional(),
+  reason: z.string().min(1),
+  rawJson: z.string(),
+  createdAt: timestampSchema,
+});
+
 export const changeLogSchema = z.object({
   id: idSchema,
   label: z.string(),
@@ -864,5 +896,8 @@ export type CategoryAssignment = z.infer<typeof categoryAssignmentSchema>;
 export type QuickCapture = z.infer<typeof quickCaptureSchema>;
 export type MigrationRun = z.infer<typeof migrationRunSchema>;
 export type QuarantineRecord = z.infer<typeof quarantineRecordSchema>;
+export type BackupSnapshot = z.infer<typeof backupSnapshotSchema>;
+export type RestoreRun = z.infer<typeof restoreRunSchema>;
+export type RestoreQuarantineRecord = z.infer<typeof restoreQuarantineRecordSchema>;
 export type ChangeLog = z.infer<typeof changeLogSchema>;
 export type AppSetting = z.infer<typeof appSettingSchema>;
