@@ -12,7 +12,7 @@ afterEach(async () => {
 });
 
 describe('ClassroomDatabase schema upgrades', () => {
-  it('upgrades legacy data to schema v9 and adds Standards stores without losing Tasks', async () => {
+  it('upgrades legacy data to schema v10 and adds Backup & Recovery stores without losing Tasks', async () => {
     const name = `classroom-v20-upgrade-${crypto.randomUUID()}`;
     names.push(name);
     const legacy = new Dexie(name);
@@ -33,7 +33,7 @@ describe('ClassroomDatabase schema upgrades', () => {
     const upgraded = new ClassroomDatabase(name);
     await upgraded.open();
 
-    expect(upgraded.verno).toBe(9);
+    expect(upgraded.verno).toBe(10);
     expect(await upgraded.tasks.get('legacy-task')).toBeDefined();
     await upgraded.reminders.put({
       id: 'reminder-1',
@@ -144,6 +144,38 @@ describe('ClassroomDatabase schema upgrades', () => {
       createdAt: '2026-07-24T00:00:00.000Z',
     });
     expect(await upgraded.standardImportBatches.count()).toBe(1);
+
+    await upgraded.backupSnapshots.put({
+      id: 'snapshot-1',
+      kind: 'pre-restore',
+      sourceFormat: 'classroom-v20-backup-v1',
+      databaseSchemaVersion: 10,
+      recordCount: 1,
+      payloadJson: '{}',
+      createdAt: '2026-07-27T12:00:00.000Z',
+    });
+    await upgraded.restoreRuns.put({
+      id: 'restore-1',
+      sourceFormat: 'classroom-v20-backup-v1',
+      sourceAppVersion: '20.0.0-alpha.0',
+      sourceBackupId: 'backup-1',
+      startedAt: '2026-07-27T12:00:00.000Z',
+      completedAt: '2026-07-27T12:00:01.000Z',
+      status: 'committed',
+      safetySnapshotId: 'snapshot-1',
+      summaryJson: '{}',
+    });
+    await upgraded.restoreQuarantineRecords.put({
+      id: 'restore-quarantine-1',
+      restoreRunId: 'restore-1',
+      tableName: 'futureTable',
+      reason: 'Unknown table',
+      rawJson: '{}',
+      createdAt: '2026-07-27T12:00:01.000Z',
+    });
+    expect(await upgraded.backupSnapshots.count()).toBe(1);
+    expect(await upgraded.restoreRuns.count()).toBe(1);
+    expect(await upgraded.restoreQuarantineRecords.count()).toBe(1);
 
     upgraded.close();
   });

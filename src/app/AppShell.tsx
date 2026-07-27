@@ -70,7 +70,7 @@ const collapsibleNavigationGroups: Array<{
     label: 'Settings & Data',
     links: [
       { to: '/import', label: 'Import Center', icon: Import },
-      { to: '/export', label: 'Export & Backup', icon: Download, status: 'planned' },
+      { to: '/export', label: 'Export & Backup', icon: Download },
       { to: '/settings', label: 'School Years', icon: Settings },
       { to: '/system-health', label: 'System Health', icon: HeartPulse },
     ],
