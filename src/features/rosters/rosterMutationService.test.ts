@@ -147,6 +147,40 @@ describe('Student and roster foundation', () => {
     expect(await database.rosterMemberships.count()).toBe(2);
   });
 
+  it('creates a Student and Individual link as one atomic undoable action', async () => {
+    ids = ['student-linked', 'log-create-and-link'];
+
+    const result = await mutation.createStudentAndLinkIndividual('individual-1', {
+      name: 'Elena Park',
+      preferredName: 'Ellie',
+      notes: 'Created from the Individual link workspace.',
+    });
+
+    expect(result.student).toMatchObject({
+      id: 'student-linked',
+      name: 'Elena Park',
+      preferredName: 'Ellie',
+    });
+    expect(result.context).toMatchObject({
+      id: 'individual-1',
+      kind: 'individual',
+      linkedStudentId: 'student-linked',
+    });
+    expect(await database.studentRecords.count()).toBe(1);
+    expect(await database.rosterMemberships.count()).toBe(0);
+
+    await history.undo();
+    expect(await database.studentRecords.get('student-linked')).toBeUndefined();
+    expect((await database.learnerContexts.get('individual-1'))?.linkedStudentId).toBeUndefined();
+
+    await history.redo();
+    expect(await database.studentRecords.get('student-linked')).toBeDefined();
+    expect((await database.learnerContexts.get('individual-1'))?.linkedStudentId).toBe(
+      'student-linked',
+    );
+    expect(await database.rosterMemberships.count()).toBe(0);
+  });
+
   it('keeps Class, Group, and Individual as peer contexts with independent roster rules', async () => {
     ids = [
       'student-1',
