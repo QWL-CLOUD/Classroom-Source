@@ -104,7 +104,38 @@ test('Roster search clearly separates current roster filtering from Student reco
   const list = roster.getByRole('list', { name: 'Students in Import Grade 3' });
 
   await expect(list.getByLabel('Ben Lee, active student')).toBeVisible();
-  await roster.getByLabel('Search this roster').fill('missing');
+  const rosterSearch = roster.getByLabel('Search this roster');
+  await expect(rosterSearch).toBeVisible();
+  const searchPresentation = await rosterSearch.evaluate((element) => {
+    const input = element as HTMLInputElement;
+    const style = getComputedStyle(input);
+    const bounds = input.getBoundingClientRect();
+    return {
+      nestedInLabel: input.closest('label') !== null,
+      borderTopWidth: style.borderTopWidth,
+      borderRightWidth: style.borderRightWidth,
+      borderBottomWidth: style.borderBottomWidth,
+      borderLeftWidth: style.borderLeftWidth,
+      outlineStyle: style.outlineStyle,
+      boxShadow: style.boxShadow,
+      type: input.type,
+      width: Math.round(bounds.width),
+      height: Math.round(bounds.height),
+    };
+  });
+  expect(searchPresentation).toMatchObject({
+    nestedInLabel: false,
+    borderTopWidth: '0px',
+    borderRightWidth: '0px',
+    borderBottomWidth: '0px',
+    borderLeftWidth: '0px',
+    outlineStyle: 'none',
+    boxShadow: 'none',
+    type: 'search',
+  });
+  expect(searchPresentation.width).toBeGreaterThan(80);
+  expect(searchPresentation.height).toBeGreaterThanOrEqual(40);
+  await rosterSearch.fill('missing');
   await expect(roster.getByRole('heading', { name: 'No matching students' })).toBeVisible();
   await roster.getByRole('button', { name: 'Clear roster search' }).click();
   await expect(list.getByLabel('Ben Lee, active student')).toBeVisible();

@@ -132,8 +132,7 @@
 .addCard input,
 .addCard select,
 .addCard textarea,
-.previewDecision select,
-.searchControl input {
+.previewDecision select {
   width: 100%;
   min-width: 0;
   padding: 9px 10px;
@@ -151,8 +150,7 @@
 .addCard input:focus,
 .addCard select:focus,
 .addCard textarea:focus,
-.previewDecision select:focus,
-.searchControl input:focus {
+.previewDecision select:focus {
   outline: 3px solid rgb(53 95 84 / 22%);
   border-color: var(--accent-strong);
 }
@@ -350,30 +348,57 @@
 }
 
 .searchControl {
-  min-width: min(100%, 340px);
+  width: min(100%, 340px);
+  min-width: 0;
+  min-height: 44px;
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr) auto;
-  gap: 7px;
+  gap: 8px;
   align-items: center;
-  padding-left: 10px;
+  padding: 0 6px 0 10px;
   border: 1px solid var(--border-soft);
   border-radius: 11px;
   background: #fff;
 }
 
-.searchControl label {
-  min-width: 0;
-}
-
 .searchControl:focus-within {
   outline: 3px solid rgb(53 95 84 / 22%);
+  outline-offset: 1px;
   border-color: var(--accent-strong);
 }
 
-.searchControl input {
-  border: 0;
+input.rosterSearchInput.rosterSearchInput {
+  width: 100%;
+  min-width: 80px;
+  height: 42px;
+  display: block;
+  padding: 0;
+  border: none !important;
+  border-top-width: 0 !important;
+  border-right-width: 0 !important;
+  border-bottom-width: 0 !important;
+  border-left-width: 0 !important;
+  border-style: none !important;
+  border-color: transparent !important;
+  border-radius: 0 !important;
   outline: 0;
-  padding-left: 0;
+  color: var(--text-primary);
+  background: transparent !important;
+  box-shadow: none !important;
+  font: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input.rosterSearchInput.rosterSearchInput:focus {
+  border: none !important;
+  outline: 0;
+  box-shadow: none !important;
+}
+
+input.rosterSearchInput.rosterSearchInput::-webkit-search-cancel-button {
+  display: none;
+  -webkit-appearance: none;
 }
 
 .clearSearch {
