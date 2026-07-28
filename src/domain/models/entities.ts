@@ -520,6 +520,212 @@ export const sessionOccurrenceSchema = z
     path: ['endMinute'],
   });
 
+export const assessmentEvidenceKindSchema = z.enum(['score', 'proficiency', 'observation']);
+
+export const assessmentEvidenceStatusSchema = z.enum(['active', 'archived']);
+
+export const assessmentEvidenceContextSnapshotSchema = z.object({
+  kind: z.enum(['class', 'group', 'individual']),
+  name: z.string().trim().min(1).max(240),
+});
+
+export const assessmentEvidenceLessonPlanSnapshotSchema = z.object({
+  title: z.string().trim().min(1).max(240),
+});
+
+export const assessmentEvidenceSessionSnapshotSchema = z
+  .object({
+    date: localDateSchema,
+    startMinute: minuteSchema,
+    endMinute: minuteSchema,
+  })
+  .refine((value) => value.endMinute > value.startMinute, {
+    message: 'The evidence Session snapshot end time must be after its start time.',
+    path: ['endMinute'],
+  });
+
+export const assessmentEvidenceAssessmentSnapshotSchema = z.object({
+  title: z.string().trim().min(1).max(240),
+  assessmentKind: libraryAssessmentKindSchema.optional(),
+});
+
+export const assessmentEvidenceStandardSnapshotSchema = z.object({
+  standardId: idSchema,
+  code: z.string().trim().min(1).max(160),
+  statement: z.string().trim().min(1).max(10_000),
+});
+
+export const assessmentEvidenceSourceSnapshotsSchema = z.object({
+  context: assessmentEvidenceContextSnapshotSchema.optional(),
+  lessonPlan: assessmentEvidenceLessonPlanSnapshotSchema.optional(),
+  sessionOccurrence: assessmentEvidenceSessionSnapshotSchema.optional(),
+  assessment: assessmentEvidenceAssessmentSnapshotSchema.optional(),
+  standards: z.array(assessmentEvidenceStandardSnapshotSchema).max(500).optional(),
+});
+
+export const assessmentEvidenceScoreSchema = z
+  .object({
+    value: z.number().finite().optional(),
+    maximum: z.number().finite().positive().optional(),
+    label: z.string().trim().min(1).max(120).optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.value === undefined && !value.label) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Score evidence requires a numeric value or categorical label.',
+        path: ['value'],
+      });
+    }
+    if (value.maximum !== undefined && value.value === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A score maximum requires a numeric score value.',
+        path: ['maximum'],
+      });
+    }
+  });
+
+export const assessmentEvidenceProficiencySchema = z.object({
+  levelId: idSchema.optional(),
+  label: z.string().trim().min(1).max(120),
+  rank: z.number().int().nonnegative().optional(),
+  scaleKey: z.string().trim().min(1).max(120).optional(),
+  scaleLabel: z.string().trim().min(1).max(240).optional(),
+});
+
+export const assessmentEvidenceObservationSchema = z.object({
+  text: z.string().trim().min(1).max(10_000),
+});
+
+const assessmentEvidenceStandardIdsSchema = z
+  .array(idSchema)
+  .max(500)
+  .superRefine((values, context) => {
+    const seen = new Set<string>();
+    values.forEach((value, index) => {
+      if (seen.has(value)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'Assessment evidence cannot link the same Standard more than once.',
+          path: [index],
+        });
+      }
+      seen.add(value);
+    });
+  })
+  .default([]);
+
+const assessmentEvidenceBaseShape = {
+  id: idSchema,
+  studentId: idSchema,
+  schoolYearId: idSchema,
+  occurredOn: localDateSchema,
+  title: z.string().trim().min(1).max(240),
+  contextId: idSchema.optional(),
+  lessonPlanId: idSchema.optional(),
+  sessionOccurrenceId: idSchema.optional(),
+  assessmentId: idSchema.optional(),
+  standardIds: assessmentEvidenceStandardIdsSchema,
+  sourceSnapshots: assessmentEvidenceSourceSnapshotsSchema.optional(),
+  notes: z.string().max(5000).optional(),
+  status: assessmentEvidenceStatusSchema.default('active'),
+  createdAt: timestampSchema,
+  updatedAt: timestampSchema,
+  archivedAt: timestampSchema.optional(),
+};
+
+export const assessmentEvidenceRecordSchema = z
+  .discriminatedUnion('kind', [
+    z.object({
+      ...assessmentEvidenceBaseShape,
+      kind: z.literal('score'),
+      score: assessmentEvidenceScoreSchema,
+      proficiency: z.never().optional(),
+      observation: z.never().optional(),
+    }),
+    z.object({
+      ...assessmentEvidenceBaseShape,
+      kind: z.literal('proficiency'),
+      score: z.never().optional(),
+      proficiency: assessmentEvidenceProficiencySchema,
+      observation: z.never().optional(),
+    }),
+    z.object({
+      ...assessmentEvidenceBaseShape,
+      kind: z.literal('observation'),
+      score: z.never().optional(),
+      proficiency: z.never().optional(),
+      observation: assessmentEvidenceObservationSchema,
+    }),
+  ])
+  .superRefine((value, context) => {
+    if (value.status === 'active' && value.archivedAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Active assessment evidence cannot contain archivedAt.',
+        path: ['archivedAt'],
+      });
+    }
+    if (value.status === 'archived' && !value.archivedAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Archived assessment evidence requires archivedAt.',
+        path: ['archivedAt'],
+      });
+    }
+
+    const snapshots = value.sourceSnapshots;
+    if (snapshots?.context && !value.contextId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A context snapshot requires contextId.',
+        path: ['sourceSnapshots', 'context'],
+      });
+    }
+    if (snapshots?.lessonPlan && !value.lessonPlanId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A Lesson Plan snapshot requires lessonPlanId.',
+        path: ['sourceSnapshots', 'lessonPlan'],
+      });
+    }
+    if (snapshots?.sessionOccurrence && !value.sessionOccurrenceId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A Session snapshot requires sessionOccurrenceId.',
+        path: ['sourceSnapshots', 'sessionOccurrence'],
+      });
+    }
+    if (snapshots?.assessment && !value.assessmentId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An Assessment snapshot requires assessmentId.',
+        path: ['sourceSnapshots', 'assessment'],
+      });
+    }
+
+    const standardIds = new Set(value.standardIds);
+    const snapshotStandardIds = new Set<string>();
+    snapshots?.standards?.forEach((snapshot, index) => {
+      if (!standardIds.has(snapshot.standardId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'A Standard snapshot must correspond to a linked standardId.',
+          path: ['sourceSnapshots', 'standards', index, 'standardId'],
+        });
+      }
+      if (snapshotStandardIds.has(snapshot.standardId)) {
+        context.addIssue({
+          code: 'custom',
+          message: 'A Standard can only appear once in evidence snapshots.',
+          path: ['sourceSnapshots', 'standards', index, 'standardId'],
+        });
+      }
+      snapshotStandardIds.add(snapshot.standardId);
+    });
+  });
+
 export const learnerNoticeKindSchema = z.enum([
   'ongoing-support',
   'date-specific-notice',
@@ -893,6 +1099,16 @@ export const appSettingSchema = z.object({
   valueJson: z.string(),
   updatedAt: timestampSchema,
 });
+
+export type AssessmentEvidenceKind = z.infer<typeof assessmentEvidenceKindSchema>;
+export type AssessmentEvidenceStatus = z.infer<typeof assessmentEvidenceStatusSchema>;
+export type AssessmentEvidenceSourceSnapshots = z.infer<
+  typeof assessmentEvidenceSourceSnapshotsSchema
+>;
+export type AssessmentEvidenceScore = z.infer<typeof assessmentEvidenceScoreSchema>;
+export type AssessmentEvidenceProficiency = z.infer<typeof assessmentEvidenceProficiencySchema>;
+export type AssessmentEvidenceObservation = z.infer<typeof assessmentEvidenceObservationSchema>;
+export type AssessmentEvidenceRecord = z.infer<typeof assessmentEvidenceRecordSchema>;
 
 export type SchoolYear = z.infer<typeof schoolYearSchema>;
 export type LearnerContext = z.infer<typeof learnerContextSchema>;

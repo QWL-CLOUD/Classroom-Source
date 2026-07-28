@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  assessmentEvidenceRecordSchema,
   categoryValueSchema,
   learnerNoticeSchema,
   learnerServiceOccurrenceSchema,
@@ -233,5 +234,111 @@ describe('domain schemas', () => {
         archivedAt: undefined,
       }),
     ).toThrow('requires archivedAt');
+  });
+  it('keeps score, proficiency, and observation evidence structurally distinct', () => {
+    const common = {
+      id: 'evidence-1',
+      studentId: 'student-1',
+      schoolYearId: 'year-1',
+      occurredOn: '2026-07-28',
+      title: 'Reading conference',
+      standardIds: ['standard-1'],
+      status: 'active',
+      createdAt: '2026-07-28T12:00:00.000Z',
+      updatedAt: '2026-07-28T12:00:00.000Z',
+    };
+
+    expect(
+      assessmentEvidenceRecordSchema.parse({
+        ...common,
+        kind: 'score',
+        score: { value: 8, maximum: 10 },
+      }),
+    ).toMatchObject({ kind: 'score', score: { value: 8, maximum: 10 } });
+    expect(
+      assessmentEvidenceRecordSchema.parse({
+        ...common,
+        id: 'evidence-2',
+        kind: 'proficiency',
+        proficiency: { label: 'Developing', rank: 2, scaleKey: 'reading-4-point' },
+      }),
+    ).toMatchObject({ kind: 'proficiency', proficiency: { label: 'Developing' } });
+    expect(
+      assessmentEvidenceRecordSchema.parse({
+        ...common,
+        id: 'evidence-3',
+        kind: 'observation',
+        observation: { text: 'Used context clues independently.' },
+      }),
+    ).toMatchObject({ kind: 'observation' });
+
+    expect(() =>
+      assessmentEvidenceRecordSchema.parse({
+        ...common,
+        kind: 'score',
+        score: {},
+      }),
+    ).toThrow('numeric value or categorical label');
+    expect(() =>
+      assessmentEvidenceRecordSchema.parse({
+        ...common,
+        kind: 'score',
+        score: { value: 8 },
+        proficiency: { label: 'Developing' },
+      }),
+    ).toThrow();
+  });
+
+  it('requires evidence lifecycle and source snapshots to remain internally consistent', () => {
+    const evidence = {
+      id: 'evidence-snapshot',
+      studentId: 'student-1',
+      schoolYearId: 'year-1',
+      occurredOn: '2026-07-28',
+      title: 'Exit ticket',
+      kind: 'observation' as const,
+      observation: { text: 'Explained the strategy clearly.' },
+      contextId: 'class-1',
+      standardIds: ['standard-1'],
+      sourceSnapshots: {
+        context: { kind: 'class' as const, name: 'Grade 3' },
+        standards: [
+          {
+            standardId: 'standard-1',
+            code: 'RL.3.1',
+            statement: 'Ask and answer questions about a text.',
+          },
+        ],
+      },
+      status: 'archived' as const,
+      archivedAt: '2026-07-28T13:00:00.000Z',
+      createdAt: '2026-07-28T12:00:00.000Z',
+      updatedAt: '2026-07-28T13:00:00.000Z',
+    };
+
+    expect(assessmentEvidenceRecordSchema.parse(evidence)).toMatchObject({
+      status: 'archived',
+      contextId: 'class-1',
+    });
+    expect(() =>
+      assessmentEvidenceRecordSchema.parse({
+        ...evidence,
+        status: 'active',
+      }),
+    ).toThrow('cannot contain archivedAt');
+    expect(() =>
+      assessmentEvidenceRecordSchema.parse({
+        ...evidence,
+        sourceSnapshots: {
+          standards: [
+            {
+              standardId: 'standard-2',
+              code: 'RL.3.2',
+              statement: 'Retell stories.',
+            },
+          ],
+        },
+      }),
+    ).toThrow('linked standardId');
   });
 });

@@ -1,4 +1,10 @@
 import type { ClassroomDatabase } from '@/data/db/ClassroomDatabase';
+import { applyAssessmentEvidenceOperations } from '@/features/assessmentEvidence/applyAssessmentEvidenceOperations';
+import {
+  ASSESSMENT_EVIDENCE_COMMAND_PREFIX,
+  parseAssessmentEvidenceCommand,
+  type AssessmentEvidenceCommand,
+} from '@/features/assessmentEvidence/assessmentEvidenceCommands';
 import {
   CATEGORY_COMMAND_PREFIX,
   parseCategoryCommand,
@@ -81,6 +87,7 @@ import {
 } from './scheduleBlockCommands';
 
 export type SupportedEditCommand =
+  | { entity: 'assessment-evidence'; command: AssessmentEvidenceCommand }
   | { entity: 'category'; command: CategoryCommand }
   | { entity: 'calendar-event'; command: CalendarEventCommand }
   | { entity: 'schedule-block'; command: ScheduleBlockCommand }
@@ -99,6 +106,7 @@ export type SupportedEditCommand =
 
 export function isSupportedEditChangeLog(log: ChangeLog): boolean {
   return (
+    log.commandType.startsWith(ASSESSMENT_EVIDENCE_COMMAND_PREFIX) ||
     log.commandType.startsWith(CATEGORY_COMMAND_PREFIX) ||
     log.commandType.startsWith(CALENDAR_EVENT_COMMAND_PREFIX) ||
     log.commandType.startsWith(SCHEDULE_BLOCK_COMMAND_PREFIX) ||
@@ -118,6 +126,12 @@ export function isSupportedEditChangeLog(log: ChangeLog): boolean {
 }
 
 export function parseSupportedEditCommand(commandType: string, json: string): SupportedEditCommand {
+  if (commandType.startsWith(ASSESSMENT_EVIDENCE_COMMAND_PREFIX)) {
+    return {
+      entity: 'assessment-evidence',
+      command: parseAssessmentEvidenceCommand(json),
+    };
+  }
   if (commandType.startsWith(CATEGORY_COMMAND_PREFIX)) {
     return {
       entity: 'category',
@@ -215,6 +229,10 @@ export async function applySupportedEditCommand(
   db: ClassroomDatabase,
   parsed: SupportedEditCommand,
 ): Promise<void> {
+  if (parsed.entity === 'assessment-evidence') {
+    await applyAssessmentEvidenceOperations(db, parsed.command.operations);
+    return;
+  }
   if (parsed.entity === 'category') {
     for (const operation of parsed.command.operations) {
       if (operation.table === 'categoryValues') {

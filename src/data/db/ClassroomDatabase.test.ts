@@ -12,7 +12,7 @@ afterEach(async () => {
 });
 
 describe('ClassroomDatabase schema upgrades', () => {
-  it('upgrades legacy data to schema v11 and adds independent Student and roster stores without losing Tasks', async () => {
+  it('upgrades legacy data to schema v12 and adds Student, roster, and Assessment Evidence stores without losing Tasks', async () => {
     const name = `classroom-v20-upgrade-${crypto.randomUUID()}`;
     names.push(name);
     const legacy = new Dexie(name);
@@ -33,7 +33,7 @@ describe('ClassroomDatabase schema upgrades', () => {
     const upgraded = new ClassroomDatabase(name);
     await upgraded.open();
 
-    expect(upgraded.verno).toBe(11);
+    expect(upgraded.verno).toBe(12);
     expect(await upgraded.tasks.get('legacy-task')).toBeDefined();
     await upgraded.learnerContexts.put({
       id: 'class-1',
@@ -57,6 +57,20 @@ describe('ClassroomDatabase schema upgrades', () => {
     });
     expect(await upgraded.studentRecords.count()).toBe(1);
     expect(await upgraded.rosterMemberships.count()).toBe(1);
+    await upgraded.assessmentEvidence.put({
+      id: 'evidence-1',
+      studentId: 'student-1',
+      schoolYearId: 'year-1',
+      occurredOn: '2026-07-28',
+      title: 'Synthetic evidence',
+      kind: 'score',
+      score: { value: 4, maximum: 5 },
+      standardIds: [],
+      status: 'active',
+      createdAt: '2026-07-28T12:00:00.000Z',
+      updatedAt: '2026-07-28T12:00:00.000Z',
+    });
+    expect(await upgraded.assessmentEvidence.count()).toBe(1);
     await upgraded.reminders.put({
       id: 'reminder-1',
       sourceType: 'task',

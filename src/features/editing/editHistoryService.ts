@@ -39,6 +39,7 @@ export class EditHistoryService {
     const nextState = await this.db.transaction(
       'rw',
       [
+        this.db.assessmentEvidence,
         this.db.calendarEvents,
         this.db.categoryValues,
         this.db.categoryAssignments,
@@ -88,6 +89,7 @@ export class EditHistoryService {
     const nextState = await this.db.transaction(
       'rw',
       [
+        this.db.assessmentEvidence,
         this.db.calendarEvents,
         this.db.categoryValues,
         this.db.categoryAssignments,
