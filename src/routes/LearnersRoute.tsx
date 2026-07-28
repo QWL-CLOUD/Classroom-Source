@@ -37,6 +37,7 @@ import type {
 } from '@/features/learners/learnerReadModel';
 import { formatLessonSeriesPositionLabel } from '@/features/planning/lessonSeriesPresentation';
 import { planningMutationService } from '@/features/planning/planningMutationService';
+import { IndividualStudentLinkPanel } from '@/features/rosters/IndividualStudentLinkPanel';
 import { RosterWorkspacePanel } from '@/features/rosters/RosterWorkspacePanel';
 import {
   buildLearnersPageReadModel,
@@ -976,11 +977,17 @@ function emptyPlanningMessage(view: LearnerPlanningView): string {
   return 'No unscheduled lesson plans for this learner context.';
 }
 
-type LearnerWorkspaceView = 'planning' | 'roster' | 'support' | 'details';
+type LearnerWorkspaceView = 'planning' | 'student' | 'roster' | 'support' | 'details';
 type LearnerDirectoryKind = 'all' | LearnerContext['kind'];
 
 function isWorkspaceView(value: string | null): value is LearnerWorkspaceView {
-  return value === 'planning' || value === 'roster' || value === 'support' || value === 'details';
+  return (
+    value === 'planning' ||
+    value === 'student' ||
+    value === 'roster' ||
+    value === 'support' ||
+    value === 'details'
+  );
 }
 
 function getWorkspaceTabs(
@@ -989,6 +996,7 @@ function getWorkspaceTabs(
   if (kind === 'individual') {
     return [
       ['planning', 'Planning'],
+      ['student', 'Student'],
       ['support', 'Support & Notices'],
       ['details', 'Details'],
     ];
@@ -1062,7 +1070,9 @@ export function LearnersRoute() {
     [anchorDate, contextStatus, state],
   );
   const visibleWorkspaceView: LearnerWorkspaceView =
-    model?.selectedContext?.kind === 'individual' && workspaceView === 'roster'
+    model?.selectedContext &&
+    ((model.selectedContext.kind === 'individual' && workspaceView === 'roster') ||
+      (model.selectedContext.kind !== 'individual' && workspaceView === 'student'))
       ? 'planning'
       : workspaceView;
 
@@ -1524,6 +1534,8 @@ export function LearnersRoute() {
                     >
                       {view === 'planning' ? (
                         <CalendarDays aria-hidden="true" size={17} />
+                      ) : view === 'student' ? (
+                        <UserRound aria-hidden="true" size={17} />
                       ) : view === 'roster' ? (
                         <Users aria-hidden="true" size={17} />
                       ) : view === 'support' ? (
@@ -1651,6 +1663,16 @@ export function LearnersRoute() {
                   </div>
                 </section>
 
+                {model.selectedContext.kind === 'individual' ? (
+                  <div
+                    id="learner-workspace-panel-student"
+                    hidden={visibleWorkspaceView !== 'student'}
+                    role="tabpanel"
+                    aria-labelledby="learner-workspace-tab-student"
+                  >
+                    <IndividualStudentLinkPanel context={model.selectedContext} />
+                  </div>
+                ) : null}
                 {model.selectedContext.kind !== 'individual' ? (
                   <div
                     id="learner-workspace-panel-roster"

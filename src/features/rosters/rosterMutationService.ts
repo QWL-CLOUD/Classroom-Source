@@ -127,6 +127,75 @@ export class RosterMutationService {
     return result.value;
   }
 
+  async createStudentAndLinkIndividual(
+    contextId: string,
+    values: StudentRecordValues,
+  ): Promise<{ student: StudentRecord; context: LearnerContext }> {
+    const profile = studentRecordValuesSchema.parse(values);
+
+    const result = await this.db.transaction(
+      'rw',
+      [this.db.learnerContexts, this.db.studentRecords, this.db.changeLog],
+      async (): Promise<
+        CommitResult<{
+          student: StudentRecord;
+          context: LearnerContext;
+        }>
+      > => {
+        const context = await this.requireContext(contextId);
+        if (context.kind !== 'individual') {
+          throw new Error('Only an Individual context can link to a student record.');
+        }
+        if (context.status !== 'active') {
+          throw new Error('Restore the Individual context before linking a Student.');
+        }
+        if (context.linkedStudentId) {
+          throw new Error('Unlink the current Student before creating another Student link.');
+        }
+
+        const createdAt = this.now();
+        const student = studentRecordSchema.parse({
+          id: this.createId(),
+          ...profile,
+          status: 'active',
+          createdAt,
+          updatedAt: createdAt,
+        });
+        const updatedContext = learnerContextSchema.parse({
+          ...context,
+          linkedStudentId: student.id,
+        });
+
+        const commands: RosterCommandPair = {
+          forward: createRosterCommand([
+            putStudentRecordOperation(student),
+            putLinkedIndividualContextOperation(updatedContext),
+          ]),
+          inverse: createRosterCommand([
+            putLinkedIndividualContextOperation(context),
+            deleteStudentRecordOperation(student.id),
+          ]),
+        };
+        const log = this.createChangeLog(
+          'roster.student-create-and-link',
+          `Create student “${student.name}” and link to ${context.name}`,
+          commands,
+        );
+
+        await clearSupportedRedoBranch(this.db);
+        await applyRosterOperations(this.db, commands.forward.operations);
+        await this.db.changeLog.put(log);
+        return {
+          value: { student, context: updatedContext },
+          log,
+        };
+      },
+    );
+
+    this.notifyNewChange(result.log);
+    return result.value;
+  }
+
   async createStudentAndAddToRoster(
     contextId: string,
     values: StudentRecordValues,
@@ -454,6 +523,9 @@ export class RosterMutationService {
         if (context.kind !== 'individual') {
           throw new Error('Only an Individual context can link to a student record.');
         }
+        if (context.status !== 'active') {
+          throw new Error('Restore the Individual context before linking a Student.');
+        }
         const student = await this.requireStudent(studentId);
         if (student.status !== 'active') {
           throw new Error('Restore the student before linking an Individual context.');
@@ -494,6 +566,9 @@ export class RosterMutationService {
         const context = await this.requireContext(contextId);
         if (context.kind !== 'individual') {
           throw new Error('Only an Individual context can have a student link.');
+        }
+        if (context.status !== 'active') {
+          throw new Error('Restore the Individual context before unlinking a Student.');
         }
         if (!context.linkedStudentId) {
           throw new Error('This Individual context is not linked to a student.');
