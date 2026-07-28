@@ -448,18 +448,16 @@ export function RosterWorkspacePanel({ context }: { context: LearnerContext }) {
       ) : null}
 
       <div className={styles.rosterTools}>
-        <div className={styles.searchControl}>
+        <div className={styles.searchControl} role="search" aria-label="Current roster search">
           <Search aria-hidden="true" size={16} />
-          <label>
-            <span className="visually-hidden">Search this roster</span>
-            <input
-              value={query}
-              type="search"
-              placeholder="Search this roster"
-              aria-label="Search this roster"
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
+          <input
+            className={styles.rosterSearchInput}
+            value={query}
+            type="search"
+            placeholder="Search this roster"
+            aria-label="Search this roster"
+            onChange={(event) => setQuery(event.target.value)}
+          />
           {query ? (
             <button
               className={styles.clearSearch}
