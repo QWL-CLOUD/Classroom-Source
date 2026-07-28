@@ -121,7 +121,7 @@ test('Individual links an existing Student without creating roster membership an
   const workspace = page.getByRole('region', {
     name: 'Planning for Carlie one-on-one',
   });
-  await expect(workspace.getByRole('tab', { name: 'Student' })).toHaveAttribute(
+  await expect(workspace.getByRole('tab', { name: 'Student', exact: true })).toHaveAttribute(
     'aria-selected',
     'true',
   );

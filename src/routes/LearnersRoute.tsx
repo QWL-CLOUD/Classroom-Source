@@ -23,7 +23,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } 
 import { useSearchParams } from 'react-router-dom';
 import { ZodError } from 'zod';
 
-import type { LearnerContext } from '@/domain/models/entities';
+import type { LearnerContext, StudentRecord } from '@/domain/models/entities';
 import { LearnerNoticePanel } from '@/features/learnerNotices/LearnerNoticePanel';
 import type { LearnerPlanningView } from '@/domain/readModels/learnerReadModels';
 import {
@@ -39,6 +39,7 @@ import { formatLessonSeriesPositionLabel } from '@/features/planning/lessonSerie
 import { planningMutationService } from '@/features/planning/planningMutationService';
 import { IndividualStudentLinkPanel } from '@/features/rosters/IndividualStudentLinkPanel';
 import { RosterWorkspacePanel } from '@/features/rosters/RosterWorkspacePanel';
+import { StudentDirectoryWorkspace } from '@/features/rosters/StudentDirectoryWorkspace';
 import {
   buildLearnersPageReadModel,
   getLearnerKindLabel,
@@ -980,6 +981,47 @@ function emptyPlanningMessage(view: LearnerPlanningView): string {
 type LearnerWorkspaceView = 'planning' | 'student' | 'roster' | 'support' | 'details';
 type LearnerDirectoryKind = 'all' | LearnerContext['kind'];
 
+type LearnerDirectoryView = 'contexts' | 'students';
+
+function isDirectoryView(value: string | null): value is LearnerDirectoryView {
+  return value === 'contexts' || value === 'students';
+}
+
+function LearnerDirectoryViewTabs({
+  value,
+  onChange,
+}: {
+  value: LearnerDirectoryView;
+  onChange: (view: LearnerDirectoryView) => void;
+}) {
+  return (
+    <div className={styles.workspaceTabs} role="tablist" aria-label="Learners directory view">
+      {(
+        [
+          ['contexts', 'Contexts'],
+          ['students', 'Students'],
+        ] as const
+      ).map(([view, label]) => (
+        <button
+          key={view}
+          type="button"
+          role="tab"
+          aria-selected={value === view}
+          className={value === view ? styles.activeWorkspaceTab : ''}
+          onClick={() => onChange(view)}
+        >
+          {view === 'contexts' ? (
+            <Layers3 aria-hidden="true" size={17} />
+          ) : (
+            <UserRound aria-hidden="true" size={17} />
+          )}
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function isWorkspaceView(value: string | null): value is LearnerWorkspaceView {
   return (
     value === 'planning' ||
@@ -1019,6 +1061,11 @@ function contextMatchesQuery(context: LearnerContext, query: string): boolean {
 
 export function LearnersRoute() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const rawDirectoryView = searchParams.get('directory');
+  const directoryView: LearnerDirectoryView = isDirectoryView(rawDirectoryView)
+    ? rawDirectoryView
+    : 'contexts';
+  const requestedStudentId = searchParams.get('student') ?? undefined;
   const requestedContextId = searchParams.get('context') ?? undefined;
   const rawContextStatus = searchParams.get('status');
   const preferredContextStatus: LearnerContext['status'] = isContextStatus(rawContextStatus)
@@ -1079,6 +1126,34 @@ export function LearnersRoute() {
   function updateSearchParam(name: string, value: string): void {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set(name, value);
+    setSearchParams(nextParams);
+  }
+
+  function selectDirectoryView(view: LearnerDirectoryView): void {
+    const nextParams = new URLSearchParams(searchParams);
+    setCreateKind(null);
+    if (view === 'students') {
+      nextParams.set('directory', 'students');
+      nextParams.delete('context');
+      nextParams.delete('workspace');
+      nextParams.delete('planning');
+      nextParams.delete('support');
+    } else {
+      nextParams.delete('directory');
+      nextParams.delete('student');
+      nextParams.set('workspace', 'planning');
+    }
+    setSearchParams(nextParams);
+  }
+
+  function selectStudent(student: StudentRecord): void {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('directory', 'students');
+    nextParams.set('student', student.id);
+    nextParams.delete('context');
+    nextParams.delete('workspace');
+    nextParams.delete('planning');
+    nextParams.delete('support');
     setSearchParams(nextParams);
   }
 
@@ -1186,13 +1261,34 @@ export function LearnersRoute() {
     0,
   );
 
+  if (directoryView === 'students') {
+    return (
+      <section className={styles.learnersPage}>
+        <header className={styles.pageHeader}>
+          <div>
+            <p className="page-eyebrow">Workspace</p>
+            <h1>Learners</h1>
+            <p>
+              Work with planning contexts or open canonical Student identities across school years.
+            </p>
+          </div>
+        </header>
+        <LearnerDirectoryViewTabs value={directoryView} onChange={selectDirectoryView} />
+        <StudentDirectoryWorkspace
+          selectedStudentId={requestedStudentId}
+          onSelectStudent={selectStudent}
+        />
+      </section>
+    );
+  }
+
   return (
     <section className={styles.learnersPage}>
       <header className={styles.pageHeader}>
         <div>
           <p className="page-eyebrow">Workspace</p>
           <h1>Learners</h1>
-          <p>Find a Class, Group, or Individual, then work in Planning, Support, or Details.</p>
+          <p>Work with Classes, Groups, Individuals, or canonical Student identities.</p>
         </div>
         <div className={styles.headerTools}>
           {schoolYearsState.status === 'ready' && schoolYearsState.data.items.length > 0 ? (
@@ -1219,6 +1315,7 @@ export function LearnersRoute() {
           <LearnerAddMenu disabled={!canCreate} onSelect={setCreateKind} />
         </div>
       </header>
+      <LearnerDirectoryViewTabs value={directoryView} onChange={selectDirectoryView} />
 
       {createKind && selectedSchoolYear ? (
         <LearnerContextCreatePanel
