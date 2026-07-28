@@ -124,3 +124,27 @@ global Undo/Redo.
 
 No existing `ScheduleBlock.category` or `CalendarEvent.category` text is automatically converted.
 Schedule Parent Blocks remain Schedule records rather than managed categories.
+
+## Canonical Assessment Evidence
+
+Phase 3I-0 upgrades Dexie to schema version 12 with the `assessmentEvidence` table. Every
+`AssessmentEvidenceRecord` belongs to one canonical `StudentRecord` and one school year. Class,
+Group, Individual, Lesson Plan, Session, Library Assessment, and Standard references are optional
+historical sources rather than ownership records.
+
+Evidence uses a discriminated result type. A record contains exactly one of numeric or categorical
+score data, a proficiency level within an identified scale, or an anecdotal observation. The domain
+does not persist a percentage, average, mastery judgment, Student ranking, or final grade. Different
+proficiency scales remain independent.
+
+When a current optional source is linked, the mutation service captures a lightweight readable
+snapshot. Deleting or archiving a context, Plan, Session, Assessment, or Standard does not delete or
+rewrite the evidence. The source ID and snapshot remain available for later progress reports and
+exports. Unchanged dangling optional references can still be edited safely after restore or source
+cleanup.
+
+Create, edit, archive, and restore are transactional `assessment-evidence.*` commands in the global
+persistent Undo/Redo journal. User-facing permanent deletion is not introduced in Phase 3I-0.
+School years containing evidence cannot be permanently deleted. Backup schema v12 exports the full
+evidence table; schema v10 and v11 backups restore it empty, while malformed evidence records are
+quarantined atomically with the rest of Restore.

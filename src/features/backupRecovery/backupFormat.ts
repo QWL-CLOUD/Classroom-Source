@@ -2,6 +2,7 @@ import type { ZodType } from 'zod';
 
 import {
   appSettingSchema,
+  assessmentEvidenceRecordSchema,
   calendarEventSchema,
   categoryAssignmentSchema,
   categoryValueSchema,
@@ -31,8 +32,9 @@ import {
 } from '@/domain/models/entities';
 
 export const CLASSROOM_BACKUP_FORMAT = 'classroom-v20-backup-v1' as const;
-export const CLASSROOM_DATABASE_SCHEMA_VERSION = 11;
+export const CLASSROOM_DATABASE_SCHEMA_VERSION = 12;
 const LEGACY_ROSTERLESS_SCHEMA_VERSION = 10;
+const LEGACY_EVIDENCELESS_SCHEMA_VERSION = 11;
 export const CLASSROOM_APP_VERSION = '20.0.0-alpha.0';
 export const MAX_BACKUP_FILE_BYTES = 100 * 1024 * 1024;
 
@@ -44,6 +46,7 @@ export const BACKUP_TABLE_NAMES = [
   'contextMemberships',
   'studentRecords',
   'rosterMemberships',
+  'assessmentEvidence',
   'scheduleBlocks',
   'scheduleExceptions',
   'calendarEvents',
@@ -77,6 +80,7 @@ const backupSchemas: Record<BackupTableName, ZodType> = {
   contextMemberships: contextMembershipSchema,
   studentRecords: studentRecordSchema,
   rosterMemberships: rosterMembershipSchema,
+  assessmentEvidence: assessmentEvidenceRecordSchema,
   scheduleBlocks: scheduleBlockSchema,
   scheduleExceptions: scheduleExceptionSchema,
   calendarEvents: calendarEventSchema,
@@ -257,10 +261,11 @@ export function buildRestorePreview(rawText: string): RestorePreview {
   }
   if (
     parsed.databaseSchemaVersion !== CLASSROOM_DATABASE_SCHEMA_VERSION &&
+    parsed.databaseSchemaVersion !== LEGACY_EVIDENCELESS_SCHEMA_VERSION &&
     parsed.databaseSchemaVersion !== LEGACY_ROSTERLESS_SCHEMA_VERSION
   ) {
     throw new Error(
-      `This backup uses database schema ${String(parsed.databaseSchemaVersion)}. Classroom supports schemas ${LEGACY_ROSTERLESS_SCHEMA_VERSION} and ${CLASSROOM_DATABASE_SCHEMA_VERSION}.`,
+      `This backup uses database schema ${String(parsed.databaseSchemaVersion)}. Classroom supports schemas ${LEGACY_ROSTERLESS_SCHEMA_VERSION}, ${LEGACY_EVIDENCELESS_SCHEMA_VERSION}, and ${CLASSROOM_DATABASE_SCHEMA_VERSION}.`,
     );
   }
   if (
@@ -311,15 +316,17 @@ export function buildRestorePreview(rawText: string): RestorePreview {
     }
   }
 
-  const legacyMissingRosterTables = new Set<BackupTableName>(
+  const legacyMissingTables = new Set<BackupTableName>(
     parsed.databaseSchemaVersion === LEGACY_ROSTERLESS_SCHEMA_VERSION
-      ? ['studentRecords', 'rosterMemberships']
-      : [],
+      ? ['studentRecords', 'rosterMemberships', 'assessmentEvidence']
+      : parsed.databaseSchemaVersion === LEGACY_EVIDENCELESS_SCHEMA_VERSION
+        ? ['assessmentEvidence']
+        : [],
   );
   for (const tableName of BACKUP_TABLE_NAMES) {
     const source = parsed.tables[tableName];
     if (!Array.isArray(source)) {
-      if (legacyMissingRosterTables.has(tableName)) {
+      if (legacyMissingTables.has(tableName)) {
         tableSummaries.push({
           tableName,
           sourceCount: 0,
@@ -384,7 +391,11 @@ export function buildRestorePreview(rawText: string): RestorePreview {
   const warnings: string[] = [];
   if (parsed.databaseSchemaVersion === LEGACY_ROSTERLESS_SCHEMA_VERSION) {
     warnings.push(
-      'This backup predates independent Student and roster records. Those new tables will be restored empty.',
+      'This backup predates independent Student, roster, and Assessment Evidence records. Those newer tables will be restored empty.',
+    );
+  } else if (parsed.databaseSchemaVersion === LEGACY_EVIDENCELESS_SCHEMA_VERSION) {
+    warnings.push(
+      'This backup predates Assessment Evidence records. The new evidence table will be restored empty.',
     );
   }
   if (quarantined.length > 0) {

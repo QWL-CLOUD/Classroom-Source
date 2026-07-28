@@ -44,6 +44,19 @@ afterEach(async () => {
 describe('BackupRecoveryService', () => {
   it('exports all user tables while excluding internal recovery tables', async () => {
     await database.tasks.put(task('current-task', 'Current task'));
+    await database.assessmentEvidence.put({
+      id: 'current-evidence',
+      studentId: 'student-1',
+      schoolYearId: 'year-1',
+      occurredOn: '2026-07-28',
+      title: 'Current evidence',
+      kind: 'observation',
+      observation: { text: 'Explained the strategy.' },
+      standardIds: [],
+      status: 'active',
+      createdAt: firstTime,
+      updatedAt: firstTime,
+    });
     await database.backupSnapshots.put({
       id: 'internal-snapshot',
       kind: 'pre-restore',
@@ -61,6 +74,7 @@ describe('BackupRecoveryService', () => {
     const envelope = await service.createBackup();
 
     expect(envelope.tables.tasks).toEqual([task('current-task', 'Current task')]);
+    expect(envelope.tables.assessmentEvidence).toHaveLength(1);
     expect(envelope.tables).not.toHaveProperty('backupSnapshots');
     expect(envelope.tableCounts.tasks).toBe(1);
   });
@@ -69,6 +83,19 @@ describe('BackupRecoveryService', () => {
     await database.tasks.put(task('old-task', 'Before restore'));
     const incoming = emptyBackupTables();
     incoming.tasks.push(task('new-task', 'After restore'));
+    incoming.assessmentEvidence.push({
+      id: 'restored-evidence',
+      studentId: 'student-2',
+      schoolYearId: 'year-2',
+      occurredOn: '2026-07-28',
+      title: 'Restored evidence',
+      kind: 'score',
+      score: { label: 'Meets' },
+      standardIds: [],
+      status: 'active',
+      createdAt: firstTime,
+      updatedAt: firstTime,
+    });
     const preview = buildRestorePreview(
       serializeBackupEnvelope(
         createBackupEnvelope(incoming, { backupId: 'incoming-backup', exportedAt: firstTime }),
@@ -91,12 +118,14 @@ describe('BackupRecoveryService', () => {
     const result = await service.restore(preview);
 
     expect(await database.tasks.toArray()).toEqual([task('new-task', 'After restore')]);
+    expect(await database.assessmentEvidence.get('restored-evidence')).toBeDefined();
     expect(await database.backupSnapshots.count()).toBe(1);
     expect(await database.restoreRuns.count()).toBe(1);
     expect(await database.restoreQuarantineRecords.count()).toBe(1);
     expect(result.safetySnapshot.id).toBe('snapshot-1');
     const safetyPreview = buildRestorePreview(result.safetySnapshot.payloadJson);
     expect(safetyPreview.validTables.tasks).toEqual([task('old-task', 'Before restore')]);
+    expect(safetyPreview.validTables.assessmentEvidence).toEqual([]);
   });
 
   it('rolls back the safety snapshot and every table change if restore writing fails', async () => {

@@ -97,7 +97,7 @@ async function waitForSchema(page: Page): Promise<void> {
   await page.waitForFunction(async () => {
     const databases = await indexedDB.databases();
     return databases.some(
-      (database) => database.name === 'classroom-v20' && (database.version ?? 0) >= 10,
+      (database) => database.name === 'classroom-v20' && (database.version ?? 0) >= 12,
     );
   });
 }
@@ -174,12 +174,13 @@ test('Backup & Recovery downloads a privacy-safe full local backup', async ({ pa
   const envelope = JSON.parse(await readFile(path!, 'utf8')) as Record<string, unknown>;
 
   expect(envelope.format).toBe('classroom-v20-backup-v1');
-  expect(envelope.databaseSchemaVersion).toBe(11);
+  expect(envelope.databaseSchemaVersion).toBe(12);
   expect(envelope).not.toHaveProperty('filePath');
   expect(envelope.tables).toMatchObject({
     tasks: [expect.objectContaining({ id: 'current-task', title: 'Current task before restore' })],
     studentRecords: [],
     rosterMemberships: [],
+    assessmentEvidence: [],
   });
   expect(envelope.tables).not.toHaveProperty('backupSnapshots');
 

@@ -36,12 +36,25 @@ export interface SchoolYearDeleteImpact {
   schoolYearId: string;
   schoolYearLabel: string;
   learnerContextCount: number;
+  assessmentEvidenceCount: number;
   canDelete: boolean;
 }
 
 export function schoolYearDeleteBlockingMessage(impact: SchoolYearDeleteImpact): string {
   if (impact.canDelete) return '';
-  return `“${impact.schoolYearLabel}” cannot be deleted because ${impact.learnerContextCount} learner context${impact.learnerContextCount === 1 ? '' : 's'} still belong to it. Archive the school year to preserve those records.`;
+  const blockers: string[] = [];
+  if (impact.learnerContextCount > 0) {
+    blockers.push(
+      `${impact.learnerContextCount} learner context${impact.learnerContextCount === 1 ? '' : 's'}`,
+    );
+  }
+  if (impact.assessmentEvidenceCount > 0) {
+    blockers.push(
+      `${impact.assessmentEvidenceCount} assessment evidence record${impact.assessmentEvidenceCount === 1 ? '' : 's'}`,
+    );
+  }
+  const details = blockers.length > 0 ? blockers.join(' and ') : 'protected records';
+  return `“${impact.schoolYearLabel}” cannot be deleted because ${details} still belong to it. Archive the school year to preserve those records.`;
 }
 
 export function schoolYearMutationError(cause: unknown): string {
@@ -204,19 +217,27 @@ export class SchoolYearMutationService {
   }
 
   async previewDelete(id: string): Promise<SchoolYearDeleteImpact> {
-    return this.db.transaction('r', this.db.schoolYears, this.db.learnerContexts, async () => {
-      const schoolYear = await this.requireSchoolYear(id);
-      const learnerContextCount = await this.db.learnerContexts
-        .where('schoolYearId')
-        .equals(id)
-        .count();
-      return {
-        schoolYearId: id,
-        schoolYearLabel: schoolYear.label,
-        learnerContextCount,
-        canDelete: learnerContextCount === 0 && !schoolYear.active,
-      };
-    });
+    return this.db.transaction(
+      'r',
+      this.db.schoolYears,
+      this.db.learnerContexts,
+      this.db.assessmentEvidence,
+      async () => {
+        const schoolYear = await this.requireSchoolYear(id);
+        const [learnerContextCount, assessmentEvidenceCount] = await Promise.all([
+          this.db.learnerContexts.where('schoolYearId').equals(id).count(),
+          this.db.assessmentEvidence.where('schoolYearId').equals(id).count(),
+        ]);
+        return {
+          schoolYearId: id,
+          schoolYearLabel: schoolYear.label,
+          learnerContextCount,
+          assessmentEvidenceCount,
+          canDelete:
+            learnerContextCount === 0 && assessmentEvidenceCount === 0 && !schoolYear.active,
+        };
+      },
+    );
   }
 
   async delete(id: string): Promise<void> {
@@ -224,19 +245,21 @@ export class SchoolYearMutationService {
       'rw',
       this.db.schoolYears,
       this.db.learnerContexts,
+      this.db.assessmentEvidence,
       this.db.changeLog,
       async () => {
         const schoolYear = await this.requireSchoolYear(id);
         if (schoolYear.active) throw new Error('The active school year cannot be deleted.');
-        const learnerContextCount = await this.db.learnerContexts
-          .where('schoolYearId')
-          .equals(id)
-          .count();
+        const [learnerContextCount, assessmentEvidenceCount] = await Promise.all([
+          this.db.learnerContexts.where('schoolYearId').equals(id).count(),
+          this.db.assessmentEvidence.where('schoolYearId').equals(id).count(),
+        ]);
         const impact: SchoolYearDeleteImpact = {
           schoolYearId: id,
           schoolYearLabel: schoolYear.label,
           learnerContextCount,
-          canDelete: learnerContextCount === 0,
+          assessmentEvidenceCount,
+          canDelete: learnerContextCount === 0 && assessmentEvidenceCount === 0,
         };
         if (!impact.canDelete) throw new Error(schoolYearDeleteBlockingMessage(impact));
         const commands: SchoolYearCommandPair = {

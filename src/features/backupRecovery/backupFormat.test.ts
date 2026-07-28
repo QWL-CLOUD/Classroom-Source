@@ -46,7 +46,7 @@ describe('Classroom backup format', () => {
     expect(preview.validRecordCount).toBe(1);
     expect(preview.quarantineCount).toBe(0);
     expect(preview.validTables.tasks).toEqual([task('task-1')]);
-    expect(preview.tableSummaries).toHaveLength(27);
+    expect(preview.tableSummaries).toHaveLength(28);
   });
 
   it('restores a schema v10 backup with the new Student and roster tables empty', () => {
@@ -58,8 +58,10 @@ describe('Classroom backup format', () => {
     const legacyCounts = { ...current.tableCounts } as Record<string, number>;
     delete legacyTables.studentRecords;
     delete legacyTables.rosterMemberships;
+    delete legacyTables.assessmentEvidence;
     delete legacyCounts.studentRecords;
     delete legacyCounts.rosterMemberships;
+    delete legacyCounts.assessmentEvidence;
     const legacyEnvelope = {
       ...current,
       databaseSchemaVersion: 10,
@@ -71,7 +73,69 @@ describe('Classroom backup format', () => {
 
     expect(preview.validTables.studentRecords).toEqual([]);
     expect(preview.validTables.rosterMemberships).toEqual([]);
+    expect(preview.validTables.assessmentEvidence).toEqual([]);
     expect(preview.warnings.join(' ')).toMatch(/predates independent Student/);
+  });
+
+  it('restores a schema v11 backup with Assessment Evidence empty', () => {
+    const current = createBackupEnvelope(emptyBackupTables(), {
+      backupId: 'legacy-v11-backup',
+      exportedAt: now,
+    });
+    const legacyTables = { ...current.tables } as Record<string, unknown[]>;
+    const legacyCounts = { ...current.tableCounts } as Record<string, number>;
+    delete legacyTables.assessmentEvidence;
+    delete legacyCounts.assessmentEvidence;
+    const legacyEnvelope = {
+      ...current,
+      databaseSchemaVersion: 11,
+      tables: legacyTables,
+      tableCounts: legacyCounts,
+    } as unknown as ClassroomBackupEnvelope;
+
+    const preview = buildRestorePreview(resign(legacyEnvelope));
+
+    expect(preview.validTables.assessmentEvidence).toEqual([]);
+    expect(preview.warnings.join(' ')).toMatch(/predates Assessment Evidence/);
+  });
+
+  it('validates Assessment Evidence while allowing historical optional source IDs', () => {
+    const tables = emptyBackupTables();
+    tables.assessmentEvidence.push({
+      id: 'evidence-1',
+      studentId: 'student-1',
+      schoolYearId: 'year-1',
+      occurredOn: '2026-07-28',
+      title: 'Historical observation',
+      kind: 'observation',
+      observation: { text: 'Read independently.' },
+      contextId: 'deleted-context',
+      lessonPlanId: 'deleted-plan',
+      standardIds: ['deleted-standard'],
+      sourceSnapshots: {
+        context: { kind: 'class', name: 'Grade 3' },
+        lessonPlan: { title: 'Reading workshop' },
+        standards: [
+          {
+            standardId: 'deleted-standard',
+            code: 'RL.3.1',
+            statement: 'Ask and answer questions.',
+          },
+        ],
+      },
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const preview = buildRestorePreview(
+      serializeBackupEnvelope(
+        createBackupEnvelope(tables, { backupId: 'evidence-backup', exportedAt: now }),
+      ),
+    );
+
+    expect(preview.quarantineCount).toBe(0);
+    expect(preview.validTables.assessmentEvidence).toHaveLength(1);
   });
 
   it('rejects a backup whose content no longer matches its integrity hash', () => {

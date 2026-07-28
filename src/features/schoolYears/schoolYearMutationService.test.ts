@@ -114,6 +114,19 @@ describe('SchoolYearMutationService', () => {
       schoolYearId: 'historical-year',
       status: 'archived',
     });
+    await database.assessmentEvidence.put({
+      id: 'historical-evidence',
+      studentId: 'student-1',
+      schoolYearId: 'historical-year',
+      occurredOn: '2026-05-01',
+      title: 'Historical evidence',
+      kind: 'observation',
+      observation: { text: 'Preserve this record.' },
+      standardIds: [],
+      status: 'active',
+      createdAt: '2026-05-01T12:00:00.000Z',
+      updatedAt: '2026-05-01T12:00:00.000Z',
+    });
 
     await expect(service.archive('active-year')).rejects.toThrow(/Set another school year/);
     ids = ['log-archive'];
@@ -122,7 +135,13 @@ describe('SchoolYearMutationService', () => {
       lifecycleState: 'archived',
       active: false,
     });
-    await expect(service.delete('historical-year')).rejects.toThrow(/learner context/);
+    const impact = await service.previewDelete('historical-year');
+    expect(impact).toMatchObject({
+      learnerContextCount: 1,
+      assessmentEvidenceCount: 1,
+      canDelete: false,
+    });
+    await expect(service.delete('historical-year')).rejects.toThrow(/assessment evidence/);
   });
 
   it('deletes only empty inactive years and restores them through undo', async () => {
