@@ -21,7 +21,7 @@ import { ZodError } from 'zod';
 
 import type { StudentRecord } from '@/domain/models/entities';
 
-import { rosterMutationService, type StudentRecordValues } from './rosterMutationService';
+import { rosterMutationService } from './rosterMutationService';
 import type {
   StudentContextReference,
   StudentProfileSnapshot,
@@ -519,10 +519,11 @@ export function StudentDirectoryWorkspace({
 
   const data = state.status === 'ready' ? state.data : null;
   const selectedStudent = data?.selectedProfile?.student;
+  const selectedStudentStatus = selectedStudent?.status;
 
   useEffect(() => {
-    if (selectedStudent) setStatus(selectedStudent.status);
-  }, [selectedStudent?.id, selectedStudent?.status]);
+    if (selectedStudentStatus) setStatus(selectedStudentStatus);
+  }, [selectedStudentStatus]);
 
   const filteredRows = useMemo(
     () =>
