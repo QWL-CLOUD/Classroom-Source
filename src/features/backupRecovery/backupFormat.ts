@@ -8,6 +8,7 @@ import {
   categoryValueSchema,
   changeLogSchema,
   contextMembershipSchema,
+  importRunSchema,
   learnerContextSchema,
   rosterMembershipSchema,
   learnerNoticeSchema,
@@ -32,9 +33,10 @@ import {
 } from '@/domain/models/entities';
 
 export const CLASSROOM_BACKUP_FORMAT = 'classroom-v20-backup-v1' as const;
-export const CLASSROOM_DATABASE_SCHEMA_VERSION = 12;
+export const CLASSROOM_DATABASE_SCHEMA_VERSION = 13;
 const LEGACY_ROSTERLESS_SCHEMA_VERSION = 10;
 const LEGACY_EVIDENCELESS_SCHEMA_VERSION = 11;
+const LEGACY_IMPORTLESS_SCHEMA_VERSION = 12;
 export const CLASSROOM_APP_VERSION = '20.0.0-alpha.0';
 export const MAX_BACKUP_FILE_BYTES = 100 * 1024 * 1024;
 
@@ -53,6 +55,7 @@ export const BACKUP_TABLE_NAMES = [
   'categoryValues',
   'categoryAssignments',
   'libraryItems',
+  'importRuns',
   'lessonSeries',
   'lessonPlans',
   'lessonTemplates',
@@ -87,6 +90,7 @@ const backupSchemas: Record<BackupTableName, ZodType> = {
   categoryValues: categoryValueSchema,
   categoryAssignments: categoryAssignmentSchema,
   libraryItems: libraryCatalogItemSchema,
+  importRuns: importRunSchema,
   lessonSeries: lessonSeriesSchema,
   lessonPlans: lessonPlanSchema,
   lessonTemplates: lessonTemplateSchema,
@@ -261,11 +265,12 @@ export function buildRestorePreview(rawText: string): RestorePreview {
   }
   if (
     parsed.databaseSchemaVersion !== CLASSROOM_DATABASE_SCHEMA_VERSION &&
+    parsed.databaseSchemaVersion !== LEGACY_IMPORTLESS_SCHEMA_VERSION &&
     parsed.databaseSchemaVersion !== LEGACY_EVIDENCELESS_SCHEMA_VERSION &&
     parsed.databaseSchemaVersion !== LEGACY_ROSTERLESS_SCHEMA_VERSION
   ) {
     throw new Error(
-      `This backup uses database schema ${String(parsed.databaseSchemaVersion)}. Classroom supports schemas ${LEGACY_ROSTERLESS_SCHEMA_VERSION}, ${LEGACY_EVIDENCELESS_SCHEMA_VERSION}, and ${CLASSROOM_DATABASE_SCHEMA_VERSION}.`,
+      `This backup uses database schema ${String(parsed.databaseSchemaVersion)}. Classroom supports schemas ${LEGACY_ROSTERLESS_SCHEMA_VERSION}, ${LEGACY_EVIDENCELESS_SCHEMA_VERSION}, ${LEGACY_IMPORTLESS_SCHEMA_VERSION}, and ${CLASSROOM_DATABASE_SCHEMA_VERSION}.`,
     );
   }
   if (
@@ -318,10 +323,12 @@ export function buildRestorePreview(rawText: string): RestorePreview {
 
   const legacyMissingTables = new Set<BackupTableName>(
     parsed.databaseSchemaVersion === LEGACY_ROSTERLESS_SCHEMA_VERSION
-      ? ['studentRecords', 'rosterMemberships', 'assessmentEvidence']
+      ? ['studentRecords', 'rosterMemberships', 'assessmentEvidence', 'importRuns']
       : parsed.databaseSchemaVersion === LEGACY_EVIDENCELESS_SCHEMA_VERSION
-        ? ['assessmentEvidence']
-        : [],
+        ? ['assessmentEvidence', 'importRuns']
+        : parsed.databaseSchemaVersion === LEGACY_IMPORTLESS_SCHEMA_VERSION
+          ? ['importRuns']
+          : [],
   );
   for (const tableName of BACKUP_TABLE_NAMES) {
     const source = parsed.tables[tableName];
@@ -391,11 +398,15 @@ export function buildRestorePreview(rawText: string): RestorePreview {
   const warnings: string[] = [];
   if (parsed.databaseSchemaVersion === LEGACY_ROSTERLESS_SCHEMA_VERSION) {
     warnings.push(
-      'This backup predates independent Student, roster, and Assessment Evidence records. Those newer tables will be restored empty.',
+      'This backup predates independent Student, roster, Assessment Evidence, and canonical Import Center history. Those newer tables will be restored empty.',
     );
   } else if (parsed.databaseSchemaVersion === LEGACY_EVIDENCELESS_SCHEMA_VERSION) {
     warnings.push(
-      'This backup predates Assessment Evidence records. The new evidence table will be restored empty.',
+      'This backup predates Assessment Evidence and canonical Import Center history. Those newer tables will be restored empty.',
+    );
+  } else if (parsed.databaseSchemaVersion === LEGACY_IMPORTLESS_SCHEMA_VERSION) {
+    warnings.push(
+      'This backup predates canonical Import Center history. The new importRuns table will be restored empty.',
     );
   }
   if (quarantined.length > 0) {

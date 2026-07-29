@@ -11,6 +11,15 @@ import {
   buildStandardFrameworkKey,
   normalizeStandardCode,
 } from '@/features/standards/standardIdentity';
+import {
+  buildImportTable,
+  createEmptyImportColumnMapping,
+  mappedImportValue,
+  suggestImportColumnMapping,
+  type ImportColumnMapping,
+  type ImportTable,
+  type ImportTableRow,
+} from '@/features/importCenter/importTableModel';
 
 import type { StandardImportFileKind } from './standardImportFileParser';
 
@@ -46,7 +55,7 @@ export const standardImportFieldKeys = [
 ] as const;
 
 export type StandardImportFieldKey = (typeof standardImportFieldKeys)[number];
-export type StandardImportColumnMapping = Record<StandardImportFieldKey, number | null>;
+export type StandardImportColumnMapping = ImportColumnMapping<StandardImportFieldKey>;
 
 export const standardImportFieldLabels: Record<StandardImportFieldKey, string> = {
   issuingOrganization: 'Issuing organization',
@@ -169,24 +178,6 @@ function optionalText(value: string): string | undefined {
   return value.trim() || undefined;
 }
 
-function normalizeReviewedText(value: string): string {
-  return value
-    .normalize('NFKC')
-    .replace(/\r\n?/g, '\n')
-    .replace(/[\t ]+/g, ' ')
-    .replace(/ *\n */g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
-function normalizeHeader(value: string): string {
-  return value
-    .normalize('NFKC')
-    .trim()
-    .toLocaleLowerCase('en')
-    .replace(/[^a-z0-9]+/g, '');
-}
-
 const headerAliases: Record<StandardImportFieldKey, string[]> = {
   issuingOrganization: ['issuingorganization', 'organization', 'publisher', 'issuer'],
   frameworkTitle: ['frameworktitle', 'framework', 'standardsframework'],
@@ -204,47 +195,27 @@ const headerAliases: Record<StandardImportFieldKey, string[]> = {
 };
 
 export function createEmptyColumnMapping(): StandardImportColumnMapping {
-  return Object.fromEntries(
-    standardImportFieldKeys.map((key) => [key, null]),
-  ) as StandardImportColumnMapping;
+  return createEmptyImportColumnMapping(standardImportFieldKeys);
 }
 
 export function suggestStandardImportMapping(
   headers: readonly string[],
 ): StandardImportColumnMapping {
-  const mapping = createEmptyColumnMapping();
-  const normalizedHeaders = headers.map(normalizeHeader);
-  for (const key of standardImportFieldKeys) {
-    const index = normalizedHeaders.findIndex((header) => headerAliases[key].includes(header));
-    if (index >= 0) mapping[key] = index;
-  }
-  return mapping;
+  return suggestImportColumnMapping(headers, standardImportFieldKeys, headerAliases);
+}
+
+function toStandardImportTable(table: ImportTable): StandardImportTable {
+  return {
+    headerRowNumber: table.headerRow,
+    headers: table.headers,
+    rows: table.rows.map((row) => ({ rowNumber: row.sourceRow, values: row.values })),
+  };
 }
 
 export function buildStandardImportTable(
   rows: readonly (readonly string[])[],
 ): StandardImportTable {
-  const headerIndex = rows.findIndex((row) => row.some((value) => value.trim()));
-  if (headerIndex < 0) throw new Error('The selected worksheet contains no rows.');
-  const width = Math.max(...rows.slice(headerIndex).map((row) => row.length), 1);
-  const rawHeaders = Array.from({ length: width }, (_, index) =>
-    normalizeReviewedText(rows[headerIndex]?.[index] ?? ''),
-  );
-  const used = new Map<string, number>();
-  const headers = rawHeaders.map((header, index) => {
-    const base = header || `Column ${index + 1}`;
-    const count = (used.get(base) ?? 0) + 1;
-    used.set(base, count);
-    return count === 1 ? base : `${base} (${count})`;
-  });
-  const dataRows = rows
-    .slice(headerIndex + 1)
-    .map((row, index) => ({
-      rowNumber: headerIndex + index + 2,
-      values: Array.from({ length: width }, (_, column) => row[column] ?? ''),
-    }))
-    .filter((row) => row.values.some((value) => value.trim()));
-  return { headerRowNumber: headerIndex + 1, headers, rows: dataRows };
+  return toStandardImportTable(buildImportTable(rows));
 }
 
 function mappedValue(
@@ -252,8 +223,8 @@ function mappedValue(
   mapping: StandardImportColumnMapping,
   key: StandardImportFieldKey,
 ): string {
-  const column = mapping[key];
-  return column === null ? '' : normalizeReviewedText(row.values[column] ?? '');
+  const genericRow: ImportTableRow = { sourceRow: row.rowNumber, values: row.values };
+  return mappedImportValue(genericRow, mapping, key);
 }
 
 function parseStatus(value: string): StandardStatus | undefined {

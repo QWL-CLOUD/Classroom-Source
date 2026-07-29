@@ -97,7 +97,7 @@ async function waitForSchema(page: Page): Promise<void> {
   await page.waitForFunction(async () => {
     const databases = await indexedDB.databases();
     return databases.some(
-      (database) => database.name === 'classroom-v20' && (database.version ?? 0) >= 12,
+      (database) => database.name === 'classroom-v20' && (database.version ?? 0) >= 13,
     );
   });
 }
@@ -123,6 +123,40 @@ async function seedCurrentTask(page: Page): Promise<void> {
           order: 0,
           createdAt: '2026-07-27T11:00:00.000Z',
           updatedAt: '2026-07-27T11:00:00.000Z',
+        });
+      });
+    } finally {
+      database.close();
+    }
+  });
+}
+
+async function seedImportRun(page: Page): Promise<void> {
+  await waitForSchema(page);
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('classroom-v20');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction('importRuns', 'readwrite');
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error);
+        transaction.oncomplete = () => resolve();
+        transaction.objectStore('importRuns').put({
+          id: 'current-import-run',
+          importType: 'activities',
+          sourceKind: 'json',
+          sourceLabel: 'activities.json',
+          totalRows: 1,
+          createdCount: 1,
+          updatedCount: 0,
+          skippedCount: 0,
+          reviewCount: 0,
+          blockedCount: 0,
+          committedAt: '2026-07-29T12:00:00.000Z',
         });
       });
     } finally {
@@ -164,6 +198,7 @@ async function readRecoveryState(page: Page) {
 test('Backup & Recovery downloads a privacy-safe full local backup', async ({ page }) => {
   await page.goto('./#/export');
   await seedCurrentTask(page);
+  await seedImportRun(page);
   await page.reload();
 
   const downloadPromise = page.waitForEvent('download');
@@ -174,13 +209,14 @@ test('Backup & Recovery downloads a privacy-safe full local backup', async ({ pa
   const envelope = JSON.parse(await readFile(path!, 'utf8')) as Record<string, unknown>;
 
   expect(envelope.format).toBe('classroom-v20-backup-v1');
-  expect(envelope.databaseSchemaVersion).toBe(12);
+  expect(envelope.databaseSchemaVersion).toBe(13);
   expect(envelope).not.toHaveProperty('filePath');
   expect(envelope.tables).toMatchObject({
     tasks: [expect.objectContaining({ id: 'current-task', title: 'Current task before restore' })],
     studentRecords: [],
     rosterMemberships: [],
     assessmentEvidence: [],
+    importRuns: [expect.objectContaining({ id: 'current-import-run', importType: 'activities' })],
   });
   expect(envelope.tables).not.toHaveProperty('backupSnapshots');
 

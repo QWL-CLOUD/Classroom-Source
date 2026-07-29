@@ -46,7 +46,7 @@ describe('Classroom backup format', () => {
     expect(preview.validRecordCount).toBe(1);
     expect(preview.quarantineCount).toBe(0);
     expect(preview.validTables.tasks).toEqual([task('task-1')]);
-    expect(preview.tableSummaries).toHaveLength(28);
+    expect(preview.tableSummaries).toHaveLength(29);
   });
 
   it('restores a schema v10 backup with the new Student and roster tables empty', () => {
@@ -59,9 +59,11 @@ describe('Classroom backup format', () => {
     delete legacyTables.studentRecords;
     delete legacyTables.rosterMemberships;
     delete legacyTables.assessmentEvidence;
+    delete legacyTables.importRuns;
     delete legacyCounts.studentRecords;
     delete legacyCounts.rosterMemberships;
     delete legacyCounts.assessmentEvidence;
+    delete legacyCounts.importRuns;
     const legacyEnvelope = {
       ...current,
       databaseSchemaVersion: 10,
@@ -74,6 +76,7 @@ describe('Classroom backup format', () => {
     expect(preview.validTables.studentRecords).toEqual([]);
     expect(preview.validTables.rosterMemberships).toEqual([]);
     expect(preview.validTables.assessmentEvidence).toEqual([]);
+    expect(preview.validTables.importRuns).toEqual([]);
     expect(preview.warnings.join(' ')).toMatch(/predates independent Student/);
   });
 
@@ -85,7 +88,9 @@ describe('Classroom backup format', () => {
     const legacyTables = { ...current.tables } as Record<string, unknown[]>;
     const legacyCounts = { ...current.tableCounts } as Record<string, number>;
     delete legacyTables.assessmentEvidence;
+    delete legacyTables.importRuns;
     delete legacyCounts.assessmentEvidence;
+    delete legacyCounts.importRuns;
     const legacyEnvelope = {
       ...current,
       databaseSchemaVersion: 11,
@@ -96,7 +101,56 @@ describe('Classroom backup format', () => {
     const preview = buildRestorePreview(resign(legacyEnvelope));
 
     expect(preview.validTables.assessmentEvidence).toEqual([]);
+    expect(preview.validTables.importRuns).toEqual([]);
     expect(preview.warnings.join(' ')).toMatch(/predates Assessment Evidence/);
+  });
+
+  it('restores a schema v12 backup with canonical Import Center history empty', () => {
+    const current = createBackupEnvelope(emptyBackupTables(), {
+      backupId: 'legacy-v12-backup',
+      exportedAt: now,
+    });
+    const legacyTables = { ...current.tables } as Record<string, unknown[]>;
+    const legacyCounts = { ...current.tableCounts } as Record<string, number>;
+    delete legacyTables.importRuns;
+    delete legacyCounts.importRuns;
+    const legacyEnvelope = {
+      ...current,
+      databaseSchemaVersion: 12,
+      tables: legacyTables,
+      tableCounts: legacyCounts,
+    } as unknown as ClassroomBackupEnvelope;
+
+    const preview = buildRestorePreview(resign(legacyEnvelope));
+
+    expect(preview.validTables.importRuns).toEqual([]);
+    expect(preview.warnings.join(' ')).toMatch(/predates canonical Import Center history/);
+  });
+
+  it('validates canonical Import Center history records', () => {
+    const tables = emptyBackupTables();
+    tables.importRuns.push({
+      id: 'import-run-1',
+      importType: 'activities',
+      sourceKind: 'json',
+      sourceLabel: 'activities.json',
+      totalRows: 2,
+      createdCount: 2,
+      updatedCount: 0,
+      skippedCount: 0,
+      reviewCount: 0,
+      blockedCount: 0,
+      committedAt: now,
+    });
+
+    const preview = buildRestorePreview(
+      serializeBackupEnvelope(
+        createBackupEnvelope(tables, { backupId: 'import-history-backup', exportedAt: now }),
+      ),
+    );
+
+    expect(preview.quarantineCount).toBe(0);
+    expect(preview.validTables.importRuns).toHaveLength(1);
   });
 
   it('validates Assessment Evidence while allowing historical optional source IDs', () => {

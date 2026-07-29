@@ -50,6 +50,25 @@ function dependencies() {
 }
 
 describe('Standards reviewed import preview', () => {
+  it('uses the shared table model while preserving Standards source-row semantics', () => {
+    const table = buildStandardImportTable([
+      [],
+      ['Code', 'Statement', 'Code'],
+      ['A.1', 'Explain a model.', 'secondary'],
+    ]);
+
+    expect(table).toEqual({
+      headerRowNumber: 2,
+      headers: ['Code', 'Statement', 'Code (2)'],
+      rows: [
+        {
+          rowNumber: 3,
+          values: ['A.1', 'Explain a model.', 'secondary'],
+        },
+      ],
+    });
+  });
+
   it('classifies new, exact duplicate, reviewed update, and invalid rows without writes', () => {
     const table = buildStandardImportTable([
       ['Code', 'Statement', 'Subject', 'Grade'],

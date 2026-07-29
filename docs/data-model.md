@@ -148,3 +148,24 @@ persistent Undo/Redo journal. User-facing permanent deletion is not introduced i
 School years containing evidence cannot be permanently deleted. Backup schema v12 exports the full
 evidence table; schema v10 and v11 backups restore it empty, while malformed evidence records are
 quarantined atomically with the rest of Restore.
+
+## Canonical Import Center foundation
+
+Phase 3I-0.5A upgrades Dexie and the backup schema to version 13. The new `importRuns` table is the
+canonical history for future roster, Standards, Activity, Resource, and Assessment imports. It stores
+source type, optional source/worksheet labels, optional roster context, complete row classification
+counts, and the commit timestamp. Existing `standardImportBatches` remain readable legacy history;
+they are not destructively migrated in this phase.
+
+Library Catalog records may now retain optional external source/key provenance, a readable source
+reference, a unique normalized `importIdentityKey`, and `lastImportRunId`. A stable import identity
+requires both an external source and key; title equality alone never establishes update ownership.
+
+The shared import source layer normalizes CSV, XLSX, JSON, and pasted tables without writing. Generic
+preview rows use Create, Update, Skip, Review, and Blocked classifications. The new
+`import-center.*` command domain can atomically restore import history, Catalog records, category
+assignments, and Standard alignments through persistent global Undo/Redo.
+
+Backup v13 includes canonical import history. Backups from database schemas v10, v11, and v12 remain
+restorable, with tables introduced by later schemas safely initialized empty. No new Import Center UI,
+file attachment storage, or catalog import workflow is introduced in 3I-0.5A.

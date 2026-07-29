@@ -5,6 +5,12 @@ import {
   parseAssessmentEvidenceCommand,
   type AssessmentEvidenceCommand,
 } from '@/features/assessmentEvidence/assessmentEvidenceCommands';
+import { applyImportOperations } from '@/features/importCenter/applyImportOperations';
+import {
+  IMPORT_CENTER_COMMAND_PREFIX,
+  parseImportCommand,
+  type ImportCommand,
+} from '@/features/importCenter/importCommands';
 import {
   CATEGORY_COMMAND_PREFIX,
   parseCategoryCommand,
@@ -89,6 +95,7 @@ import {
 export type SupportedEditCommand =
   | { entity: 'assessment-evidence'; command: AssessmentEvidenceCommand }
   | { entity: 'category'; command: CategoryCommand }
+  | { entity: 'import-center'; command: ImportCommand }
   | { entity: 'calendar-event'; command: CalendarEventCommand }
   | { entity: 'schedule-block'; command: ScheduleBlockCommand }
   | { entity: 'schedule-exception'; command: ScheduleExceptionCommand }
@@ -108,6 +115,7 @@ export function isSupportedEditChangeLog(log: ChangeLog): boolean {
   return (
     log.commandType.startsWith(ASSESSMENT_EVIDENCE_COMMAND_PREFIX) ||
     log.commandType.startsWith(CATEGORY_COMMAND_PREFIX) ||
+    log.commandType.startsWith(IMPORT_CENTER_COMMAND_PREFIX) ||
     log.commandType.startsWith(CALENDAR_EVENT_COMMAND_PREFIX) ||
     log.commandType.startsWith(SCHEDULE_BLOCK_COMMAND_PREFIX) ||
     log.commandType.startsWith(SCHEDULE_EXCEPTION_COMMAND_PREFIX) ||
@@ -136,6 +144,12 @@ export function parseSupportedEditCommand(commandType: string, json: string): Su
     return {
       entity: 'category',
       command: parseCategoryCommand(json),
+    };
+  }
+  if (commandType.startsWith(IMPORT_CENTER_COMMAND_PREFIX)) {
+    return {
+      entity: 'import-center',
+      command: parseImportCommand(json),
     };
   }
   if (commandType.startsWith(CALENDAR_EVENT_COMMAND_PREFIX)) {
@@ -231,6 +245,10 @@ export async function applySupportedEditCommand(
 ): Promise<void> {
   if (parsed.entity === 'assessment-evidence') {
     await applyAssessmentEvidenceOperations(db, parsed.command.operations);
+    return;
+  }
+  if (parsed.entity === 'import-center') {
+    await applyImportOperations(db, parsed.command.operations);
     return;
   }
   if (parsed.entity === 'category') {

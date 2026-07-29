@@ -16,7 +16,25 @@ describe('Standard import file parsing', () => {
     ]);
   });
 
-  it('rejects unsupported local files without storing them', async () => {
+  it('keeps the Standards adapter restricted to CSV/XLSX while using the shared parser', async () => {
+    const workbook = await parseStandardImportFile(
+      new File(['Code,Statement\nA.1,Explain a model.'], 'standards.csv'),
+    );
+    expect(workbook).toEqual({
+      kind: 'csv',
+      sheets: [
+        {
+          name: 'CSV data',
+          rows: [
+            ['Code', 'Statement'],
+            ['A.1', 'Explain a model.'],
+          ],
+        },
+      ],
+    });
+    await expect(parseStandardImportFile(new File(['[]'], 'standards.json'))).rejects.toThrow(
+      /\.csv or \.xlsx/,
+    );
     await expect(parseStandardImportFile(new File(['x'], 'standards.pdf'))).rejects.toThrow(
       /\.csv or \.xlsx/,
     );

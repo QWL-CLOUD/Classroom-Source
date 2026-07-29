@@ -12,7 +12,7 @@ afterEach(async () => {
 });
 
 describe('ClassroomDatabase schema upgrades', () => {
-  it('upgrades legacy data to schema v12 and adds Student, roster, and Assessment Evidence stores without losing Tasks', async () => {
+  it('upgrades legacy data to schema v13 and adds Student, roster, Assessment Evidence, and Import Center stores without losing Tasks', async () => {
     const name = `classroom-v20-upgrade-${crypto.randomUUID()}`;
     names.push(name);
     const legacy = new Dexie(name);
@@ -33,7 +33,7 @@ describe('ClassroomDatabase schema upgrades', () => {
     const upgraded = new ClassroomDatabase(name);
     await upgraded.open();
 
-    expect(upgraded.verno).toBe(12);
+    expect(upgraded.verno).toBe(13);
     expect(await upgraded.tasks.get('legacy-task')).toBeDefined();
     await upgraded.learnerContexts.put({
       id: 'class-1',
@@ -129,6 +129,32 @@ describe('ClassroomDatabase schema upgrades', () => {
       updatedAt: '2026-07-23T12:00:00.000Z',
     });
     expect(await upgraded.libraryItems.count()).toBe(1);
+    await upgraded.importRuns.put({
+      id: 'import-run-1',
+      importType: 'resources',
+      sourceKind: 'csv',
+      sourceLabel: 'resources.csv',
+      totalRows: 1,
+      createdCount: 1,
+      updatedCount: 0,
+      skippedCount: 0,
+      reviewCount: 0,
+      blockedCount: 0,
+      committedAt: '2026-07-29T12:00:00.000Z',
+    });
+    expect(await upgraded.importRuns.count()).toBe(1);
+    await upgraded.libraryItems.update('library-resource-1', {
+      externalSource: 'district catalog',
+      externalKey: 'resource-1',
+      importIdentityKey: 'resource\u0000district catalog\u0000resource-1',
+      lastImportRunId: 'import-run-1',
+    });
+    expect(
+      await upgraded.libraryItems
+        .where('importIdentityKey')
+        .equals('resource\u0000district catalog\u0000resource-1')
+        .count(),
+    ).toBe(1);
 
     await upgraded.lessonTemplates.put({
       id: 'template-1',
