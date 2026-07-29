@@ -3,6 +3,7 @@ import {
   assessmentEvidenceRecordSchema,
   categoryValueSchema,
   learnerNoticeSchema,
+  importRunSchema,
   learnerServiceOccurrenceSchema,
   libraryCatalogItemSchema,
   lessonPlanSchema,
@@ -235,6 +236,74 @@ describe('domain schemas', () => {
       }),
     ).toThrow('requires archivedAt');
   });
+  it('validates canonical Import Center runs and imported Catalog identity metadata', () => {
+    expect(
+      importRunSchema.parse({
+        id: 'import-run-1',
+        importType: 'activities',
+        sourceKind: 'xlsx',
+        sourceLabel: 'activities.xlsx',
+        worksheetName: 'Activities',
+        totalRows: 3,
+        createdCount: 2,
+        updatedCount: 0,
+        skippedCount: 1,
+        reviewCount: 0,
+        blockedCount: 0,
+        committedAt: '2026-07-29T12:00:00.000Z',
+      }),
+    ).toMatchObject({ importType: 'activities', totalRows: 3 });
+    expect(() =>
+      importRunSchema.parse({
+        id: 'invalid-import-run',
+        importType: 'resources',
+        sourceKind: 'csv',
+        totalRows: 2,
+        createdCount: 1,
+        updatedCount: 0,
+        skippedCount: 0,
+        reviewCount: 0,
+        blockedCount: 0,
+        committedAt: '2026-07-29T12:00:00.000Z',
+      }),
+    ).toThrow('counts must equal');
+    expect(() =>
+      importRunSchema.parse({
+        id: 'roster-import-without-context',
+        importType: 'roster',
+        sourceKind: 'xlsx',
+        totalRows: 0,
+        createdCount: 0,
+        updatedCount: 0,
+        skippedCount: 0,
+        reviewCount: 0,
+        blockedCount: 0,
+        committedAt: '2026-07-29T12:00:00.000Z',
+      }),
+    ).toThrow('target context');
+
+    const imported = libraryCatalogItemSchema.parse({
+      id: 'activity-imported',
+      catalogType: 'activity',
+      title: 'Partner retell',
+      tags: [],
+      externalSource: 'district catalog',
+      externalKey: 'activity-101',
+      importIdentityKey: 'activity\u0000district catalog\u0000activity-101',
+      lastImportRunId: 'import-run-1',
+      status: 'active',
+      createdAt: '2026-07-29T12:00:00.000Z',
+      updatedAt: '2026-07-29T12:00:00.000Z',
+    });
+    expect(imported.lastImportRunId).toBe('import-run-1');
+    expect(() =>
+      libraryCatalogItemSchema.parse({
+        ...imported,
+        externalSource: undefined,
+      }),
+    ).toThrow('external source');
+  });
+
   it('keeps score, proficiency, and observation evidence structurally distinct', () => {
     const common = {
       id: 'evidence-1',

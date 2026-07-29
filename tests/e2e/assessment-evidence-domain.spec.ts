@@ -165,7 +165,7 @@ test('Assessment Evidence persists independently and remains source-traceable in
     tables: { assessmentEvidence: unknown[] };
   };
 
-  expect(envelope.databaseSchemaVersion).toBe(12);
+  expect(envelope.databaseSchemaVersion).toBe(13);
   expect(envelope.tables.assessmentEvidence).toEqual([
     expect.objectContaining({
       id: 'evidence-record',

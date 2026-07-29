@@ -240,6 +240,77 @@ export const standardImportBatchSchema = z
     }
   });
 
+export const importRunTypeSchema = z.enum([
+  'roster',
+  'standards',
+  'activities',
+  'resources',
+  'assessments',
+]);
+
+export const importRunSourceKindSchema = z.enum([
+  'csv',
+  'xlsx',
+  'json',
+  'paste-table',
+  'paste-url',
+  'file-metadata',
+]);
+
+export const importRunSchema = z
+  .object({
+    id: idSchema,
+    importType: importRunTypeSchema,
+    sourceKind: importRunSourceKindSchema,
+    sourceLabel: z.string().trim().min(1).max(500).optional(),
+    worksheetName: z.string().trim().min(1).max(240).optional(),
+    contextId: idSchema.optional(),
+    totalRows: z.number().int().nonnegative().max(50_000),
+    createdCount: z.number().int().nonnegative().max(50_000),
+    updatedCount: z.number().int().nonnegative().max(50_000),
+    skippedCount: z.number().int().nonnegative().max(50_000),
+    reviewCount: z.number().int().nonnegative().max(50_000),
+    blockedCount: z.number().int().nonnegative().max(50_000),
+    summaryJson: z.string().max(100_000).optional(),
+    committedAt: timestampSchema,
+  })
+  .superRefine((value, context) => {
+    const classifiedRows =
+      value.createdCount +
+      value.updatedCount +
+      value.skippedCount +
+      value.reviewCount +
+      value.blockedCount;
+    if (classifiedRows !== value.totalRows) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Import run counts must equal totalRows.',
+        path: ['totalRows'],
+      });
+    }
+    if (value.totalRows === 0 || value.createdCount + value.updatedCount === 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A committed import run must contain at least one created or updated record.',
+        path: ['totalRows'],
+      });
+    }
+    if (value.reviewCount > 0 || value.blockedCount > 0) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A committed import run cannot contain unresolved review or blocked rows.',
+        path: ['reviewCount'],
+      });
+    }
+    if (value.importType === 'roster' && !value.contextId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Roster import runs require a target context.',
+        path: ['contextId'],
+      });
+    }
+  });
+
 export const standardAlignmentTargetTypeSchema = z.enum(['lesson-plan', 'lesson-template']);
 
 export const standardAlignmentSchema = z
@@ -321,6 +392,11 @@ export const libraryCatalogItemSchema = z
     description: z.string().trim().max(5000).optional(),
     tags: z.array(z.string().trim().min(1).max(80)).max(30).default([]),
     typedFields: libraryCatalogTypedFieldsSchema.optional(),
+    externalSource: z.string().trim().min(1).max(500).optional(),
+    externalKey: z.string().trim().min(1).max(500).optional(),
+    sourceReference: z.string().trim().min(1).max(2000).optional(),
+    importIdentityKey: z.string().trim().min(1).max(1200).optional(),
+    lastImportRunId: idSchema.optional(),
     status: libraryCatalogStatusSchema.default('active'),
     createdAt: timestampSchema,
     updatedAt: timestampSchema,
@@ -339,6 +415,20 @@ export const libraryCatalogItemSchema = z
         code: 'custom',
         message: 'An archived Library item requires archivedAt.',
         path: ['archivedAt'],
+      });
+    }
+    if (value.externalKey && !value.externalSource) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An external key requires an external source.',
+        path: ['externalSource'],
+      });
+    }
+    if (value.importIdentityKey && (!value.externalSource || !value.externalKey)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An import identity requires both an external source and external key.',
+        path: ['importIdentityKey'],
       });
     }
     if (value.catalogType === 'standard' && value.typedFields) {
@@ -1141,6 +1231,9 @@ export type Task = z.infer<typeof taskSchema>;
 export type StandardStatus = z.infer<typeof standardStatusSchema>;
 export type Standard = z.infer<typeof standardSchema>;
 export type StandardImportBatch = z.infer<typeof standardImportBatchSchema>;
+export type ImportRunType = z.infer<typeof importRunTypeSchema>;
+export type ImportRunSourceKind = z.infer<typeof importRunSourceKindSchema>;
+export type ImportRun = z.infer<typeof importRunSchema>;
 export type StandardAlignmentTargetType = z.infer<typeof standardAlignmentTargetTypeSchema>;
 export type StandardAlignment = z.infer<typeof standardAlignmentSchema>;
 export type LibraryCatalogType = z.infer<typeof libraryCatalogTypeSchema>;

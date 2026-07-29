@@ -57,6 +57,20 @@ describe('BackupRecoveryService', () => {
       createdAt: firstTime,
       updatedAt: firstTime,
     });
+    await database.importRuns.put({
+      id: 'current-import-run',
+      importType: 'assessments',
+      sourceKind: 'xlsx',
+      sourceLabel: 'assessments.xlsx',
+      worksheetName: 'Assessments',
+      totalRows: 1,
+      createdCount: 1,
+      updatedCount: 0,
+      skippedCount: 0,
+      reviewCount: 0,
+      blockedCount: 0,
+      committedAt: firstTime,
+    });
     await database.backupSnapshots.put({
       id: 'internal-snapshot',
       kind: 'pre-restore',
@@ -75,6 +89,7 @@ describe('BackupRecoveryService', () => {
 
     expect(envelope.tables.tasks).toEqual([task('current-task', 'Current task')]);
     expect(envelope.tables.assessmentEvidence).toHaveLength(1);
+    expect(envelope.tables.importRuns).toHaveLength(1);
     expect(envelope.tables).not.toHaveProperty('backupSnapshots');
     expect(envelope.tableCounts.tasks).toBe(1);
   });
@@ -95,6 +110,19 @@ describe('BackupRecoveryService', () => {
       status: 'active',
       createdAt: firstTime,
       updatedAt: firstTime,
+    });
+    incoming.importRuns.push({
+      id: 'restored-import-run',
+      importType: 'resources',
+      sourceKind: 'json',
+      sourceLabel: 'resources.json',
+      totalRows: 1,
+      createdCount: 1,
+      updatedCount: 0,
+      skippedCount: 0,
+      reviewCount: 0,
+      blockedCount: 0,
+      committedAt: firstTime,
     });
     const preview = buildRestorePreview(
       serializeBackupEnvelope(
@@ -119,6 +147,7 @@ describe('BackupRecoveryService', () => {
 
     expect(await database.tasks.toArray()).toEqual([task('new-task', 'After restore')]);
     expect(await database.assessmentEvidence.get('restored-evidence')).toBeDefined();
+    expect(await database.importRuns.get('restored-import-run')).toBeDefined();
     expect(await database.backupSnapshots.count()).toBe(1);
     expect(await database.restoreRuns.count()).toBe(1);
     expect(await database.restoreQuarantineRecords.count()).toBe(1);
@@ -126,10 +155,23 @@ describe('BackupRecoveryService', () => {
     const safetyPreview = buildRestorePreview(result.safetySnapshot.payloadJson);
     expect(safetyPreview.validTables.tasks).toEqual([task('old-task', 'Before restore')]);
     expect(safetyPreview.validTables.assessmentEvidence).toEqual([]);
+    expect(safetyPreview.validTables.importRuns).toEqual([]);
   });
 
   it('rolls back the safety snapshot and every table change if restore writing fails', async () => {
     await database.tasks.put(task('old-task', 'Before failed restore'));
+    await database.importRuns.put({
+      id: 'old-import-run',
+      importType: 'activities',
+      sourceKind: 'csv',
+      totalRows: 1,
+      createdCount: 1,
+      updatedCount: 0,
+      skippedCount: 0,
+      reviewCount: 0,
+      blockedCount: 0,
+      committedAt: firstTime,
+    });
     const incoming = emptyBackupTables();
     incoming.tasks.push(task('new-task', 'Should not persist'));
     const preview = buildRestorePreview(
@@ -148,6 +190,7 @@ describe('BackupRecoveryService', () => {
     await expect(service.restore(preview)).rejects.toThrow(/Synthetic write failure/);
 
     expect(await database.tasks.toArray()).toEqual([task('old-task', 'Before failed restore')]);
+    expect(await database.importRuns.get('old-import-run')).toBeDefined();
     expect(await database.backupSnapshots.count()).toBe(0);
     expect(await database.restoreRuns.count()).toBe(0);
     expect(await database.restoreQuarantineRecords.count()).toBe(0);
