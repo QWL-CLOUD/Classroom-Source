@@ -9,11 +9,12 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { ZodError } from 'zod';
 
 import type { LearnerContext, StudentRecord } from '@/domain/models/entities';
+import { buildImportCenterHref } from '@/features/importCenter/importRouteState';
 
-import { RosterImportPanel } from './RosterImportPanel';
 import { rosterMutationService, type StudentRecordValues } from './rosterMutationService';
 import { useRosterWorkspace } from './useRosterWorkspace';
 import styles from './RosterWorkspacePanel.module.css';
@@ -265,7 +266,7 @@ function CreateStudentForm({
   );
 }
 
-type RosterTool = 'add' | 'import' | null;
+type RosterTool = 'add' | null;
 
 export function RosterWorkspacePanel({ context }: { context: LearnerContext }) {
   const state = useRosterWorkspace(context.id);
@@ -273,7 +274,6 @@ export function RosterWorkspacePanel({ context }: { context: LearnerContext }) {
   const [activeTool, setActiveTool] = useState<RosterTool>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
   const [removeArmedId, setRemoveArmedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -281,7 +281,6 @@ export function RosterWorkspacePanel({ context }: { context: LearnerContext }) {
     setActiveTool(null);
     setBusy(false);
     setError(null);
-    setSuccess(null);
     setRemoveArmedId(null);
   }, [context.id]);
 
@@ -319,7 +318,6 @@ export function RosterWorkspacePanel({ context }: { context: LearnerContext }) {
 
     setBusy(true);
     setError(null);
-    setSuccess(null);
     try {
       await rosterMutationService.removeFromRoster(membershipId);
       setRemoveArmedId(null);
@@ -333,7 +331,6 @@ export function RosterWorkspacePanel({ context }: { context: LearnerContext }) {
   function toggleTool(tool: Exclude<RosterTool, null>): void {
     setActiveTool((current) => (current === tool ? null : tool));
     setError(null);
-    setSuccess(null);
   }
 
   if (context.kind === 'individual') return null;
@@ -369,19 +366,10 @@ export function RosterWorkspacePanel({ context }: { context: LearnerContext }) {
               )}
               {activeTool === 'add' ? 'Close add forms' : 'Add students'}
             </button>
-            <button
-              className="button"
-              type="button"
-              aria-expanded={activeTool === 'import'}
-              onClick={() => toggleTool('import')}
-            >
-              {activeTool === 'import' ? (
-                <X aria-hidden="true" size={16} />
-              ) : (
-                <FileSpreadsheet aria-hidden="true" size={16} />
-              )}
-              {activeTool === 'import' ? 'Close import' : 'Import'}
-            </button>
+            <Link className="button" to={buildImportCenterHref('roster', context.id)}>
+              <FileSpreadsheet aria-hidden="true" size={16} />
+              Import students
+            </Link>
           </div>
         ) : (
           <span className={styles.archivedRestriction}>
@@ -410,32 +398,11 @@ export function RosterWorkspacePanel({ context }: { context: LearnerContext }) {
         </div>
       ) : null}
 
-      {activeTool === 'import' && canEdit && data ? (
-        <RosterImportPanel
-          context={context}
-          students={data.allStudents}
-          memberStudentIds={memberStudentIds}
-          busy={busy}
-          onBusyChange={setBusy}
-          onError={setError}
-          onDone={(message) => {
-            setSuccess(message);
-            setActiveTool(null);
-          }}
-        />
-      ) : null}
-
       {error ? (
         <p className={styles.error} role="alert">
           {error}
         </p>
       ) : null}
-      {success ? (
-        <p className={styles.success} role="status">
-          {success}
-        </p>
-      ) : null}
-
       {archivedMemberCount > 0 ? (
         <div className={styles.archivedWarning} role="status">
           <AlertTriangle aria-hidden="true" size={18} />

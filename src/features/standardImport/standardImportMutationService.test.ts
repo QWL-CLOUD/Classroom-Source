@@ -96,6 +96,7 @@ describe('StandardImportMutationService', () => {
     await expect(
       service.commit(preview, {
         fileKind: 'csv',
+        sourceLabel: 'standards.csv',
         worksheetName: 'CSV data',
         confirmUpdates: false,
         confirmCommit: true,
@@ -104,6 +105,7 @@ describe('StandardImportMutationService', () => {
 
     const result = await service.commit(preview, {
       fileKind: 'csv',
+      sourceLabel: 'standards.csv',
       worksheetName: 'CSV data',
       confirmUpdates: true,
       confirmCommit: true,
@@ -111,12 +113,17 @@ describe('StandardImportMutationService', () => {
     expect(result).toMatchObject({ duplicateCount: 1 });
     expect(result.created).toHaveLength(1);
     expect(result.updated).toHaveLength(1);
-    expect(await database.standardImportBatches.get('batch-1')).toMatchObject({
+    expect(await database.importRuns.get('batch-1')).toMatchObject({
+      importType: 'standards',
+      sourceKind: 'csv',
+      sourceLabel: 'standards.csv',
+      worksheetName: 'CSV data',
       totalRows: 3,
       createdCount: 1,
       updatedCount: 1,
-      duplicateCount: 1,
+      skippedCount: 1,
     });
+    expect(await database.standardImportBatches.count()).toBe(0);
     expect(await database.standards.get('row-new')).toMatchObject({ importBatchId: 'batch-1' });
     expect(await database.standards.get('existing-1')).toMatchObject({
       statement: 'Revised fraction statement.',
@@ -126,13 +133,15 @@ describe('StandardImportMutationService', () => {
 
     const history = new EditHistoryService(database, { now: () => '2026-07-25T17:10:00.000Z' });
     await history.undo();
+    expect(await database.importRuns.count()).toBe(0);
     expect(await database.standardImportBatches.count()).toBe(0);
     expect(await database.standards.get('row-new')).toBeUndefined();
     expect(await database.standards.get('existing-1')).toEqual(current);
     expect(await database.standards.get('existing-duplicate')).toEqual(duplicate);
 
     await history.redo();
-    expect(await database.standardImportBatches.count()).toBe(1);
+    expect(await database.importRuns.count()).toBe(1);
+    expect(await database.standardImportBatches.count()).toBe(0);
     expect(await database.standards.get('row-new')).toBeDefined();
     expect(await database.standards.get('existing-1')).toMatchObject({
       statement: 'Revised fraction statement.',
@@ -164,11 +173,13 @@ describe('StandardImportMutationService', () => {
     await expect(
       service.commit(preview, {
         fileKind: 'xlsx',
+        sourceLabel: 'standards.xlsx',
         worksheetName: 'Standards',
         confirmUpdates: true,
         confirmCommit: true,
       }),
     ).rejects.toThrow(/changed after preview/);
+    expect(await database.importRuns.count()).toBe(0);
     expect(await database.standardImportBatches.count()).toBe(0);
     expect(await database.changeLog.count()).toBe(0);
   });

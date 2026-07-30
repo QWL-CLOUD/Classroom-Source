@@ -4,33 +4,17 @@ import {
   parseImportFile,
   parseXlsxArrayBuffer as parseSharedXlsxArrayBuffer,
 } from '@/features/importCenter/importSourceAdapters';
+import type { ImportWorkbook } from '@/features/importCenter/importTypes';
 
 export type StandardImportFileKind = 'csv' | 'xlsx';
-
-export interface StandardImportSheet {
-  name: string;
-  rows: string[][];
-}
-
-export interface StandardImportWorkbook {
-  kind: StandardImportFileKind;
-  sheets: StandardImportSheet[];
-}
+export type StandardImportWorkbook = ImportWorkbook & { kind: StandardImportFileKind };
 
 export { parseDelimitedText };
 
-function toStandardWorkbook(
-  workbook: Awaited<ReturnType<typeof parseSharedXlsxArrayBuffer>>,
-): StandardImportWorkbook {
-  if (workbook.kind !== 'xlsx') throw new Error('The reviewed workbook is not an XLSX source.');
-  return {
-    kind: 'xlsx',
-    sheets: workbook.worksheets.map((sheet) => ({ name: sheet.name, rows: sheet.rows })),
-  };
-}
-
 export async function parseXlsxArrayBuffer(buffer: ArrayBuffer): Promise<StandardImportWorkbook> {
-  return toStandardWorkbook(await parseSharedXlsxArrayBuffer(buffer));
+  const workbook = await parseSharedXlsxArrayBuffer(buffer);
+  if (workbook.kind !== 'xlsx') throw new Error('The reviewed workbook is not an XLSX source.');
+  return { ...workbook, kind: 'xlsx' };
 }
 
 export async function parseStandardImportFile(file: File): Promise<StandardImportWorkbook> {
@@ -45,8 +29,5 @@ export async function parseStandardImportFile(file: File): Promise<StandardImpor
   if (workbook.kind !== 'csv' && workbook.kind !== 'xlsx') {
     throw new Error('Choose a .csv or .xlsx file.');
   }
-  return {
-    kind: workbook.kind,
-    sheets: workbook.worksheets.map((sheet) => ({ name: sheet.name, rows: sheet.rows })),
-  };
+  return { ...workbook, kind: workbook.kind };
 }

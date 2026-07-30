@@ -4,12 +4,12 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { classroomDb } from '@/data/db/ClassroomDatabase';
 import {
+  importRunSchema,
   lessonPlanSchema,
   lessonTemplateSchema,
   standardAlignmentSchema,
   standardImportBatchSchema,
   standardSchema,
-  type StandardImportBatch,
   type StandardStatus,
 } from '@/domain/models/entities';
 import { StandardEditor } from '@/features/standards/StandardEditor';
@@ -33,6 +33,11 @@ const notSpecifiedFilter = '__not-specified__';
 
 type StandardsWorkspaceView = 'catalog' | 'coverage';
 
+interface StandardImportMetadata {
+  committedAt: string;
+  worksheetName?: string;
+}
+
 function uniqueSorted(values: readonly (string | undefined)[]): string[] {
   return [...new Set(values.filter((value): value is string => Boolean(value)))].sort((a, b) =>
     a.localeCompare(b, 'en', { sensitivity: 'base' }),
@@ -41,17 +46,41 @@ function uniqueSorted(values: readonly (string | undefined)[]): string[] {
 
 export function StandardsRoute() {
   const data = useLiveQuery(async () => {
-    const [standardValues, alignmentValues, batchValues, planValues, templateValues] =
-      await Promise.all([
-        classroomDb.standards.toArray(),
-        classroomDb.standardAlignments.toArray(),
-        classroomDb.standardImportBatches.toArray(),
-        classroomDb.lessonPlans.toArray(),
-        classroomDb.lessonTemplates.toArray(),
-      ]);
+    const [
+      standardValues,
+      alignmentValues,
+      batchValues,
+      importRunValues,
+      planValues,
+      templateValues,
+    ] = await Promise.all([
+      classroomDb.standards.toArray(),
+      classroomDb.standardAlignments.toArray(),
+      classroomDb.standardImportBatches.toArray(),
+      classroomDb.importRuns.toArray(),
+      classroomDb.lessonPlans.toArray(),
+      classroomDb.lessonTemplates.toArray(),
+    ]);
     const standards = standardValues.map((value) => standardSchema.parse(value));
     const alignments = alignmentValues.map((value) => standardAlignmentSchema.parse(value));
     const batches = batchValues.map((value) => standardImportBatchSchema.parse(value));
+    const standardImportRuns = importRunValues.flatMap((value) => {
+      const parsed = importRunSchema.safeParse(value);
+      return parsed.success && parsed.data.importType === 'standards' ? [parsed.data] : [];
+    });
+    const importsById = new Map<string, StandardImportMetadata>();
+    for (const batch of batches) {
+      importsById.set(batch.id, {
+        committedAt: batch.createdAt,
+        worksheetName: batch.worksheetName,
+      });
+    }
+    for (const run of standardImportRuns) {
+      importsById.set(run.id, {
+        committedAt: run.committedAt,
+        worksheetName: run.worksheetName,
+      });
+    }
     const plans = planValues.map((value) => lessonPlanSchema.parse(value));
     const templates = templateValues.map((value) => lessonTemplateSchema.parse(value));
     const views = buildStandardViews(standards, alignments);
@@ -59,7 +88,7 @@ export function StandardsRoute() {
       standards,
       views,
       coverage: buildStandardsCoverageView({ standards, alignments, plans, templates }),
-      batchesById: new Map(batches.map((batch) => [batch.id, batch])),
+      importsById,
       frameworks: [
         ...new Map(views.map((value) => [value.frameworkKey, value.frameworkLabel])).entries(),
       ]
@@ -391,9 +420,9 @@ export function StandardsRoute() {
                 <StandardDetails
                   standard={selected}
                   standards={data?.views ?? []}
-                  importBatch={
+                  importMetadata={
                     selected.importBatchId
-                      ? data?.batchesById.get(selected.importBatchId)
+                      ? data?.importsById.get(selected.importBatchId)
                       : undefined
                   }
                   busy={busy}
@@ -413,7 +442,7 @@ export function StandardsRoute() {
 function StandardDetails({
   standard,
   standards,
-  importBatch,
+  importMetadata,
   busy,
   onEdit,
   onArchive,
@@ -421,7 +450,7 @@ function StandardDetails({
 }: {
   standard: StandardView;
   standards: readonly StandardView[];
-  importBatch?: StandardImportBatch;
+  importMetadata?: StandardImportMetadata;
   busy: boolean;
   onEdit: () => void;
   onArchive: () => void;
@@ -503,8 +532,10 @@ function StandardDetails({
         <div>
           <dt>Imported</dt>
           <dd>
-            {importBatch
-              ? `${new Date(importBatch.createdAt).toLocaleString('en-US')} · ${importBatch.worksheetName}`
+            {importMetadata
+              ? `${new Date(importMetadata.committedAt).toLocaleString('en-US')} · ${
+                  importMetadata.worksheetName ?? 'Source data'
+                }`
               : 'Not imported'}
           </dd>
         </div>

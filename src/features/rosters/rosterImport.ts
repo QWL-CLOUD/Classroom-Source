@@ -1,4 +1,14 @@
 import type { StudentRecord } from '@/domain/models/entities';
+import {
+  MAX_IMPORT_FILE_BYTES,
+  parseImportFile,
+} from '@/features/importCenter/importSourceAdapters';
+import {
+  buildImportTable,
+  normalizeImportHeader,
+  normalizeImportText,
+} from '@/features/importCenter/importTableModel';
+import type { ImportWorkbook } from '@/features/importCenter/importTypes';
 
 import type { RosterImportItem } from './rosterMutationService';
 
@@ -11,6 +21,8 @@ export type RosterImportStatus =
   | 'ambiguous'
   | 'duplicate-file'
   | 'invalid';
+
+export type RosterImportWorkbook = ImportWorkbook & { kind: 'csv' | 'xlsx' };
 
 export interface ParsedRosterImportRow {
   sourceRow: number;
@@ -29,7 +41,6 @@ export interface RosterImportPreviewRow extends ParsedRosterImportRow {
 }
 
 const MAX_IMPORT_ROWS = 500;
-const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
 
 const HEADER_ALIASES = {
   name: ['name', 'studentname', 'fullname', 'student', '姓名', '学生姓名'],
@@ -38,134 +49,61 @@ const HEADER_ALIASES = {
   notes: ['notes', 'studentnotes', 'note', '备注', '学生备注'],
 } as const;
 
-function normalizeHeader(value: string): string {
-  return value
-    .normalize('NFKC')
-    .trim()
-    .toLocaleLowerCase('en')
-    .replace(/[\s_\-–—/]+/g, '');
+function findColumn(headers: readonly string[], aliases: readonly string[]): number {
+  const normalizedAliases = new Set(aliases.map(normalizeImportHeader));
+  return headers.findIndex((header) => normalizedAliases.has(normalizeImportHeader(header)));
+}
+
+function optionalCell(value: string): string | undefined {
+  const normalized = normalizeImportText(value);
+  return normalized || undefined;
 }
 
 export function normalizeStudentImportName(value: string): string {
   return value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('en');
 }
 
-function cellText(value: unknown): string {
-  if (value === null || value === undefined) return '';
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
-  return String(value).trim();
-}
-
-function findColumn(headers: string[], aliases: readonly string[]): number {
-  const normalizedAliases = new Set(aliases.map(normalizeHeader));
-  return headers.findIndex((header) => normalizedAliases.has(header));
-}
-
-function readFileAsText(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onerror = () => {
-      reject(reader.error ?? new Error('The roster file could not be read.'));
-    };
-    reader.onabort = () => {
-      reject(new Error('Reading the roster file was canceled.'));
-    };
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') {
-        reject(new Error('The roster CSV file could not be read as text.'));
-        return;
-      }
-      resolve(reader.result);
-    };
-
-    reader.readAsText(file);
-  });
-}
-
-function readFileAsArrayBuffer(file: File): Promise<ArrayBuffer> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onerror = () => {
-      reject(reader.error ?? new Error('The roster file could not be read.'));
-    };
-    reader.onabort = () => {
-      reject(new Error('Reading the roster file was canceled.'));
-    };
-    reader.onload = () => {
-      if (!(reader.result instanceof ArrayBuffer)) {
-        reject(new Error('The roster Excel file could not be read as binary data.'));
-        return;
-      }
-      resolve(reader.result);
-    };
-
-    reader.readAsArrayBuffer(file);
-  });
-}
-
-async function loadSheetRows(file: File): Promise<unknown[][]> {
-  if (file.size > MAX_IMPORT_BYTES) {
-    throw new Error('Choose a roster file smaller than 5 MB.');
+export async function parseRosterImportFile(file: File): Promise<RosterImportWorkbook> {
+  if (file.size > MAX_IMPORT_FILE_BYTES) {
+    throw new Error('Choose a CSV or XLSX roster file no larger than 20 MB.');
   }
-
-  const extension = file.name.split('.').pop()?.toLocaleLowerCase('en');
-  if (!extension || !['csv', 'xlsx', 'xls'].includes(extension)) {
-    throw new Error('Choose a CSV or Excel (.xlsx or .xls) roster file.');
+  const extension = file.name.split('.').at(-1)?.toLocaleLowerCase('en');
+  if (extension !== 'csv' && extension !== 'xlsx') {
+    throw new Error('Choose a .csv or .xlsx roster file.');
   }
-
-  const XLSX = await import('xlsx');
-  const workbook =
-    extension === 'csv'
-      ? XLSX.read(await readFileAsText(file), { type: 'string' })
-      : XLSX.read(await readFileAsArrayBuffer(file), { type: 'array' });
-  const firstSheetName = workbook.SheetNames[0];
-  if (!firstSheetName) throw new Error('The roster file has no worksheets.');
-  const worksheet = workbook.Sheets[firstSheetName];
-  if (!worksheet) throw new Error('The first worksheet could not be read.');
-
-  return XLSX.utils.sheet_to_json(worksheet, {
-    header: 1,
-    defval: '',
-    blankrows: false,
-    raw: false,
-  }) as unknown[][];
+  const workbook = await parseImportFile(file);
+  if (workbook.kind !== 'csv' && workbook.kind !== 'xlsx') {
+    throw new Error('Choose a .csv or .xlsx roster file.');
+  }
+  return { ...workbook, kind: workbook.kind };
 }
 
-export async function parseRosterImportFile(file: File): Promise<ParsedRosterImportRow[]> {
-  const matrix = await loadSheetRows(file);
-  const headerIndex = matrix.findIndex((row) => row.some((cell) => cellText(cell)));
-  if (headerIndex < 0) throw new Error('The roster file is empty.');
+export function parseRosterImportWorksheet(
+  matrix: readonly (readonly string[])[],
+): ParsedRosterImportRow[] {
+  const table = buildImportTable(matrix);
+  const nameColumn = findColumn(table.headers, HEADER_ALIASES.name);
+  if (nameColumn < 0) throw new Error('The roster worksheet must include a Name column.');
+  const preferredNameColumn = findColumn(table.headers, HEADER_ALIASES.preferredName);
+  const roleColumn = findColumn(table.headers, HEADER_ALIASES.role);
+  const notesColumn = findColumn(table.headers, HEADER_ALIASES.notes);
 
-  const headers = matrix[headerIndex]?.map((value) => normalizeHeader(cellText(value))) ?? [];
-  const nameColumn = findColumn(headers, HEADER_ALIASES.name);
-  if (nameColumn < 0) {
-    throw new Error('The roster file must include a Name column.');
-  }
-  const preferredNameColumn = findColumn(headers, HEADER_ALIASES.preferredName);
-  const roleColumn = findColumn(headers, HEADER_ALIASES.role);
-  const notesColumn = findColumn(headers, HEADER_ALIASES.notes);
-
-  const sourceRows = matrix
-    .slice(headerIndex + 1)
-    .map((row, index): ParsedRosterImportRow => ({
-      sourceRow: headerIndex + index + 2,
-      name: cellText(row[nameColumn]),
+  const rows = table.rows
+    .map((row): ParsedRosterImportRow => ({
+      sourceRow: row.sourceRow,
+      name: normalizeImportText(row.values[nameColumn] ?? ''),
       preferredName:
-        preferredNameColumn >= 0 ? cellText(row[preferredNameColumn]) || undefined : undefined,
-      role: roleColumn >= 0 ? cellText(row[roleColumn]) || undefined : undefined,
-      notes: notesColumn >= 0 ? cellText(row[notesColumn]) || undefined : undefined,
+        preferredNameColumn >= 0 ? optionalCell(row.values[preferredNameColumn] ?? '') : undefined,
+      role: roleColumn >= 0 ? optionalCell(row.values[roleColumn] ?? '') : undefined,
+      notes: notesColumn >= 0 ? optionalCell(row.values[notesColumn] ?? '') : undefined,
     }))
     .filter((row) => Boolean(row.name || row.preferredName || row.role || row.notes));
 
-  if (sourceRows.length === 0) {
-    throw new Error('The roster file has headers but no student rows.');
-  }
-  if (sourceRows.length > MAX_IMPORT_ROWS) {
+  if (rows.length === 0) throw new Error('The roster worksheet has headers but no student rows.');
+  if (rows.length > MAX_IMPORT_ROWS) {
     throw new Error(`Import at most ${MAX_IMPORT_ROWS} students at a time.`);
   }
-  return sourceRows;
+  return rows;
 }
 
 export function buildRosterImportPreview(

@@ -20,9 +20,10 @@ describe('Standard import file parsing', () => {
     const workbook = await parseStandardImportFile(
       new File(['Code,Statement\nA.1,Explain a model.'], 'standards.csv'),
     );
-    expect(workbook).toEqual({
+    expect(workbook).toMatchObject({
       kind: 'csv',
-      sheets: [
+      sourceLabel: 'standards.csv',
+      worksheets: [
         {
           name: 'CSV data',
           rows: [

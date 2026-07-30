@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { classroomDb, type ClassroomDatabase } from '@/data/db/ClassroomDatabase';
 import {
   changeLogSchema,
+  importRunSchema,
   learnerContextSchema,
   rosterMembershipSchema,
   studentRecordSchema,
@@ -13,6 +14,18 @@ import {
 } from '@/domain/models/entities';
 import { clearSupportedRedoBranch } from '@/features/editing/editCommandRegistry';
 import { notifyEditHistoryChanged } from '@/features/editing/editHistorySignal';
+import { applyImportOperations } from '@/features/importCenter/applyImportOperations';
+import {
+  createImportCommand,
+  deleteImportRunOperation,
+  deleteImportedRosterMembershipOperation,
+  deleteImportedStudentOperation,
+  putImportRunOperation,
+  putImportedRosterMembershipOperation,
+  putImportedStudentOperation,
+  serializeImportCommand,
+  type ImportOperation,
+} from '@/features/importCenter/importCommands';
 
 import { applyRosterOperations } from './applyRosterOperations';
 import {
@@ -24,7 +37,6 @@ import {
   putStudentRecordOperation,
   serializeRosterCommand,
   type RosterCommandPair,
-  type RosterOperation,
 } from './rosterCommands';
 
 const optionalTrimmedString = (maximum: number) =>
@@ -63,6 +75,16 @@ const rosterImportItemSchema = z.discriminatedUnion('kind', [
 ]);
 
 export type RosterImportItem = z.input<typeof rosterImportItemSchema>;
+
+const rosterImportCommitOptionsSchema = z.object({
+  sourceKind: z.enum(['csv', 'xlsx']),
+  sourceLabel: optionalTrimmedString(500),
+  worksheetName: z.string().trim().min(1).max(240),
+  totalRows: z.number().int().min(1).max(500),
+  skippedCount: z.number().int().nonnegative().max(500),
+});
+
+export type RosterImportCommitOptions = z.input<typeof rosterImportCommitOptionsSchema>;
 
 export interface RosterImportResult {
   memberships: RosterMembership[];
@@ -378,14 +400,21 @@ export class RosterMutationService {
   async importRoster(
     contextId: string,
     values: readonly RosterImportItem[],
+    optionsValue: RosterImportCommitOptions,
   ): Promise<RosterImportResult> {
     const items = z.array(rosterImportItemSchema).min(1).max(500).parse(values);
+    const options = rosterImportCommitOptionsSchema.parse(optionsValue);
+    if (items.length + options.skippedCount !== options.totalRows) {
+      throw new Error('The roster import summary changed after preview. Generate a new preview.');
+    }
+
     const result = await this.db.transaction(
       'rw',
       [
         this.db.learnerContexts,
         this.db.studentRecords,
         this.db.rosterMemberships,
+        this.db.importRuns,
         this.db.changeLog,
       ],
       async (): Promise<CommitResult<RosterImportResult>> => {
@@ -405,9 +434,9 @@ export class RosterMutationService {
           existingMemberships.map((membership) => membership.studentId),
         );
         const requestedStudentIds = new Set<string>();
-        const forwardOperations: RosterOperation[] = [];
-        const inverseMembershipOperations: RosterOperation[] = [];
-        const inverseStudentOperations: RosterOperation[] = [];
+        const forwardOperations: ImportOperation[] = [];
+        const inverseMembershipOperations: ImportOperation[] = [];
+        const inverseStudentOperations: ImportOperation[] = [];
         const memberships: RosterMembership[] = [];
         let createdStudents = 0;
         let reusedStudents = 0;
@@ -430,8 +459,8 @@ export class RosterMutationService {
               createdAt,
               updatedAt: createdAt,
             });
-            forwardOperations.push(putStudentRecordOperation(student));
-            inverseStudentOperations.unshift(deleteStudentRecordOperation(student.id));
+            forwardOperations.push(putImportedStudentOperation(student));
+            inverseStudentOperations.unshift(deleteImportedStudentOperation(student.id));
             createdStudents += 1;
           }
 
@@ -448,24 +477,51 @@ export class RosterMutationService {
             createdAt: this.now(),
           });
           memberships.push(membership);
-          forwardOperations.push(putRosterMembershipOperation(membership));
-          inverseMembershipOperations.unshift(deleteRosterMembershipOperation(membership.id));
+          forwardOperations.push(putImportedRosterMembershipOperation(membership));
+          inverseMembershipOperations.unshift(
+            deleteImportedRosterMembershipOperation(membership.id),
+          );
         }
 
-        const commands: RosterCommandPair = {
-          forward: createRosterCommand(forwardOperations),
-          inverse: createRosterCommand([
-            ...inverseMembershipOperations,
-            ...inverseStudentOperations,
-          ]),
-        };
+        const importRun = importRunSchema.parse({
+          id: this.createId(),
+          importType: 'roster',
+          sourceKind: options.sourceKind,
+          sourceLabel: options.sourceLabel,
+          worksheetName: options.worksheetName,
+          contextId: context.id,
+          totalRows: options.totalRows,
+          createdCount: memberships.length,
+          updatedCount: 0,
+          skippedCount: options.skippedCount,
+          reviewCount: 0,
+          blockedCount: 0,
+          summaryJson: JSON.stringify({ createdStudents, reusedStudents }),
+          committedAt: this.now(),
+        });
+        const forward = createImportCommand([
+          putImportRunOperation(importRun),
+          ...forwardOperations,
+        ]);
+        const inverse = createImportCommand([
+          ...inverseMembershipOperations,
+          ...inverseStudentOperations,
+          deleteImportRunOperation(importRun.id),
+        ]);
         const label = `Import ${memberships.length} student${
           memberships.length === 1 ? '' : 's'
         } to ${context.name}`;
-        const log = this.createChangeLog('roster.membership-import', label, commands);
+        const log = changeLogSchema.parse({
+          id: this.createId(),
+          label,
+          commandType: 'import-center.roster',
+          forwardJson: serializeImportCommand(forward),
+          inverseJson: serializeImportCommand(inverse),
+          createdAt: this.now(),
+        });
 
         await clearSupportedRedoBranch(this.db);
-        await applyRosterOperations(this.db, commands.forward.operations);
+        await applyImportOperations(this.db, forward.operations);
         await this.db.changeLog.put(log);
         return {
           value: { memberships, createdStudents, reusedStudents },

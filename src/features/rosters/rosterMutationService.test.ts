@@ -109,24 +109,34 @@ describe('Student and roster foundation', () => {
       createdAt: '2026-07-27T11:00:00.000Z',
       updatedAt: '2026-07-27T11:00:00.000Z',
     });
-    ids = ['membership-existing', 'student-new', 'membership-new', 'log-import'];
+    ids = ['membership-existing', 'student-new', 'membership-new', 'import-run', 'log-import'];
 
-    const result = await mutation.importRoster('class-1', [
-      {
-        kind: 'existing',
-        studentId: 'student-existing',
-        role: 'Student',
-      },
-      {
-        kind: 'new',
-        student: {
-          name: 'Elena Park',
-          preferredName: 'Ellie',
-          notes: 'Imported Student',
+    const result = await mutation.importRoster(
+      'class-1',
+      [
+        {
+          kind: 'existing',
+          studentId: 'student-existing',
+          role: 'Student',
         },
-        role: 'Student',
+        {
+          kind: 'new',
+          student: {
+            name: 'Elena Park',
+            preferredName: 'Ellie',
+            notes: 'Imported Student',
+          },
+          role: 'Student',
+        },
+      ],
+      {
+        sourceKind: 'xlsx',
+        sourceLabel: 'roster.xlsx',
+        worksheetName: 'Grade 3',
+        totalRows: 3,
+        skippedCount: 1,
       },
-    ]);
+    );
 
     expect(result).toMatchObject({
       createdStudents: 1,
@@ -136,15 +146,27 @@ describe('Student and roster foundation', () => {
     expect(await database.studentRecords.get('student-existing')).toBeDefined();
     expect(await database.studentRecords.get('student-new')).toBeDefined();
     expect(await database.rosterMemberships.count()).toBe(2);
+    expect(await database.importRuns.get('import-run')).toMatchObject({
+      importType: 'roster',
+      contextId: 'class-1',
+      sourceKind: 'xlsx',
+      sourceLabel: 'roster.xlsx',
+      worksheetName: 'Grade 3',
+      totalRows: 3,
+      createdCount: 2,
+      skippedCount: 1,
+    });
 
     await history.undo();
     expect(await database.studentRecords.get('student-existing')).toBeDefined();
     expect(await database.studentRecords.get('student-new')).toBeUndefined();
     expect(await database.rosterMemberships.count()).toBe(0);
+    expect(await database.importRuns.count()).toBe(0);
 
     await history.redo();
     expect(await database.studentRecords.get('student-new')).toBeDefined();
     expect(await database.rosterMemberships.count()).toBe(2);
+    expect(await database.importRuns.count()).toBe(1);
   });
 
   it('creates a Student and Individual link as one atomic undoable action', async () => {
