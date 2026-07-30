@@ -4,11 +4,17 @@ import {
   categoryAssignmentSchema,
   importRunSchema,
   libraryCatalogItemSchema,
+  rosterMembershipSchema,
   standardAlignmentSchema,
+  standardSchema,
+  studentRecordSchema,
   type CategoryAssignment,
   type ImportRun,
   type LibraryCatalogItem,
+  type RosterMembership,
+  type Standard,
   type StandardAlignment,
+  type StudentRecord,
 } from '@/domain/models/entities';
 
 export const IMPORT_CENTER_COMMAND_PREFIX = 'import-center.';
@@ -43,6 +49,38 @@ const deleteCategoryAssignmentOperationSchema = z.object({
   table: z.literal('categoryAssignments'),
   id: z.string().min(1),
 });
+
+const putStandardOperationSchema = z.object({
+  action: z.literal('put'),
+  table: z.literal('standards'),
+  record: standardSchema,
+});
+const deleteStandardOperationSchema = z.object({
+  action: z.literal('delete'),
+  table: z.literal('standards'),
+  id: z.string().min(1),
+});
+const putStudentRecordOperationSchema = z.object({
+  action: z.literal('put'),
+  table: z.literal('studentRecords'),
+  record: studentRecordSchema,
+});
+const deleteStudentRecordOperationSchema = z.object({
+  action: z.literal('delete'),
+  table: z.literal('studentRecords'),
+  id: z.string().min(1),
+});
+const putRosterMembershipOperationSchema = z.object({
+  action: z.literal('put'),
+  table: z.literal('rosterMemberships'),
+  record: rosterMembershipSchema,
+});
+const deleteRosterMembershipOperationSchema = z.object({
+  action: z.literal('delete'),
+  table: z.literal('rosterMemberships'),
+  id: z.string().min(1),
+});
+
 const putStandardAlignmentOperationSchema = z.object({
   action: z.literal('put'),
   table: z.literal('standardAlignments'),
@@ -63,6 +101,12 @@ export const importOperationSchema = z.union([
   deleteCategoryAssignmentOperationSchema,
   putStandardAlignmentOperationSchema,
   deleteStandardAlignmentOperationSchema,
+  putStandardOperationSchema,
+  deleteStandardOperationSchema,
+  putStudentRecordOperationSchema,
+  deleteStudentRecordOperationSchema,
+  putRosterMembershipOperationSchema,
+  deleteRosterMembershipOperationSchema,
 ]);
 
 export const importCommandSchema = z.object({
@@ -132,4 +176,32 @@ export function putImportStandardAlignmentOperation(record: StandardAlignment): 
 
 export function deleteImportStandardAlignmentOperation(id: string): ImportOperation {
   return { action: 'delete', table: 'standardAlignments', id };
+}
+
+export function putImportedStandardOperation(record: Standard): ImportOperation {
+  return { action: 'put', table: 'standards', record: standardSchema.parse(record) };
+}
+
+export function deleteImportedStandardOperation(id: string): ImportOperation {
+  return { action: 'delete', table: 'standards', id };
+}
+
+export function putImportedStudentOperation(record: StudentRecord): ImportOperation {
+  return { action: 'put', table: 'studentRecords', record: studentRecordSchema.parse(record) };
+}
+
+export function deleteImportedStudentOperation(id: string): ImportOperation {
+  return { action: 'delete', table: 'studentRecords', id };
+}
+
+export function putImportedRosterMembershipOperation(record: RosterMembership): ImportOperation {
+  return {
+    action: 'put',
+    table: 'rosterMemberships',
+    record: rosterMembershipSchema.parse(record),
+  };
+}
+
+export function deleteImportedRosterMembershipOperation(id: string): ImportOperation {
+  return { action: 'delete', table: 'rosterMemberships', id };
 }

@@ -21,14 +21,21 @@ async function readImportCounts(page: Page) {
       request.onsuccess = () => resolve(request.result);
     });
     try {
-      const transaction = database.transaction(['standards', 'standardImportBatches'], 'readonly');
+      const transaction = database.transaction(
+        ['standards', 'standardImportBatches', 'importRuns'],
+        'readonly',
+      );
       const count = (store: string) =>
         new Promise<number>((resolve, reject) => {
           const request = transaction.objectStore(store).count();
           request.onerror = () => reject(request.error);
           request.onsuccess = () => resolve(request.result);
         });
-      return { standards: await count('standards'), batches: await count('standardImportBatches') };
+      return {
+        standards: await count('standards'),
+        batches: await count('standardImportBatches'),
+        runs: await count('importRuns'),
+      };
     } finally {
       database.close();
     }
@@ -82,13 +89,40 @@ async function fillSource(page: Page): Promise<void> {
   await sourceSection.getByLabel(/Source note/).fill('Reviewed locally for import.');
 }
 
+test('Import Center uses one route for available and planned import types', async ({ page }) => {
+  await page.goto('./#/import');
+  await expect(page.getByRole('heading', { level: 1, name: 'Import Center' })).toBeVisible();
+  const importTypes = page.getByRole('navigation', { name: 'Import types' });
+  await expect(importTypes.getByRole('link', { name: /Rosters/ })).toHaveAttribute(
+    'href',
+    '#/import?type=roster',
+  );
+  await expect(importTypes.getByRole('link', { name: /Standards/ })).toHaveAttribute(
+    'href',
+    '#/import?type=standards',
+  );
+  await expect(importTypes.getByText('Activities', { exact: true })).toBeVisible();
+  await expect(importTypes.getByText('Resources', { exact: true })).toBeVisible();
+  await expect(importTypes.getByText('Assessments', { exact: true })).toBeVisible();
+
+  await importTypes.getByRole('link', { name: /Standards/ }).click();
+  await expect(page).toHaveURL(/#\/import\?type=standards$/);
+  await expect(page.getByRole('heading', { name: 'Import Standards' })).toBeVisible();
+
+  await page.goto('./#/import?type=standards&context=class-1');
+  await expect(page.getByRole('alert')).toContainText(
+    'Only Roster import accepts a target Class or Group context.',
+  );
+  await expect(page.getByRole('heading', { name: 'Import Standards' })).toHaveCount(0);
+});
+
 test('Standards CSV import previews without writes, commits atomically, and globally undoes', async ({
   page,
 }) => {
-  await page.goto('./#/import');
+  await page.goto('./#/import?type=standards');
   await seedExistingStandard(page);
   await page.reload();
-  await page.getByLabel('Choose file').setInputFiles({
+  await page.getByLabel('Choose CSV or XLSX Standards file').setInputFiles({
     name: 'reviewed-standards.csv',
     mimeType: 'text/csv',
     buffer: Buffer.from(
@@ -104,7 +138,7 @@ test('Standards CSV import previews without writes, commits atomically, and glob
   await expect(page.getByRole('heading', { name: 'Review every classified row' })).toBeVisible();
   await expect(page.getByText('Valid new Standard')).toHaveCount(1);
   await expect(page.getByText('Reviewed update')).toHaveCount(1);
-  await expect.poll(() => readImportCounts(page)).toEqual({ standards: 1, batches: 0 });
+  await expect.poll(() => readImportCounts(page)).toEqual({ standards: 1, batches: 0, runs: 0 });
 
   const accessibility = await new AxeBuilder({ page }).analyze();
   expect(accessibility.violations).toEqual([]);
@@ -113,33 +147,43 @@ test('Standards CSV import previews without writes, commits atomically, and glob
   await page.getByLabel(/Commit this complete preview/).check();
   await page.getByRole('button', { name: 'Commit reviewed import' }).click();
   await expect(page.getByText(/Committed 1 new and 1 updated Standards/)).toBeVisible();
-  await expect.poll(() => readImportCounts(page)).toEqual({ standards: 2, batches: 1 });
+  await expect.poll(() => readImportCounts(page)).toEqual({ standards: 2, batches: 0, runs: 1 });
 
   await page.reload();
-  await expect.poll(() => readImportCounts(page)).toEqual({ standards: 2, batches: 1 });
+  await expect.poll(() => readImportCounts(page)).toEqual({ standards: 2, batches: 0, runs: 1 });
   await page.goto('./#/standards');
   await page.getByRole('button', { name: /3\.NF\.A\.1/ }).click();
   await expect(page.getByText('Reviewed Mathematics Framework', { exact: true })).toBeVisible();
   await expect(page.getByText('Reviewed locally for import.')).toBeVisible();
+  await expect(
+    page.getByRole('article', { name: '3.NF.A.1 Standard details' }).getByText(/CSV data/),
+  ).toBeVisible();
 
   await page.getByRole('button', { name: 'Undo' }).click();
-  await expect.poll(() => readImportCounts(page)).toEqual({ standards: 1, batches: 0 });
+  await expect.poll(() => readImportCounts(page)).toEqual({ standards: 1, batches: 0, runs: 0 });
   await expect(page.getByText('Old fraction statement.')).toBeVisible();
+  await expect(
+    page.getByRole('article', { name: '3.NF.A.1 Standard details' }).getByText('Not imported'),
+  ).toBeVisible();
 });
 
 test('Standards XLSX import requires worksheet selection and preserves local preview-only behavior', async ({
   page,
 }) => {
-  await page.goto('./#/import');
+  await page.goto('./#/import?type=standards');
   await waitForSchema(page);
-  await page.getByLabel('Choose file').setInputFiles({
+  await page.getByLabel('Choose CSV or XLSX Standards file').setInputFiles({
     name: 'reviewed-standards.xlsx',
     mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     buffer: Buffer.from(xlsxFixtureBase64, 'base64'),
   });
 
-  await expect(page.getByLabel('Worksheet', { exact: true })).toHaveValue('0');
-  await page.getByLabel('Worksheet', { exact: true }).selectOption({ label: 'Standards' });
+  const worksheetSelect = page.getByRole('combobox', {
+    name: 'Worksheet',
+    exact: true,
+  });
+  await expect(worksheetSelect).toHaveValue('0');
+  await worksheetSelect.selectOption({ label: 'Standards' });
   await fillSource(page);
   await expect(page.getByLabel(/Parent code/)).toHaveValue('4');
   await page.getByRole('button', { name: 'Generate reviewed preview' }).click();
@@ -149,16 +193,16 @@ test('Standards XLSX import requires worksheet selection and preserves local pre
   const previewCodeCells = previewTable.locator('tbody td:nth-child(3) > strong');
   await expect(previewCodeCells.filter({ hasText: /^3\.NF\.A$/ })).toBeVisible();
   await expect(previewCodeCells.filter({ hasText: /^3\.NF\.A\.1$/ })).toBeVisible();
-  await expect.poll(() => readImportCounts(page)).toEqual({ standards: 0, batches: 0 });
+  await expect.poll(() => readImportCounts(page)).toEqual({ standards: 0, batches: 0, runs: 0 });
 });
 
 test('Standards import controls remain contained and keyboard reachable on a compact viewport', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('./#/import');
+  await page.goto('./#/import?type=standards');
   await waitForSchema(page);
-  await page.getByLabel('Choose file').setInputFiles({
+  await page.getByLabel('Choose CSV or XLSX Standards file').setInputFiles({
     name: 'compact.csv',
     mimeType: 'text/csv',
     buffer: Buffer.from('Code,Statement\nA.1,Explain a model.\n'),

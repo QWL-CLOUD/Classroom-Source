@@ -1,29 +1,30 @@
 import { classroomDb, type ClassroomDatabase } from '@/data/db/ClassroomDatabase';
 import {
   changeLogSchema,
+  importRunSchema,
   standardSchema,
   type ChangeLog,
   type Standard,
 } from '@/domain/models/entities';
 import { clearSupportedRedoBranch } from '@/features/editing/editCommandRegistry';
 import { notifyEditHistoryChanged } from '@/features/editing/editHistorySignal';
-import { applyStandardOperations } from '@/features/standards/applyStandardOperations';
+import { applyImportOperations } from '@/features/importCenter/applyImportOperations';
 import {
-  createStandardCommand,
-  deleteStandardImportBatchOperation,
-  deleteStandardOperation,
-  putStandardImportBatchOperation,
-  putStandardOperation,
-  serializeStandardCommand,
-  type StandardCommandPair,
-  type StandardOperation,
-} from '@/features/standards/standardCommands';
+  createImportCommand,
+  deleteImportRunOperation,
+  deleteImportedStandardOperation,
+  putImportRunOperation,
+  putImportedStandardOperation,
+  serializeImportCommand,
+  type ImportOperation,
+} from '@/features/importCenter/importCommands';
 
 import type { StandardImportFileKind } from './standardImportFileParser';
-import { buildStandardImportBatch, type StandardImportPreview } from './standardImportModel';
+import type { StandardImportPreview } from './standardImportModel';
 
 export interface CommitStandardImportOptions {
   fileKind: StandardImportFileKind;
+  sourceLabel?: string;
   worksheetName: string;
   confirmUpdates: boolean;
   confirmCommit: boolean;
@@ -74,9 +75,12 @@ export class StandardImportMutationService {
 
     const result = await this.db.transaction(
       'rw',
-      [this.db.standards, this.db.standardImportBatches, this.db.changeLog],
+      [this.db.standards, this.db.standardImportBatches, this.db.importRuns, this.db.changeLog],
       async (): Promise<StandardImportCommitResult> => {
-        if (await this.db.standardImportBatches.get(preview.batchId)) {
+        if (
+          (await this.db.importRuns.get(preview.batchId)) ||
+          (await this.db.standardImportBatches.get(preview.batchId))
+        ) {
           throw new Error('This reviewed import batch has already been committed.');
         }
 
@@ -87,8 +91,8 @@ export class StandardImportMutationService {
         const currentByIdentity = new Map(currentValues.map((value) => [identityOf(value), value]));
         const created: Standard[] = [];
         const updated: Standard[] = [];
-        const inverseStandards: StandardOperation[] = [];
-        const forwardStandards: StandardOperation[] = [];
+        const inverseStandards: ImportOperation[] = [];
+        const forwardStandards: ImportOperation[] = [];
 
         for (const row of preview.rows) {
           if (row.classification === 'exact-duplicate') {
@@ -113,8 +117,8 @@ export class StandardImportMutationService {
               throw new Error(`Row ${row.rowNumber} identity changed after preview.`);
             }
             created.push(planned);
-            forwardStandards.push(putStandardOperation(planned));
-            inverseStandards.unshift(deleteStandardOperation(planned.id));
+            forwardStandards.push(putImportedStandardOperation(planned));
+            inverseStandards.unshift(deleteImportedStandardOperation(planned.id));
             currentById.set(planned.id, planned);
             currentByIdentity.set(identityOf(planned), planned);
           } else {
@@ -129,35 +133,47 @@ export class StandardImportMutationService {
               throw new Error(`Row ${row.rowNumber} identity now conflicts with another Standard.`);
             }
             updated.push(planned);
-            forwardStandards.push(putStandardOperation(planned));
-            inverseStandards.unshift(putStandardOperation(expected));
+            forwardStandards.push(putImportedStandardOperation(planned));
+            inverseStandards.unshift(putImportedStandardOperation(expected));
             currentById.set(planned.id, planned);
             currentByIdentity.set(identityOf(planned), planned);
           }
         }
 
         this.validateHierarchy([...currentById.values()]);
-        const batch = buildStandardImportBatch(preview, options.fileKind, options.worksheetName);
-        const commands: StandardCommandPair = {
-          forward: createStandardCommand([
-            putStandardImportBatchOperation(batch),
-            ...forwardStandards,
-          ]),
-          inverse: createStandardCommand([
-            ...inverseStandards,
-            deleteStandardImportBatchOperation(batch.id),
-          ]),
-        };
+        const importRun = importRunSchema.parse({
+          id: preview.batchId,
+          importType: 'standards',
+          sourceKind: options.fileKind,
+          sourceLabel: options.sourceLabel?.trim() || preview.source.sourceName,
+          worksheetName: options.worksheetName,
+          totalRows: preview.summary.total,
+          createdCount: preview.summary.newCount,
+          updatedCount: preview.summary.updateCount,
+          skippedCount: preview.summary.duplicateCount,
+          reviewCount: 0,
+          blockedCount: 0,
+          summaryJson: JSON.stringify({ source: preview.source }),
+          committedAt: preview.generatedAt,
+        });
+        const forward = createImportCommand([
+          putImportRunOperation(importRun),
+          ...forwardStandards,
+        ]);
+        const inverse = createImportCommand([
+          ...inverseStandards,
+          deleteImportRunOperation(importRun.id),
+        ]);
         const log = changeLogSchema.parse({
           id: this.createId(),
           label: `Import ${preview.summary.newCount + preview.summary.updateCount} reviewed Standards`,
-          commandType: 'standard.import.reviewed',
-          forwardJson: serializeStandardCommand(commands.forward),
-          inverseJson: serializeStandardCommand(commands.inverse),
+          commandType: 'import-center.standards.reviewed',
+          forwardJson: serializeImportCommand(forward),
+          inverseJson: serializeImportCommand(inverse),
           createdAt: preview.generatedAt,
         });
         await clearSupportedRedoBranch(this.db);
-        await applyStandardOperations(this.db, commands.forward.operations);
+        await applyImportOperations(this.db, forward.operations);
         await this.db.changeLog.put(log);
         return {
           created,

@@ -6,6 +6,7 @@ import type { StudentRecord } from '@/domain/models/entities';
 import {
   buildRosterImportPreview,
   parseRosterImportFile,
+  parseRosterImportWorksheet,
   toRosterImportItems,
 } from './rosterImport';
 
@@ -36,7 +37,8 @@ describe('roster import parsing and preview', () => {
       { type: 'text/csv' },
     );
 
-    const rows = await parseRosterImportFile(file);
+    const workbook = await parseRosterImportFile(file);
+    const rows = parseRosterImportWorksheet(workbook.worksheets[0]?.rows ?? []);
     const preview = buildRosterImportPreview(
       rows,
       [student('amy', 'Amy Chen'), student('dana', 'Dana Old', 'archived')],
@@ -67,33 +69,45 @@ describe('roster import parsing and preview', () => {
     ]);
   });
 
-  it('parses the first worksheet of an XLSX roster file', async () => {
-    const worksheet = XLSX.utils.aoa_to_sheet([
+  it('preserves XLSX worksheet selection before building roster rows', async () => {
+    const first = XLSX.utils.aoa_to_sheet([
       ['Name', 'Preferred Name', 'Role', 'Notes'],
-      ['XLSX Student', 'Excel', 'Student', 'Imported from workbook'],
+      ['First Student', 'First', 'Student', 'First sheet'],
+    ]);
+    const second = XLSX.utils.aoa_to_sheet([
+      ['Name', 'Preferred Name', 'Role', 'Notes'],
+      ['Second Student', 'Second', 'Student', 'Selected sheet'],
     ]);
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Roster Import');
+    XLSX.utils.book_append_sheet(workbook, first, 'First Roster');
+    XLSX.utils.book_append_sheet(workbook, second, 'Second Roster');
     const data = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
     const file = new File([data], 'roster.xlsx', {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
 
-    await expect(parseRosterImportFile(file)).resolves.toEqual([
+    const parsed = await parseRosterImportFile(file);
+    expect(parsed.worksheets.map((sheet) => sheet.name)).toEqual(['First Roster', 'Second Roster']);
+    expect(parseRosterImportWorksheet(parsed.worksheets[1]?.rows ?? [])).toEqual([
       {
         sourceRow: 2,
-        name: 'XLSX Student',
-        preferredName: 'Excel',
+        name: 'Second Student',
+        preferredName: 'Second',
         role: 'Student',
-        notes: 'Imported from workbook',
+        notes: 'Selected sheet',
       },
     ]);
   });
 
-  it('rejects a file without a Name column', async () => {
-    const file = new File(['Nickname,Role\nAmy,Student\n'], 'bad.csv', {
-      type: 'text/csv',
-    });
-    await expect(parseRosterImportFile(file)).rejects.toThrow(/Name column/);
+  it('rejects a selected worksheet without a Name column', async () => {
+    expect(() =>
+      parseRosterImportWorksheet([
+        ['Nickname', 'Role'],
+        ['Amy', 'Student'],
+      ]),
+    ).toThrow(/Name column/);
+    await expect(parseRosterImportFile(new File(['[]'], 'roster.json'))).rejects.toThrow(
+      /\.csv or \.xlsx/,
+    );
   });
 });

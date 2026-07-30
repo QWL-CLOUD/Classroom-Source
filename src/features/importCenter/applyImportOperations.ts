@@ -16,10 +16,19 @@ export async function applyImportOperations(
     } else if (operation.table === 'categoryAssignments') {
       if (operation.action === 'put') await db.categoryAssignments.put(operation.record);
       else await db.categoryAssignments.delete(operation.id);
+    } else if (operation.table === 'standardAlignments') {
+      if (operation.action === 'put') await db.standardAlignments.put(operation.record);
+      else await db.standardAlignments.delete(operation.id);
+    } else if (operation.table === 'standards') {
+      if (operation.action === 'put') await db.standards.put(operation.record);
+      else await db.standards.delete(operation.id);
+    } else if (operation.table === 'studentRecords') {
+      if (operation.action === 'put') await db.studentRecords.put(operation.record);
+      else await db.studentRecords.delete(operation.id);
     } else if (operation.action === 'put') {
-      await db.standardAlignments.put(operation.record);
+      await db.rosterMemberships.put(operation.record);
     } else {
-      await db.standardAlignments.delete(operation.id);
+      await db.rosterMemberships.delete(operation.id);
     }
   }
 }
