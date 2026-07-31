@@ -109,6 +109,18 @@ test('Import Center uses one route for available and planned import types', asyn
   await expect(page).toHaveURL(/#\/import\?type=standards$/);
   await expect(page.getByRole('heading', { name: 'Import Standards' })).toBeVisible();
 
+  const xlsxDownloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Excel template' }).click();
+  expect((await xlsxDownloadPromise).suggestedFilename()).toBe(
+    'Classroom-Standards-Import-Template.xlsx',
+  );
+
+  const csvDownloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'CSV template' }).click();
+  expect((await csvDownloadPromise).suggestedFilename()).toBe(
+    'Classroom-Standards-Import-Template.csv',
+  );
+
   await page.goto('./#/import?type=standards&context=class-1');
   await expect(page.getByRole('alert')).toContainText(
     'Only Roster import accepts a target Class or Group context.',

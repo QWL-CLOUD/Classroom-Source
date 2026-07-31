@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { AlertTriangle, CheckCircle2, Import } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Download, Import } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -9,6 +9,7 @@ import {
   parseStandardImportFile,
   type StandardImportWorkbook,
 } from '@/features/standardImport/standardImportFileParser';
+import { downloadStandardImportTemplate } from '@/features/standardImport/standardImportTemplate';
 import {
   buildStandardImportPreview,
   buildStandardImportTable,
@@ -211,6 +212,22 @@ export function StandardsImportWorkspace() {
           <p>
             Review source attribution, hierarchy, duplicates, and updates before one atomic commit.
           </p>
+        </div>
+        <div className={styles.templateActions}>
+          <button
+            className="button"
+            type="button"
+            onClick={() => downloadStandardImportTemplate('xlsx')}
+          >
+            <Download aria-hidden="true" size={16} /> Excel template
+          </button>
+          <button
+            className="button"
+            type="button"
+            onClick={() => downloadStandardImportTemplate('csv')}
+          >
+            <Download aria-hidden="true" size={16} /> CSV template
+          </button>
         </div>
       </div>
 
