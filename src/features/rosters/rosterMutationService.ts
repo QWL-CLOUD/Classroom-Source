@@ -77,7 +77,7 @@ const rosterImportItemSchema = z.discriminatedUnion('kind', [
 export type RosterImportItem = z.input<typeof rosterImportItemSchema>;
 
 const rosterImportCommitOptionsSchema = z.object({
-  sourceKind: z.enum(['csv', 'xlsx']),
+  sourceKind: z.enum(['csv', 'xlsx', 'paste-table']),
   sourceLabel: optionalTrimmedString(500),
   worksheetName: z.string().trim().min(1).max(240),
   totalRows: z.number().int().min(1).max(500),

@@ -23,9 +23,11 @@ export interface ImportSourcePanelProps {
   sourceModes?: readonly ImportSourcePanelMode[];
   sourceMode?: ImportSourcePanelMode;
   onSourceModeChange?: (mode: ImportSourcePanelMode) => void;
+  fileModeLabel?: string;
   pasteInputId?: string;
   pasteValue?: string;
   pasteLabel?: string;
+  pastePlaceholder?: string;
   onPasteValueChange?: (value: string) => void;
   onParsePaste?: () => void;
 }
@@ -47,9 +49,11 @@ export function ImportSourcePanel({
   sourceModes = ['file'],
   sourceMode = 'file',
   onSourceModeChange,
+  fileModeLabel = 'File: CSV, XLSX, or JSON',
   pasteInputId = `${headingId}-paste-table`,
   pasteValue = '',
   pasteLabel = 'Paste a table with one header row',
+  pastePlaceholder = 'title\tduration_minutes\tgrouping\nPartner retell\t12\tpartners',
   onPasteValueChange,
   onParsePaste,
 }: ImportSourcePanelProps) {
@@ -89,7 +93,7 @@ export function ImportSourcePanel({
                   disabled={busy}
                   onChange={() => onSourceModeChange?.(mode)}
                 />
-                <span>{mode === 'file' ? 'File: CSV, XLSX, or JSON' : 'Pasted table'}</span>
+                <span>{mode === 'file' ? fileModeLabel : 'Pasted table'}</span>
               </label>
             ))}
           </div>
@@ -124,7 +128,7 @@ export function ImportSourcePanel({
             value={pasteValue}
             disabled={busy}
             onChange={(event) => onPasteValueChange?.(event.target.value)}
-            placeholder="title\tduration_minutes\tgrouping\nPartner retell\t12\tpartners"
+            placeholder={pastePlaceholder}
           />
           <div className={styles.actions}>
             <button

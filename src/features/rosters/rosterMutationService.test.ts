@@ -169,6 +169,52 @@ describe('Student and roster foundation', () => {
     expect(await database.importRuns.count()).toBe(1);
   });
 
+  it('records pasted-table source metadata and preserves atomic Undo/Redo', async () => {
+    ids = ['student-pasted', 'membership-pasted', 'import-run-pasted', 'log-pasted'];
+
+    await mutation.importRoster(
+      'group-1',
+      [
+        {
+          kind: 'new',
+          student: {
+            name: 'Pasted Student',
+            preferredName: 'Paste',
+          },
+          role: 'Student',
+        },
+      ],
+      {
+        sourceKind: 'paste-table',
+        sourceLabel: 'Pasted table',
+        worksheetName: 'Pasted table',
+        totalRows: 1,
+        skippedCount: 0,
+      },
+    );
+
+    expect(await database.importRuns.get('import-run-pasted')).toMatchObject({
+      importType: 'roster',
+      contextId: 'group-1',
+      sourceKind: 'paste-table',
+      sourceLabel: 'Pasted table',
+      worksheetName: 'Pasted table',
+      totalRows: 1,
+      createdCount: 1,
+      skippedCount: 0,
+    });
+
+    await history.undo();
+    expect(await database.studentRecords.get('student-pasted')).toBeUndefined();
+    expect(await database.rosterMemberships.get('membership-pasted')).toBeUndefined();
+    expect(await database.importRuns.get('import-run-pasted')).toBeUndefined();
+
+    await history.redo();
+    expect(await database.studentRecords.get('student-pasted')).toBeDefined();
+    expect(await database.rosterMemberships.get('membership-pasted')).toBeDefined();
+    expect(await database.importRuns.get('import-run-pasted')).toBeDefined();
+  });
+
   it('creates a Student and Individual link as one atomic undoable action', async () => {
     ids = ['student-linked', 'log-create-and-link'];
 
