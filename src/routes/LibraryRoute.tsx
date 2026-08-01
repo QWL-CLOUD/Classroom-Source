@@ -33,6 +33,7 @@ import {
 import {
   libraryActivityGroupingLabels,
   libraryAssessmentKindLabels,
+  safeLibraryResourceHref,
 } from '@/features/libraryCatalog/libraryCatalogTypedFields';
 
 import styles from './LibraryRoute.module.css';
@@ -530,7 +531,19 @@ function LibraryItemDetail({
           <dl className={styles.facts}>
             <div>
               <dt>Source or location</dt>
-              <dd>{item.typedFields.sourceLocation ?? 'Not specified'}</dd>
+              <dd>
+                {safeLibraryResourceHref(item.typedFields.sourceLocation) ? (
+                  <a
+                    href={safeLibraryResourceHref(item.typedFields.sourceLocation)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {item.typedFields.sourceLocation}
+                  </a>
+                ) : (
+                  (item.typedFields.sourceLocation ?? 'Not specified')
+                )}
+              </dd>
             </div>
           </dl>
           {item.typedFields.usageNotes ? (

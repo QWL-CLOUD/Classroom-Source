@@ -19,6 +19,11 @@ describe('Import Center route state', () => {
       contextId: undefined,
     });
     expect(buildImportCenterHref('activities')).toBe('/import?type=activities');
+    expect(parseImportRouteState(new URLSearchParams('type=resources'))).toEqual({
+      importType: 'resources',
+      contextId: undefined,
+    });
+    expect(buildImportCenterHref('resources')).toBe('/import?type=resources');
   });
 
   it('rejects ambiguous, unknown, and cross-domain query state', () => {

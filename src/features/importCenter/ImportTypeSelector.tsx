@@ -43,9 +43,9 @@ const options: Array<{
   {
     type: 'resources',
     label: 'Resources',
-    description: 'Metadata and URL import arrives in Phase 3I-0.5D.',
+    description: 'Create reviewed Library Resource records from metadata and references.',
     icon: PackageOpen,
-    available: false,
+    available: true,
   },
   {
     type: 'assessments',
