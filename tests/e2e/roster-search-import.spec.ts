@@ -270,6 +270,121 @@ test('CSV roster import previews duplicate decisions and commits as one global U
   await expect(list.getByLabel('Ellie, active student')).toBeVisible();
 });
 
+test('Pasted roster import invalidates stale review and records canonical source metadata', async ({
+  page,
+}) => {
+  await seed(page);
+  const roster = page.getByRole('region', { name: 'Roster for Import Grade 3' });
+  await roster.getByRole('link', { name: 'Import students' }).click();
+
+  const fileMode = page.getByLabel('File: CSV or XLSX');
+  const pasteMode = page.getByLabel('Pasted table');
+  await expect(fileMode).toBeChecked();
+  await pasteMode.check();
+
+  const pastedRows = [
+    'Name\tPreferred Name\tRole\tNotes',
+    'Amy Chen\tAmy\tStudent\tReuse existing',
+    'Elena Park\tEllie\tStudent\tCreate new',
+  ].join('\n');
+  const pastedInput = page.getByLabel('Paste roster rows with one header row');
+  await pastedInput.fill(pastedRows);
+  await page.getByRole('button', { name: 'Review pasted table' }).click();
+
+  const preview = page.getByLabel('Scrollable roster import preview');
+  await expect(preview.getByText('Amy Chen', { exact: true })).toBeVisible();
+  await expect(preview.getByText('Elena Park', { exact: true })).toBeVisible();
+  await expect
+    .poll(() => readRosterImportState(page))
+    .toEqual({
+      students: 3,
+      memberships: 1,
+      rosterRuns: 0,
+    });
+
+  const revisedRows = pastedRows.replace('Create new', 'Create after re-review');
+  await pastedInput.fill(revisedRows);
+  await expect(preview).toHaveCount(0);
+  await expect(page.getByText('No database writes yet')).toHaveCount(0);
+
+  await fileMode.check();
+  await expect(pastedInput).toHaveCount(0);
+  await expect(preview).toHaveCount(0);
+  await pasteMode.check();
+  await expect(page.getByLabel('Paste roster rows with one header row')).toHaveValue(revisedRows);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const compactInput = page.getByLabel('Paste roster rows with one header row');
+  await compactInput.focus();
+  await expect(compactInput).toBeFocused();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(accessibility.violations).toEqual([]);
+
+  await page.getByRole('button', { name: 'Review pasted table' }).click();
+  await page.getByLabel(/Commit the selected Student rows/).check();
+  await page.getByRole('button', { name: 'Import 2 students' }).click();
+  await expect(page.getByText(/Imported 2 students: 1 new and 1 existing/)).toBeVisible();
+  await expect
+    .poll(() => readRosterImportState(page))
+    .toEqual({
+      students: 4,
+      memberships: 3,
+      rosterRuns: 1,
+    });
+
+  const sourceMetadata = await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('classroom-v20');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    try {
+      const transaction = database.transaction('importRuns', 'readonly');
+      const rows = await new Promise<
+        Array<{
+          importType: string;
+          contextId?: string;
+          sourceKind: string;
+          sourceLabel?: string;
+          worksheetName?: string;
+        }>
+      >((resolve, reject) => {
+        const request = transaction.objectStore('importRuns').getAll();
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+      });
+      return rows.find((run) => run.importType === 'roster' && run.contextId === 'import-class');
+    } finally {
+      database.close();
+    }
+  });
+  expect(sourceMetadata).toMatchObject({
+    sourceKind: 'paste-table',
+    sourceLabel: 'Pasted table',
+    worksheetName: 'Pasted table',
+  });
+
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect
+    .poll(() => readRosterImportState(page))
+    .toEqual({
+      students: 3,
+      memberships: 1,
+      rosterRuns: 0,
+    });
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect
+    .poll(() => readRosterImportState(page))
+    .toEqual({
+      students: 4,
+      memberships: 3,
+      rosterRuns: 1,
+    });
+});
+
 test('XLSX roster import requires explicit worksheet review before any write', async ({ page }) => {
   await seed(page);
   const roster = page.getByRole('region', { name: 'Roster for Import Grade 3' });

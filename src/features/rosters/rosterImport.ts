@@ -2,6 +2,7 @@ import type { StudentRecord } from '@/domain/models/entities';
 import {
   MAX_IMPORT_FILE_BYTES,
   parseImportFile,
+  parsePastedImportTable,
 } from '@/features/importCenter/importSourceAdapters';
 import {
   buildImportTable,
@@ -22,7 +23,9 @@ export type RosterImportStatus =
   | 'duplicate-file'
   | 'invalid';
 
-export type RosterImportWorkbook = ImportWorkbook & { kind: 'csv' | 'xlsx' };
+export type RosterImportWorkbook = ImportWorkbook & {
+  kind: 'csv' | 'xlsx' | 'paste-table';
+};
 
 export interface ParsedRosterImportRow {
   sourceRow: number;
@@ -76,6 +79,11 @@ export async function parseRosterImportFile(file: File): Promise<RosterImportWor
     throw new Error('Choose a .csv or .xlsx roster file.');
   }
   return { ...workbook, kind: workbook.kind };
+}
+
+export function parseRosterImportPastedTable(text: string): RosterImportWorkbook {
+  const workbook = parsePastedImportTable(text);
+  return { ...workbook, kind: 'paste-table' };
 }
 
 export function parseRosterImportWorksheet(

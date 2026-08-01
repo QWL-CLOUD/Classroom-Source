@@ -6,6 +6,7 @@ import type { StudentRecord } from '@/domain/models/entities';
 import {
   buildRosterImportPreview,
   parseRosterImportFile,
+  parseRosterImportPastedTable,
   parseRosterImportWorksheet,
   toRosterImportItems,
 } from './rosterImport';
@@ -64,6 +65,35 @@ describe('roster import parsing and preview', () => {
           preferredName: 'Ellie',
           notes: 'New',
         },
+        role: 'Student',
+      },
+    ]);
+  });
+
+  it('parses a pasted roster table through the canonical local adapter', () => {
+    const workbook = parseRosterImportPastedTable(
+      [
+        'Name\tPreferred Name\tRole\tNotes',
+        'Amy Chen\tAmy\tStudent\tReading support',
+        'Ben Lee\t\tStudent\t',
+      ].join('\n'),
+    );
+
+    expect(workbook).toMatchObject({
+      kind: 'paste-table',
+      worksheets: [{ id: 'pasted-table', name: 'Pasted table' }],
+    });
+    expect(parseRosterImportWorksheet(workbook.worksheets[0]?.rows ?? [])).toEqual([
+      {
+        sourceRow: 2,
+        name: 'Amy Chen',
+        preferredName: 'Amy',
+        role: 'Student',
+        notes: 'Reading support',
+      },
+      {
+        sourceRow: 3,
+        name: 'Ben Lee',
         role: 'Student',
       },
     ]);

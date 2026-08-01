@@ -14,6 +14,7 @@ import {
   buildRosterImportPreview,
   downloadRosterImportTemplate,
   parseRosterImportFile,
+  parseRosterImportPastedTable,
   parseRosterImportWorksheet,
   toRosterImportItems,
   type RosterImportDecision,
@@ -23,7 +24,7 @@ import {
 import { rosterMutationService } from '@/features/rosters/rosterMutationService';
 
 import { ImportPreviewTable, type ImportPreviewColumn } from './ImportPreviewTable';
-import { ImportSourcePanel } from './ImportSourcePanel';
+import { ImportSourcePanel, type ImportSourcePanelMode } from './ImportSourcePanel';
 import styles from './ImportCenterShared.module.css';
 
 function statusLabel(row: RosterImportPreviewRow): string {
@@ -88,6 +89,8 @@ export function RosterImportWorkspace({
       memberships: memberships.map((value) => rosterMembershipSchema.parse(value)),
     };
   }, []);
+  const [sourceMode, setSourceMode] = useState<ImportSourcePanelMode>('file');
+  const [pastedText, setPastedText] = useState('');
   const [workbook, setWorkbook] = useState<RosterImportWorkbook | null>(null);
   const [selectedSheetIndex, setSelectedSheetIndex] = useState(0);
   const [fileLabel, setFileLabel] = useState('');
@@ -120,6 +123,7 @@ export function RosterImportWorkspace({
   const selectedSheet = workbook?.worksheets[selectedSheetIndex] ?? null;
 
   useEffect(() => {
+    setPastedText('');
     setWorkbook(null);
     setSelectedSheetIndex(0);
     setFileLabel('');
@@ -173,6 +177,27 @@ export function RosterImportWorkspace({
     }
   }
 
+  function parsePaste(): void {
+    if (busy || !selectedContext || !data) return;
+    setError(null);
+    setSuccess(null);
+    try {
+      const parsed = parseRosterImportPastedTable(pastedText);
+      setWorkbook(parsed);
+      setFileLabel('Pasted table');
+      loadSheet(parsed, 0);
+    } catch (cause) {
+      setWorkbook(null);
+      setSelectedSheetIndex(0);
+      setFileLabel('');
+      setRows([]);
+      setConfirmCommit(false);
+      setError(
+        cause instanceof Error ? cause.message : 'The pasted roster table could not be read.',
+      );
+    }
+  }
+
   function updateDecision(key: string, decision: RosterImportDecision): void {
     setRows((current) => current.map((row) => (row.key === key ? { ...row, decision } : row)));
     setSuccess(null);
@@ -210,6 +235,7 @@ export function RosterImportWorkspace({
       setWorkbook(null);
       setSelectedSheetIndex(0);
       setFileLabel('');
+      setPastedText('');
       setRows([]);
       setConfirmCommit(false);
     } catch (cause) {
@@ -367,9 +393,9 @@ export function RosterImportWorkspace({
 
       {selectedContext?.status === 'active' ? (
         <ImportSourcePanel
-          headingId="roster-import-file-heading"
+          headingId="roster-import-source-heading"
           stepLabel="Step 2"
-          title="Choose the reviewed roster file"
+          title="Choose or paste the reviewed roster source"
           description="CSV or XLSX, up to 20 MB. Name is required; Preferred Name, Role, and Notes are optional."
           fileLabel={fileLabel}
           accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -389,6 +415,36 @@ export function RosterImportWorkspace({
               setError(cause instanceof Error ? cause.message : 'The worksheet could not be read.');
             }
           }}
+          sourceModes={['file', 'paste-table']}
+          sourceMode={sourceMode}
+          onSourceModeChange={(mode) => {
+            setSourceMode(mode);
+            setWorkbook(null);
+            setSelectedSheetIndex(0);
+            setFileLabel('');
+            setRows([]);
+            setError(null);
+            setSuccess(null);
+            setConfirmCommit(false);
+          }}
+          fileModeLabel="File: CSV or XLSX"
+          pasteInputId="roster-import-paste-table"
+          pasteValue={pastedText}
+          pasteLabel="Paste roster rows with one header row"
+          pastePlaceholder={
+            'Name\tPreferred Name\tRole\tNotes\nAmy Chen\tAmy\tStudent\tReading support'
+          }
+          onPasteValueChange={(value) => {
+            setPastedText(value);
+            setWorkbook(null);
+            setSelectedSheetIndex(0);
+            setFileLabel('');
+            setRows([]);
+            setError(null);
+            setSuccess(null);
+            setConfirmCommit(false);
+          }}
+          onParsePaste={parsePaste}
         />
       ) : null}
 
