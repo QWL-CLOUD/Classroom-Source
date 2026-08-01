@@ -19,6 +19,7 @@ import {
 } from '@/features/libraryCatalog/libraryCatalogTypedFields';
 
 import { parseLibraryCatalogTags } from './libraryCatalogReadModel';
+import { categoryFamilyIdsForLibraryCatalogType } from './libraryCatalogMutationService';
 import styles from './LibraryCatalogEditor.module.css';
 
 export interface LibraryCatalogEditorSubmission {
@@ -66,6 +67,12 @@ export function LibraryCatalogEditor({
   const [activityDirections, setActivityDirections] = useState(
     initialTypedFields?.catalogType === 'activity' ? (initialTypedFields.directions ?? '') : '',
   );
+  const [activityMaterials, setActivityMaterials] = useState(
+    initialTypedFields?.catalogType === 'activity' ? (initialTypedFields.materials ?? '') : '',
+  );
+  const [activityNotes, setActivityNotes] = useState(
+    initialTypedFields?.catalogType === 'activity' ? (initialTypedFields.notes ?? '') : '',
+  );
   const [resourceLocation, setResourceLocation] = useState(
     initialTypedFields?.catalogType === 'resource' ? (initialTypedFields.sourceLocation ?? '') : '',
   );
@@ -88,7 +95,11 @@ export function LibraryCatalogEditor({
       : '',
   );
   const [error, setError] = useState<string | null>(null);
-  const categoryDraft = useCategorySelectionDraft('library-item', item?.id);
+  const categoryDraft = useCategorySelectionDraft(
+    'library-item',
+    item?.id,
+    categoryFamilyIdsForLibraryCatalogType(catalogType),
+  );
 
   function buildTypedFields(): LibraryCatalogTypedFields | undefined {
     if (catalogType === 'activity') {
@@ -98,6 +109,8 @@ export function LibraryCatalogEditor({
         grouping: activityGrouping,
         estimatedMinutes,
         directions: optionalText(activityDirections),
+        materials: optionalText(activityMaterials),
+        notes: optionalText(activityNotes),
       });
     }
     if (catalogType === 'resource') {
@@ -233,6 +246,30 @@ export function LibraryCatalogEditor({
               placeholder="Core directions that can be reused across lessons."
             />
           </label>
+          <label htmlFor={`${id}-activity-materials`}>
+            <span>Materials</span>
+            <textarea
+              id={`${id}-activity-materials`}
+              rows={3}
+              value={activityMaterials}
+              maxLength={5000}
+              disabled={busy}
+              onChange={(event) => setActivityMaterials(event.target.value)}
+              placeholder="Text-only materials list. Attachments are not stored here."
+            />
+          </label>
+          <label htmlFor={`${id}-activity-notes`}>
+            <span>Teacher notes</span>
+            <textarea
+              id={`${id}-activity-notes`}
+              rows={5}
+              value={activityNotes}
+              maxLength={10000}
+              disabled={busy}
+              onChange={(event) => setActivityNotes(event.target.value)}
+              placeholder="Preparation, teacher language, differentiation, variations, and assessment opportunities."
+            />
+          </label>
         </fieldset>
       ) : null}
 
@@ -323,7 +360,7 @@ export function LibraryCatalogEditor({
         <small>Separate reusable search tags with commas.</small>
       </label>
 
-      {catalogType === 'resource' ? (
+      {catalogType === 'activity' || catalogType === 'resource' ? (
         <CategoryAssignmentFields
           snapshot={categoryDraft.snapshot}
           selectedSets={categoryDraft.selectedSets}

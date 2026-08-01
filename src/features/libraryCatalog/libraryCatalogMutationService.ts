@@ -5,6 +5,7 @@ import {
   changeLogSchema,
   libraryCatalogItemSchema,
   libraryCatalogTypedFieldsSchema,
+  type CategoryFamilyId,
   type ChangeLog,
   type LibraryCatalogItem,
   type LibraryCatalogStatus,
@@ -83,12 +84,26 @@ interface CommitResult<T> {
   log: ChangeLog;
 }
 
+export function categoryFamilyIdsForLibraryCatalogType(
+  catalogType: LibraryCatalogItem['catalogType'],
+): readonly CategoryFamilyId[] {
+  if (catalogType === 'activity') return ['purpose-tag', 'focus-tag'];
+  if (catalogType === 'resource') return ['resource-format'];
+  return [];
+}
+
 function categorySelectionsForType(
   catalogType: LibraryCatalogItem['catalogType'],
   selections: CategorySelectionMap | undefined,
 ): CategorySelectionMap {
-  if (catalogType === 'resource') return selections ?? {};
-  return { 'resource-format': [] };
+  const allowed = new Set(categoryFamilyIdsForLibraryCatalogType(catalogType));
+  const scoped: CategorySelectionMap = {};
+  for (const [familyId, valueIds] of Object.entries(selections ?? {})) {
+    if (allowed.has(familyId as CategoryFamilyId)) {
+      scoped[familyId as CategoryFamilyId] = valueIds;
+    }
+  }
+  return scoped;
 }
 
 export class LibraryCatalogMutationService {
@@ -136,6 +151,7 @@ export class LibraryCatalogMutationService {
           {
             selections: categorySelectionsForType(item.catalogType, categorySelections),
             useDefaultsForMissingFamilies: item.catalogType === 'resource',
+            allowedFamilyIds: categoryFamilyIdsForLibraryCatalogType(item.catalogType),
             createId: this.createId,
             now,
           },
@@ -243,6 +259,7 @@ export class LibraryCatalogMutationService {
           {
             selections: categorySelectionsForType(updated.catalogType, categorySelections),
             useDefaultsForMissingFamilies: false,
+            allowedFamilyIds: categoryFamilyIdsForLibraryCatalogType(updated.catalogType),
             createId: this.createId,
             now,
           },

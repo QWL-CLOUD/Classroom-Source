@@ -14,9 +14,13 @@ import { EditHistoryService } from '@/features/editing/editHistoryService';
 import { applyImportOperations } from './applyImportOperations';
 import {
   createImportCommand,
+  deleteImportCategoryAssignmentOperation,
+  deleteImportCategoryValueOperation,
   deleteImportedLibraryItemOperation,
   deleteImportRunOperation,
   parseImportCommand,
+  putImportCategoryAssignmentOperation,
+  putImportCategoryValueOperation,
   putImportedLibraryItemOperation,
   putImportRunOperation,
   serializeImportCommand,
@@ -155,18 +159,49 @@ describe('Import Center history and commands', () => {
       createdAt: committedAt,
       updatedAt: committedAt,
     });
+    const purposeValue = {
+      id: 'purpose-imported',
+      familyId: 'purpose-tag' as const,
+      name: 'Oral language',
+      normalizedName: 'oral language',
+      aliases: [],
+      normalizedAliases: [],
+      sortOrder: 0,
+      isDefault: false,
+      lifecycleState: 'active' as const,
+      createdAt: committedAt,
+      updatedAt: committedAt,
+    };
+    const assignment = {
+      id: 'assignment-imported',
+      familyId: 'purpose-tag' as const,
+      categoryValueId: purposeValue.id,
+      entityType: 'library-item' as const,
+      entityId: item.id,
+      createdAt: committedAt,
+    };
     const forward = createImportCommand([
-      putImportRunOperation(run),
+      putImportCategoryValueOperation(purposeValue),
       putImportedLibraryItemOperation(item),
+      putImportCategoryAssignmentOperation(assignment),
+      putImportRunOperation(run),
     ]);
     const inverse = createImportCommand([
+      deleteImportCategoryAssignmentOperation(assignment.id),
       deleteImportedLibraryItemOperation(item.id),
+      deleteImportCategoryValueOperation(purposeValue.id),
       deleteImportRunOperation(run.id),
     ]);
 
     await database.transaction(
       'rw',
-      [database.importRuns, database.libraryItems, database.changeLog],
+      [
+        database.importRuns,
+        database.libraryItems,
+        database.categoryValues,
+        database.categoryAssignments,
+        database.changeLog,
+      ],
       async () => {
         await applyImportOperations(database, forward.operations);
         await database.changeLog.put(
@@ -188,9 +223,13 @@ describe('Import Center history and commands', () => {
     await history.undo();
     expect(await database.importRuns.get(run.id)).toBeUndefined();
     expect(await database.libraryItems.get(item.id)).toBeUndefined();
+    expect(await database.categoryValues.get(purposeValue.id)).toBeUndefined();
+    expect(await database.categoryAssignments.get(assignment.id)).toBeUndefined();
 
     await history.redo();
     expect(await database.importRuns.get(run.id)).toEqual(run);
     expect(await database.libraryItems.get(item.id)).toEqual(item);
+    expect(await database.categoryValues.get(purposeValue.id)).toEqual(purposeValue);
+    expect(await database.categoryAssignments.get(assignment.id)).toEqual(assignment);
   });
 });

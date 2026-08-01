@@ -454,6 +454,36 @@ function LibraryItemDetail({
             <dd>{item.resourceFormatLabel ?? 'Not assigned'}</dd>
           </div>
         ) : null}
+        {item.catalogType === 'activity' ? (
+          <>
+            <div>
+              <dt>Purpose Tags</dt>
+              <dd>{item.purposeTagLabels.join(', ') || 'Not assigned'}</dd>
+            </div>
+            <div>
+              <dt>Focus Tags</dt>
+              <dd>{item.focusTagLabels.join(', ') || 'Not assigned'}</dd>
+            </div>
+          </>
+        ) : null}
+        {item.externalSource ? (
+          <div>
+            <dt>External source</dt>
+            <dd>{item.externalSource}</dd>
+          </div>
+        ) : null}
+        {item.externalKey ? (
+          <div>
+            <dt>External key</dt>
+            <dd>{item.externalKey}</dd>
+          </div>
+        ) : null}
+        {item.sourceReference ? (
+          <div>
+            <dt>Source reference</dt>
+            <dd>{item.sourceReference}</dd>
+          </div>
+        ) : null}
       </dl>
 
       {item.typedFields?.catalogType === 'activity' ? (
@@ -477,6 +507,18 @@ function LibraryItemDetail({
             <div className={styles.workflowText}>
               <strong>Reusable directions</strong>
               <p>{item.typedFields.directions}</p>
+            </div>
+          ) : null}
+          {item.typedFields.materials ? (
+            <div className={styles.workflowText}>
+              <strong>Materials</strong>
+              <p>{item.typedFields.materials}</p>
+            </div>
+          ) : null}
+          {item.typedFields.notes ? (
+            <div className={styles.workflowText}>
+              <strong>Teacher notes</strong>
+              <p>{item.typedFields.notes}</p>
             </div>
           ) : null}
         </section>

@@ -14,6 +14,11 @@ describe('Import Center route state', () => {
     });
     expect(buildImportCenterHref('roster', 'class-1')).toBe('/import?type=roster&context=class-1');
     expect(buildImportCenterHref('standards', 'ignored')).toBe('/import?type=standards');
+    expect(parseImportRouteState(new URLSearchParams('type=activities'))).toEqual({
+      importType: 'activities',
+      contextId: undefined,
+    });
+    expect(buildImportCenterHref('activities')).toBe('/import?type=activities');
   });
 
   it('rejects ambiguous, unknown, and cross-domain query state', () => {
