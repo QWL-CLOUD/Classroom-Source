@@ -50,9 +50,9 @@ const options: Array<{
   {
     type: 'assessments',
     label: 'Assessments',
-    description: 'Assessment import arrives in Phase 3I-0.5E.',
+    description: 'Create reviewed reusable Assessment definitions.',
     icon: ClipboardCheck,
-    available: false,
+    available: true,
   },
 ];
 

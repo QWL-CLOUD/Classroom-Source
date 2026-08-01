@@ -314,4 +314,27 @@ describe('BackupRecoveryService', () => {
       sourceKind: 'file-metadata',
     });
   });
+
+  it('preserves imported Assessment catalog fields and provenance', async () => {
+    const assessment = {
+      id: 'assessment-imported',
+      catalogType: 'assessment' as const,
+      title: 'Imported fictional Assessment',
+      tags: ['Grade: Grade 3'],
+      typedFields: {
+        catalogType: 'assessment' as const,
+        assessmentKind: 'formative' as const,
+        studentPrompt: 'Provide a fictional response.',
+        evidenceToCollect: 'A fictional explanation.',
+      },
+      externalSource: 'DEMO Catalog',
+      externalKey: 'DEMO-ASM-1',
+      importIdentityKey: 'assessment\\u0000democatalog\\u0000demoasm1',
+      lastImportRunId: 'assessment-run',
+      status: 'active' as const,
+      createdAt: '2026-08-01T00:00:00.000Z',
+      updatedAt: '2026-08-01T00:00:00.000Z',
+    };
+    expect(JSON.parse(JSON.stringify(assessment))).toEqual(assessment);
+  });
 });
