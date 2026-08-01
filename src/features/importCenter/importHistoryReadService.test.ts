@@ -271,4 +271,25 @@ describe('Import Center history and commands', () => {
       ['run-resource-url', 'paste-url'],
     ]);
   });
+
+  it('reads canonical Assessment import history', async () => {
+    await database.importRuns.add(
+      importRunSchema.parse({
+        id: 'assessment-import-run',
+        importType: 'assessments',
+        sourceKind: 'csv',
+        sourceLabel: 'Assessments.csv',
+        totalRows: 2,
+        createdCount: 1,
+        updatedCount: 1,
+        skippedCount: 0,
+        reviewCount: 0,
+        blockedCount: 0,
+        committedAt: '2026-08-01T00:00:00.000Z',
+      }),
+    );
+    const history = await new ImportHistoryReadService(database).list();
+    expect(history).toHaveLength(1);
+    expect(history[0]?.importType).toBe('assessments');
+  });
 });

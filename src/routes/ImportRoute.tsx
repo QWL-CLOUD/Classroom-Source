@@ -2,6 +2,7 @@ import { ShieldCheck } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { ActivitiesImportWorkspace } from '@/features/importCenter/ActivitiesImportWorkspace';
+import { AssessmentsImportWorkspace } from '@/features/importCenter/AssessmentsImportWorkspace';
 import sharedStyles from '@/features/importCenter/ImportCenterShared.module.css';
 import { ImportTypeSelector } from '@/features/importCenter/ImportTypeSelector';
 import { ResourcesImportWorkspace } from '@/features/importCenter/ResourcesImportWorkspace';
@@ -49,6 +50,9 @@ export function ImportRoute() {
       {!routeState.issue && routeState.importType === 'activities' ? (
         <ActivitiesImportWorkspace key="activities" />
       ) : null}
+      {!routeState.issue && routeState.importType === 'assessments' ? (
+        <AssessmentsImportWorkspace key="assessments" />
+      ) : null}
       {!routeState.issue && routeState.importType === 'resources' ? (
         <ResourcesImportWorkspace key="resources" />
       ) : null}
@@ -68,7 +72,9 @@ export function ImportRoute() {
       ) : null}
       {!routeState.issue &&
       routeState.importType &&
-      !['activities', 'resources', 'standards', 'roster'].includes(routeState.importType) ? (
+      !['activities', 'assessments', 'resources', 'standards', 'roster'].includes(
+        routeState.importType,
+      ) ? (
         <section className={`card ${sharedStyles.plannedPanel}`} aria-label="Planned import type">
           <p className="page-eyebrow">Planned catalog import</p>
           <h2>Assessment import is not enabled yet</h2>
@@ -83,8 +89,8 @@ export function ImportRoute() {
           <p className="page-eyebrow">Start here</p>
           <h2>Choose what you are importing</h2>
           <p>
-            Activities, Resources, Standards, and Rosters are available now. Assessments will join
-            this same Import Center without creating additional routes or duplicated state.
+            Activities, Resources, Assessments, Standards, and Rosters are available in this one
+            Import Center without creating additional routes or duplicated state.
           </p>
         </section>
       ) : null}

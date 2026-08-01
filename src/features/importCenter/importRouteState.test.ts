@@ -38,4 +38,10 @@ describe('Import Center route state', () => {
       issue: 'Only Roster import accepts a target Class or Group context.',
     });
   });
+  it('parses the enabled Assessments route', () => {
+    expect(parseImportRouteState(new URLSearchParams('type=assessments'))).toEqual({
+      importType: 'assessments',
+    });
+    expect(buildImportCenterHref('assessments')).toBe('/import?type=assessments');
+  });
 });
