@@ -12,14 +12,17 @@ import {
   listLibraryCatalogTags,
   normalizeLibraryCatalogTags,
   type LibraryCatalogFilters,
+  type LibraryCatalogItemView,
 } from './libraryCatalogReadModel';
 
 const createdAt = '2026-07-23T12:00:00.000Z';
 
 function item(
   overrides: Partial<LibraryCatalogItem> & Pick<LibraryCatalogItem, 'id' | 'catalogType' | 'title'>,
-): LibraryCatalogItem {
+): LibraryCatalogItemView {
   return {
+    purposeTagLabels: [],
+    focusTagLabels: [],
     description: undefined,
     tags: [],
     status: 'active',
@@ -83,6 +86,67 @@ describe('Library Catalog read model', () => {
     });
   });
 
+  it('joins Activity Purpose and Focus assignments without treating them as Resource Formats', () => {
+    const values: CategoryValue[] = [
+      {
+        id: 'purpose-speaking',
+        familyId: 'purpose-tag',
+        name: 'Oral language',
+        normalizedName: 'oral language',
+        aliases: [],
+        normalizedAliases: [],
+        sortOrder: 0,
+        isDefault: false,
+        lifecycleState: 'active',
+        createdAt,
+        updatedAt: createdAt,
+      },
+      {
+        id: 'focus-retell',
+        familyId: 'focus-tag',
+        name: 'Retelling',
+        normalizedName: 'retelling',
+        aliases: [],
+        normalizedAliases: [],
+        sortOrder: 0,
+        isDefault: false,
+        lifecycleState: 'active',
+        createdAt,
+        updatedAt: createdAt,
+      },
+    ];
+    const assignments: CategoryAssignment[] = [
+      {
+        id: 'purpose-assignment',
+        familyId: 'purpose-tag',
+        categoryValueId: 'purpose-speaking',
+        entityType: 'library-item',
+        entityId: 'activity-1',
+        createdAt,
+      },
+      {
+        id: 'focus-assignment',
+        familyId: 'focus-tag',
+        categoryValueId: 'focus-retell',
+        entityType: 'library-item',
+        entityId: 'activity-1',
+        createdAt,
+      },
+    ];
+
+    expect(
+      buildLibraryCatalogItemViews(
+        [item({ id: 'activity-1', catalogType: 'activity', title: 'Partner retell' })],
+        assignments,
+        values,
+      )[0],
+    ).toMatchObject({
+      purposeTagLabels: ['Oral language'],
+      focusTagLabels: ['Retelling'],
+      resourceFormatId: undefined,
+    });
+  });
+
   it('searches title, description, tags, type, and Resource Format', () => {
     const values = [
       {
@@ -95,6 +159,8 @@ describe('Library Catalog read model', () => {
         }),
         resourceFormatId: 'format-cards',
         resourceFormatLabel: 'Printable cards',
+        purposeTagLabels: [],
+        focusTagLabels: [],
       },
     ];
     for (const query of ['weather', 'picture', 'speaking', 'resource', 'printable']) {
@@ -113,6 +179,8 @@ describe('Library Catalog read model', () => {
           grouping: 'partners',
           estimatedMinutes: 8,
           directions: 'Explain one example to a partner.',
+          materials: 'Picture cards',
+          notes: 'Preparation\nSort the cards.',
         },
       }),
       item({
@@ -129,6 +197,12 @@ describe('Library Catalog read model', () => {
     ];
 
     expect(filterLibraryCatalogItems(values, { ...defaults, query: 'partner' })).toHaveLength(1);
+    expect(filterLibraryCatalogItems(values, { ...defaults, query: 'picture cards' })).toHaveLength(
+      1,
+    );
+    expect(
+      filterLibraryCatalogItems(values, { ...defaults, query: 'sort the cards' }),
+    ).toHaveLength(1);
     expect(filterLibraryCatalogItems(values, { ...defaults, query: 'labeled model' })).toHaveLength(
       1,
     );
@@ -146,6 +220,8 @@ describe('Library Catalog read model', () => {
         }),
         resourceFormatId: 'format-cards',
         resourceFormatLabel: 'Cards',
+        purposeTagLabels: [],
+        focusTagLabels: [],
       },
       {
         ...item({
@@ -158,6 +234,8 @@ describe('Library Catalog read model', () => {
         }),
         resourceFormatId: 'format-slides',
         resourceFormatLabel: 'Slides',
+        purposeTagLabels: [],
+        focusTagLabels: [],
       },
       item({
         id: 'activity-1',

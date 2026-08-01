@@ -1,6 +1,7 @@
 import { ShieldCheck } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 
+import { ActivitiesImportWorkspace } from '@/features/importCenter/ActivitiesImportWorkspace';
 import sharedStyles from '@/features/importCenter/ImportCenterShared.module.css';
 import { ImportTypeSelector } from '@/features/importCenter/ImportTypeSelector';
 import { RosterImportWorkspace } from '@/features/importCenter/RosterImportWorkspace';
@@ -44,6 +45,9 @@ export function ImportRoute() {
         </div>
       ) : null}
 
+      {!routeState.issue && routeState.importType === 'activities' ? (
+        <ActivitiesImportWorkspace key="activities" />
+      ) : null}
       {!routeState.issue && routeState.importType === 'standards' ? (
         <StandardsImportWorkspace key="standards" />
       ) : null}
@@ -60,16 +64,12 @@ export function ImportRoute() {
       ) : null}
       {!routeState.issue &&
       routeState.importType &&
-      !['standards', 'roster'].includes(routeState.importType) ? (
+      !['activities', 'standards', 'roster'].includes(routeState.importType) ? (
         <section className={`card ${sharedStyles.plannedPanel}`} aria-label="Planned import type">
           <p className="page-eyebrow">Planned catalog import</p>
           <h2>
-            {routeState.importType === 'activities'
-              ? 'Activities'
-              : routeState.importType === 'resources'
-                ? 'Resources'
-                : 'Assessments'}{' '}
-            import is not enabled yet
+            {routeState.importType === 'resources' ? 'Resources' : 'Assessments'} import is not
+            enabled yet
           </h2>
           <p>
             This canonical route is reserved, but implementation remains in the approved later Phase
@@ -82,7 +82,7 @@ export function ImportRoute() {
           <p className="page-eyebrow">Start here</p>
           <h2>Choose what you are importing</h2>
           <p>
-            Standards and Rosters are available now. Activities, Resources, and Assessments will
+            Activities, Standards, and Rosters are available now. Resources and Assessments will
             join this same Import Center without creating additional routes or duplicated state.
           </p>
         </section>

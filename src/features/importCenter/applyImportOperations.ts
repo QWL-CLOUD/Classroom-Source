@@ -13,6 +13,9 @@ export async function applyImportOperations(
     } else if (operation.table === 'libraryItems') {
       if (operation.action === 'put') await db.libraryItems.put(operation.record);
       else await db.libraryItems.delete(operation.id);
+    } else if (operation.table === 'categoryValues') {
+      if (operation.action === 'put') await db.categoryValues.put(operation.record);
+      else await db.categoryValues.delete(operation.id);
     } else if (operation.table === 'categoryAssignments') {
       if (operation.action === 'put') await db.categoryAssignments.put(operation.record);
       else await db.categoryAssignments.delete(operation.id);

@@ -363,6 +363,8 @@ export const libraryActivityFieldsSchema = z.object({
   grouping: libraryActivityGroupingSchema.default('flexible'),
   estimatedMinutes: z.number().int().positive().max(1440).optional(),
   directions: z.string().trim().max(5000).optional(),
+  materials: z.string().trim().max(5000).optional(),
+  notes: z.string().trim().max(10000).optional(),
 });
 
 export const libraryResourceFieldsSchema = z.object({

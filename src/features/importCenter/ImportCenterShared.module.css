@@ -440,3 +440,136 @@
     justify-content: center;
   }
 }
+
+.sourceModeFieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.sourceModeFieldset legend {
+  margin-bottom: 7px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.sourceModeOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.sourceModeOptions label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 11px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pastePanel {
+  display: grid;
+  gap: 9px;
+}
+
+.pastePanel > label,
+.unmappedGrid label,
+.reviewGrid label {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.pastePanel textarea,
+.unmappedGrid select,
+.reviewGrid select {
+  width: 100%;
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  background: #fff;
+  font: inherit;
+}
+
+.pastePanel textarea:focus,
+.unmappedGrid select:focus,
+.reviewGrid select:focus {
+  outline: 3px solid rgb(53 95 84 / 20%);
+  border-color: var(--accent-strong);
+}
+
+.unmappedGrid,
+.reviewGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.unmappedGrid small,
+.reviewGrid small {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.reviewCard {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 11px;
+  background: var(--surface-soft);
+}
+
+.reviewCard strong,
+.reviewCard p {
+  overflow-wrap: anywhere;
+}
+
+.reviewCard p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.reasonList {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.reasonList li {
+  overflow-wrap: anywhere;
+}
+
+.reviewActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+@media (max-width: 620px) {
+  .unmappedGrid,
+  .reviewGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .sourceModeOptions label {
+    width: 100%;
+  }
+}

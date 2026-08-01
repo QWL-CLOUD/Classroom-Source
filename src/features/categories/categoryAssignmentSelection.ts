@@ -42,6 +42,7 @@ export interface CategoryAssignmentChangePlan {
 export interface BuildCategoryAssignmentChangePlanOptions {
   selections?: CategorySelectionMap;
   useDefaultsForMissingFamilies?: boolean;
+  allowedFamilyIds?: readonly CategoryFamilyId[];
   createId: () => string;
   now: string;
 }
@@ -61,11 +62,16 @@ function compareValues(first: CategoryValue, second: CategoryValue): number {
   );
 }
 
-function supportedFamilies(entityType: CategoryAssignableEntityType): CategoryFamilyDefinition[] {
+function supportedFamilies(
+  entityType: CategoryAssignableEntityType,
+  allowedFamilyIds?: readonly CategoryFamilyId[],
+): CategoryFamilyDefinition[] {
+  const allowed = allowedFamilyIds ? new Set(allowedFamilyIds) : undefined;
   return CATEGORY_FAMILIES.filter(
     (family) =>
       family.assignmentAvailability === 'current' &&
-      categoryFamilySupportsEntity(family.id, entityType),
+      categoryFamilySupportsEntity(family.id, entityType) &&
+      (!allowed || allowed.has(family.id)),
   );
 }
 
@@ -98,8 +104,9 @@ export async function loadCategorySelectionSnapshot(
   db: ClassroomDatabase,
   entityType: CategoryAssignableEntityType,
   entityId?: string,
+  allowedFamilyIds?: readonly CategoryFamilyId[],
 ): Promise<CategorySelectionSnapshot> {
-  const families = supportedFamilies(entityType);
+  const families = supportedFamilies(entityType, allowedFamilyIds);
   const familyIds = new Set(families.map((family) => family.id));
   const [allValues, allAssignments] = await Promise.all([
     db.categoryValues.toArray(),
@@ -141,7 +148,7 @@ export async function buildCategoryAssignmentChangePlan(
   entityId: string,
   options: BuildCategoryAssignmentChangePlanOptions,
 ): Promise<CategoryAssignmentChangePlan> {
-  const families = supportedFamilies(entityType);
+  const families = supportedFamilies(entityType, options.allowedFamilyIds);
   const familyIds = new Set(families.map((family) => family.id));
   const [allValues, existingAssignments] = await Promise.all([
     db.categoryValues.toArray(),

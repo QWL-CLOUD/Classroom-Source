@@ -30,7 +30,7 @@ export const CATEGORY_FAMILIES = [
     label: 'Focus Tags',
     description: 'Instructional skills, language domains, or learning priorities.',
     selectionMode: 'multiple',
-    entityTypes: ['lesson-plan', 'lesson-template'],
+    entityTypes: ['lesson-plan', 'lesson-template', 'library-item'],
     assignmentAvailability: 'current',
   },
   {
@@ -38,7 +38,7 @@ export const CATEGORY_FAMILIES = [
     label: 'Purpose Tags',
     description: 'The teaching purpose or intended use of a plan.',
     selectionMode: 'multiple',
-    entityTypes: ['lesson-plan', 'lesson-template'],
+    entityTypes: ['lesson-plan', 'lesson-template', 'library-item'],
     assignmentAvailability: 'current',
   },
   {

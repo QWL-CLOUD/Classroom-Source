@@ -153,6 +153,87 @@ describe('Classroom backup format', () => {
     expect(preview.validTables.importRuns).toHaveLength(1);
   });
 
+  it('round-trips imported Activities, text-only workflow fields, controlled labels, and import metadata on DB v13', () => {
+    const tables = emptyBackupTables();
+    tables.libraryItems.push({
+      id: 'activity-imported',
+      catalogType: 'activity',
+      title: 'Partner retell',
+      description: 'Retell a short story with a partner.',
+      tags: ['Speaking'],
+      typedFields: {
+        catalogType: 'activity',
+        grouping: 'partners',
+        estimatedMinutes: 15,
+        directions: 'Partners retell the events in order.',
+        materials: 'Picture cards; timer',
+        notes: 'Preparation\nSort the cards before the lesson.',
+      },
+      externalSource: 'district activity catalog',
+      externalKey: 'ACT-101',
+      sourceReference: 'Grade 3 activity guide, page 8',
+      importIdentityKey: 'activity\u0000district activity catalog\u0000act-101',
+      lastImportRunId: 'activity-run-1',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    });
+    tables.categoryValues.push({
+      id: 'purpose-oral-language',
+      familyId: 'purpose-tag',
+      name: 'Oral language',
+      normalizedName: 'oral language',
+      aliases: [],
+      normalizedAliases: [],
+      sortOrder: 0,
+      isDefault: false,
+      lifecycleState: 'active',
+      createdAt: now,
+      updatedAt: now,
+    });
+    tables.categoryAssignments.push({
+      id: 'activity-purpose-assignment',
+      familyId: 'purpose-tag',
+      categoryValueId: 'purpose-oral-language',
+      entityType: 'library-item',
+      entityId: 'activity-imported',
+      createdAt: now,
+    });
+    tables.importRuns.push({
+      id: 'activity-run-1',
+      importType: 'activities',
+      sourceKind: 'xlsx',
+      sourceLabel: 'activities.xlsx',
+      worksheetName: 'Activities',
+      totalRows: 1,
+      createdCount: 1,
+      updatedCount: 0,
+      skippedCount: 0,
+      reviewCount: 0,
+      blockedCount: 0,
+      committedAt: now,
+    });
+
+    const preview = buildRestorePreview(
+      serializeBackupEnvelope(
+        createBackupEnvelope(tables, { backupId: 'activity-import-backup', exportedAt: now }),
+      ),
+    );
+
+    expect(preview.quarantineCount).toBe(0);
+    expect(preview.validTables.libraryItems[0]).toMatchObject({
+      id: 'activity-imported',
+      typedFields: {
+        materials: 'Picture cards; timer',
+        notes: 'Preparation\nSort the cards before the lesson.',
+      },
+      lastImportRunId: 'activity-run-1',
+    });
+    expect(preview.validTables.categoryValues).toHaveLength(1);
+    expect(preview.validTables.categoryAssignments).toHaveLength(1);
+    expect(preview.validTables.importRuns).toHaveLength(1);
+  });
+
   it('validates Assessment Evidence while allowing historical optional source IDs', () => {
     const tables = emptyBackupTables();
     tables.assessmentEvidence.push({

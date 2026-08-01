@@ -61,6 +61,8 @@ export function libraryCatalogTypedFieldsSearchText(item: LibraryCatalogItem): s
       libraryActivityGroupingLabels[fields.grouping],
       fields.estimatedMinutes?.toString() ?? '',
       fields.directions ?? '',
+      fields.materials ?? '',
+      fields.notes ?? '',
     ].join(' ');
   }
   if (fields.catalogType === 'resource') {
@@ -89,6 +91,8 @@ export function libraryCatalogWorkflowDetails(
         ? [{ label: 'Estimated time', value: `${typedFields.estimatedMinutes} minutes` }]
         : []),
       ...(typedFields.directions ? [{ label: 'Directions', value: typedFields.directions }] : []),
+      ...(typedFields.materials ? [{ label: 'Materials', value: typedFields.materials }] : []),
+      ...(typedFields.notes ? [{ label: 'Teacher notes', value: typedFields.notes }] : []),
     ];
   }
   if (typedFields.catalogType === 'resource') {

@@ -36,9 +36,9 @@ const options: Array<{
   {
     type: 'activities',
     label: 'Activities',
-    description: 'Catalog import arrives in Phase 3I-0.5C.',
+    description: 'Create reviewed Library Activity records from structured sources.',
     icon: Library,
-    available: false,
+    available: true,
   },
   {
     type: 'resources',

@@ -23,6 +23,8 @@ export const libraryCatalogStatusLabels: Record<LibraryCatalogStatus, string> = 
 export interface LibraryCatalogItemView extends LibraryCatalogItem {
   resourceFormatId?: string;
   resourceFormatLabel?: string;
+  purposeTagLabels: string[];
+  focusTagLabels: string[];
 }
 
 export interface LibraryCatalogFilters {
@@ -53,27 +55,35 @@ export function buildLibraryCatalogItemViews(
   assignments: readonly CategoryAssignment[],
   categoryValues: readonly CategoryValue[],
 ): LibraryCatalogItemView[] {
-  const resourceFormatById = new Map(
-    categoryValues
-      .filter((value) => value.familyId === 'resource-format')
-      .map((value) => [value.id, value] as const),
-  );
-  const assignmentByItemId = new Map<string, CategoryAssignment>();
+  const valueById = new Map(categoryValues.map((value) => [value.id, value] as const));
+  const assignmentsByItemId = new Map<string, CategoryAssignment[]>();
 
   for (const assignment of assignments) {
-    if (assignment.entityType !== 'library-item' || assignment.familyId !== 'resource-format') {
-      continue;
-    }
-    assignmentByItemId.set(assignment.entityId, assignment);
+    if (assignment.entityType !== 'library-item') continue;
+    const values = assignmentsByItemId.get(assignment.entityId) ?? [];
+    values.push(assignment);
+    assignmentsByItemId.set(assignment.entityId, values);
   }
 
   return items.map((item) => {
-    const assignment = assignmentByItemId.get(item.id);
-    const format = assignment ? resourceFormatById.get(assignment.categoryValueId) : undefined;
+    const itemAssignments = assignmentsByItemId.get(item.id) ?? [];
+    const labelValues = (familyId: CategoryAssignment['familyId']) =>
+      itemAssignments
+        .filter((assignment) => assignment.familyId === familyId)
+        .map((assignment) => valueById.get(assignment.categoryValueId))
+        .filter((value): value is CategoryValue => Boolean(value))
+        .sort(
+          (first, second) =>
+            first.sortOrder - second.sortOrder ||
+            first.name.localeCompare(second.name, 'en', { sensitivity: 'base' }),
+        );
+    const resourceFormat = labelValues('resource-format')[0];
     return {
       ...item,
-      resourceFormatId: format?.id,
-      resourceFormatLabel: format?.name,
+      resourceFormatId: resourceFormat?.id,
+      resourceFormatLabel: resourceFormat?.name,
+      purposeTagLabels: labelValues('purpose-tag').map((value) => value.name),
+      focusTagLabels: labelValues('focus-tag').map((value) => value.name),
     };
   });
 }
@@ -84,6 +94,8 @@ function searchableText(item: LibraryCatalogItemView): string {
     item.description ?? '',
     item.tags.join(' '),
     item.resourceFormatLabel ?? '',
+    item.purposeTagLabels.join(' '),
+    item.focusTagLabels.join(' '),
     libraryCatalogTypeLabels[item.catalogType],
     libraryCatalogTypedFieldsSearchText(item),
   ]

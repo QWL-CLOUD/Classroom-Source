@@ -57,6 +57,46 @@ describe('BackupRecoveryService', () => {
       createdAt: firstTime,
       updatedAt: firstTime,
     });
+    await database.libraryItems.put({
+      id: 'current-activity',
+      catalogType: 'activity',
+      title: 'Current imported Activity',
+      tags: ['Speaking'],
+      typedFields: {
+        catalogType: 'activity',
+        grouping: 'partners',
+        materials: 'Picture cards',
+        notes: 'Preparation\nSort cards.',
+      },
+      externalSource: 'district catalog',
+      externalKey: 'ACT-1',
+      importIdentityKey: 'activity\u0000district catalog\u0000act-1',
+      lastImportRunId: 'current-import-run',
+      status: 'active',
+      createdAt: firstTime,
+      updatedAt: firstTime,
+    });
+    await database.categoryValues.put({
+      id: 'current-purpose',
+      familyId: 'purpose-tag',
+      name: 'Oral language',
+      normalizedName: 'oral language',
+      aliases: [],
+      normalizedAliases: [],
+      sortOrder: 0,
+      isDefault: false,
+      lifecycleState: 'active',
+      createdAt: firstTime,
+      updatedAt: firstTime,
+    });
+    await database.categoryAssignments.put({
+      id: 'current-purpose-assignment',
+      familyId: 'purpose-tag',
+      categoryValueId: 'current-purpose',
+      entityType: 'library-item',
+      entityId: 'current-activity',
+      createdAt: firstTime,
+    });
     await database.importRuns.put({
       id: 'current-import-run',
       importType: 'assessments',
@@ -90,6 +130,12 @@ describe('BackupRecoveryService', () => {
     expect(envelope.tables.tasks).toEqual([task('current-task', 'Current task')]);
     expect(envelope.tables.assessmentEvidence).toHaveLength(1);
     expect(envelope.tables.importRuns).toHaveLength(1);
+    expect(envelope.tables.libraryItems[0]).toMatchObject({
+      id: 'current-activity',
+      typedFields: { materials: 'Picture cards', notes: 'Preparation\nSort cards.' },
+    });
+    expect(envelope.tables.categoryValues).toHaveLength(1);
+    expect(envelope.tables.categoryAssignments).toHaveLength(1);
     expect(envelope.tables).not.toHaveProperty('backupSnapshots');
     expect(envelope.tableCounts.tasks).toBe(1);
   });

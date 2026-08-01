@@ -11,6 +11,34 @@ import { LibraryCatalogMutationService } from './libraryCatalogMutationService';
 let database: ClassroomDatabase;
 const timestamp = '2026-07-23T12:00:00.000Z';
 
+const oralLanguage: CategoryValue = {
+  id: 'purpose-oral-language',
+  familyId: 'purpose-tag',
+  name: 'Oral language',
+  normalizedName: 'oral language',
+  aliases: [],
+  normalizedAliases: [],
+  sortOrder: 0,
+  isDefault: false,
+  lifecycleState: 'active',
+  createdAt: timestamp,
+  updatedAt: timestamp,
+};
+
+const retelling: CategoryValue = {
+  id: 'focus-retelling',
+  familyId: 'focus-tag',
+  name: 'Retelling',
+  normalizedName: 'retelling',
+  aliases: [],
+  normalizedAliases: [],
+  sortOrder: 0,
+  isDefault: false,
+  lifecycleState: 'active',
+  createdAt: timestamp,
+  updatedAt: timestamp,
+};
+
 const slideDeck: CategoryValue = {
   id: 'format-slides',
   familyId: 'resource-format',
@@ -28,7 +56,7 @@ const slideDeck: CategoryValue = {
 beforeEach(async () => {
   database = new ClassroomDatabase(`library-catalog-${globalThis.crypto.randomUUID()}`);
   await database.open();
-  await database.categoryValues.put(slideDeck);
+  await database.categoryValues.bulkPut([slideDeck, oralLanguage, retelling]);
 });
 
 afterEach(async () => {
@@ -87,6 +115,48 @@ describe('LibraryCatalogMutationService', () => {
       entityType: 'library-item',
       entityId: 'resource-1',
     });
+  });
+
+  it('creates an Activity with scoped Purpose and Focus values plus text-only workflow fields', async () => {
+    const service = createService([
+      'activity-1',
+      'assignment-focus',
+      'assignment-purpose',
+      '01-create-log',
+    ]);
+
+    const created = await service.create(
+      {
+        catalogType: 'activity',
+        title: 'Partner retell',
+        tags: ['Speaking'],
+        typedFields: {
+          catalogType: 'activity',
+          grouping: 'partners',
+          estimatedMinutes: 15,
+          directions: 'Partners retell the story in order.',
+          materials: 'Picture cards; timer',
+          notes: 'Preparation\nSort the picture cards.',
+        },
+      },
+      {
+        'purpose-tag': ['purpose-oral-language'],
+        'focus-tag': ['focus-retelling'],
+        'resource-format': ['format-slides'],
+      },
+    );
+
+    expect(created.typedFields).toMatchObject({
+      catalogType: 'activity',
+      grouping: 'partners',
+      materials: 'Picture cards; timer',
+      notes: 'Preparation\nSort the picture cards.',
+    });
+    expect(
+      (await database.categoryAssignments.where('entityId').equals('activity-1').toArray())
+        .map((assignment) => assignment.familyId)
+        .sort(),
+    ).toEqual(['focus-tag', 'purpose-tag']);
   });
 
   it('edits metadata without replacing the item identity or type', async () => {

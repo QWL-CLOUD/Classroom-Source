@@ -291,11 +291,34 @@ describe('domain schemas', () => {
       externalKey: 'activity-101',
       importIdentityKey: 'activity\u0000district catalog\u0000activity-101',
       lastImportRunId: 'import-run-1',
+      typedFields: {
+        catalogType: 'activity',
+        grouping: 'partners',
+        estimatedMinutes: 20,
+        directions: 'Partners rehearse and retell the sequence.',
+        materials: 'Picture cards; timer',
+        notes: 'Preparation\nSort cards before the lesson.',
+      },
       status: 'active',
       createdAt: '2026-07-29T12:00:00.000Z',
       updatedAt: '2026-07-29T12:00:00.000Z',
     });
     expect(imported.lastImportRunId).toBe('import-run-1');
+    expect(imported.typedFields).toMatchObject({
+      catalogType: 'activity',
+      materials: 'Picture cards; timer',
+      notes: 'Preparation\nSort cards before the lesson.',
+    });
+    expect(() =>
+      libraryCatalogItemSchema.parse({
+        ...imported,
+        typedFields: {
+          catalogType: 'activity',
+          grouping: 'partners',
+          materials: 'x'.repeat(5001),
+        },
+      }),
+    ).toThrow();
     expect(() =>
       libraryCatalogItemSchema.parse({
         ...imported,

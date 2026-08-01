@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import {
   categoryAssignmentSchema,
+  categoryValueSchema,
   importRunSchema,
   libraryCatalogItemSchema,
   rosterMembershipSchema,
@@ -9,6 +10,7 @@ import {
   standardSchema,
   studentRecordSchema,
   type CategoryAssignment,
+  type CategoryValue,
   type ImportRun,
   type LibraryCatalogItem,
   type RosterMembership,
@@ -37,6 +39,16 @@ const putLibraryItemOperationSchema = z.object({
 const deleteLibraryItemOperationSchema = z.object({
   action: z.literal('delete'),
   table: z.literal('libraryItems'),
+  id: z.string().min(1),
+});
+const putCategoryValueOperationSchema = z.object({
+  action: z.literal('put'),
+  table: z.literal('categoryValues'),
+  record: categoryValueSchema,
+});
+const deleteCategoryValueOperationSchema = z.object({
+  action: z.literal('delete'),
+  table: z.literal('categoryValues'),
   id: z.string().min(1),
 });
 const putCategoryAssignmentOperationSchema = z.object({
@@ -97,6 +109,8 @@ export const importOperationSchema = z.union([
   deleteImportRunOperationSchema,
   putLibraryItemOperationSchema,
   deleteLibraryItemOperationSchema,
+  putCategoryValueOperationSchema,
+  deleteCategoryValueOperationSchema,
   putCategoryAssignmentOperationSchema,
   deleteCategoryAssignmentOperationSchema,
   putStandardAlignmentOperationSchema,
@@ -152,6 +166,18 @@ export function putImportedLibraryItemOperation(record: LibraryCatalogItem): Imp
 
 export function deleteImportedLibraryItemOperation(id: string): ImportOperation {
   return { action: 'delete', table: 'libraryItems', id };
+}
+
+export function putImportCategoryValueOperation(record: CategoryValue): ImportOperation {
+  return {
+    action: 'put',
+    table: 'categoryValues',
+    record: categoryValueSchema.parse(record),
+  };
+}
+
+export function deleteImportCategoryValueOperation(id: string): ImportOperation {
+  return { action: 'delete', table: 'categoryValues', id };
 }
 
 export function putImportCategoryAssignmentOperation(record: CategoryAssignment): ImportOperation {

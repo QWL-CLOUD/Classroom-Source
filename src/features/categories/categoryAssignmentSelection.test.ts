@@ -127,6 +127,63 @@ describe('category assignment selection', () => {
     ).rejects.toThrow('Archived Task Labels values cannot be newly assigned.');
   });
 
+  it('scopes Library categories by Catalog subtype without exposing Resource formats to Activities', async () => {
+    await database.categoryValues.bulkPut([
+      value('purpose-speaking', 'Oral language', 'purpose-tag'),
+      value('focus-retell', 'Retelling', 'focus-tag'),
+      value('resource-slides', 'Slide deck', 'resource-format'),
+    ]);
+
+    const activitySnapshot = await loadCategorySelectionSnapshot(
+      database,
+      'library-item',
+      undefined,
+      ['purpose-tag', 'focus-tag'],
+    );
+    expect(activitySnapshot.families.map((item) => item.family.id)).toEqual([
+      'focus-tag',
+      'purpose-tag',
+    ]);
+    expect(
+      activitySnapshot.families.flatMap((item) => item.values.map((entry) => entry.id)),
+    ).toEqual(['focus-retell', 'purpose-speaking']);
+
+    const resourceSnapshot = await loadCategorySelectionSnapshot(
+      database,
+      'library-item',
+      undefined,
+      ['resource-format'],
+    );
+    expect(resourceSnapshot.families.map((item) => item.family.id)).toEqual(['resource-format']);
+    expect(resourceSnapshot.families[0]?.values.map((item) => item.id)).toEqual([
+      'resource-slides',
+    ]);
+
+    const activityPlan = await buildCategoryAssignmentChangePlan(
+      database,
+      'library-item',
+      'activity-1',
+      {
+        selections: {
+          'purpose-tag': ['purpose-speaking'],
+          'focus-tag': ['focus-retell'],
+          'resource-format': ['resource-slides'],
+        },
+        allowedFamilyIds: ['purpose-tag', 'focus-tag'],
+        createId: (() => {
+          const ids = ['assignment-purpose', 'assignment-focus'];
+          return () => ids.shift() ?? crypto.randomUUID();
+        })(),
+        now,
+      },
+    );
+    expect(
+      activityPlan.forward.map((operation) =>
+        operation.action === 'put' ? operation.record.familyId : operation.action,
+      ),
+    ).toEqual(['focus-tag', 'purpose-tag']);
+  });
+
   it('creates a default task assignment and undoes the task and label atomically', async () => {
     await database.categoryValues.put(
       value('task-default', 'Priority', 'task-label', { isDefault: true }),

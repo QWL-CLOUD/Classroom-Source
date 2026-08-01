@@ -8,30 +8,32 @@ import {
   loadCategorySelectionSnapshot,
   type CategorySelectionMap,
 } from './categoryAssignmentSelection';
-import { CATEGORY_FAMILIES } from './categoryFamilies';
 
 function cloneSelections(selections: CategorySelectionMap): CategorySelectionMap {
   const clone: CategorySelectionMap = {};
-  for (const family of CATEGORY_FAMILIES) {
-    const values = selections[family.id];
-    if (values !== undefined) clone[family.id] = [...values];
+  for (const [familyId, values] of Object.entries(selections)) {
+    if (values !== undefined) clone[familyId as CategoryFamilyId] = [...values];
   }
   return clone;
 }
 
 function selectionKey(selections: CategorySelectionMap): string {
   return JSON.stringify(
-    CATEGORY_FAMILIES.map((family) => [family.id, [...(selections[family.id] ?? [])].sort()]),
+    Object.entries(selections)
+      .map(([familyId, values]) => [familyId, [...(values ?? [])].sort()] as const)
+      .sort(([first], [second]) => first.localeCompare(second)),
   );
 }
 
 export function useCategorySelectionDraft(
   entityType: CategoryAssignableEntityType,
   entityId?: string,
+  allowedFamilyIds?: readonly CategoryFamilyId[],
 ) {
+  const allowedKey = [...(allowedFamilyIds ?? [])].sort().join('|');
   const snapshot = useLiveQuery(
-    () => loadCategorySelectionSnapshot(classroomDb, entityType, entityId),
-    [entityType, entityId],
+    () => loadCategorySelectionSnapshot(classroomDb, entityType, entityId, allowedFamilyIds),
+    [entityType, entityId, allowedKey],
   );
   const [selections, setSelections] = useState<CategorySelectionMap>({});
   const [initializedKey, setInitializedKey] = useState<string | null>(null);
@@ -39,19 +41,19 @@ export function useCategorySelectionDraft(
 
   useEffect(() => {
     if (!snapshot || snapshotKey === null) return;
-    const entityKey = `${entityType}:${entityId ?? 'new'}:${snapshotKey}`;
+    const entityKey = `${entityType}:${entityId ?? 'new'}:${allowedKey}:${snapshotKey}`;
     if (initializedKey === entityKey) return;
     setSelections(cloneSelections(snapshot.initialSelections));
     setInitializedKey(entityKey);
-  }, [entityId, entityType, initializedKey, snapshot, snapshotKey]);
+  }, [allowedKey, entityId, entityType, initializedKey, snapshot, snapshotKey]);
 
   const selectedSets = useMemo(() => {
     const sets: Partial<Record<CategoryFamilyId, Set<string>>> = {};
-    for (const family of CATEGORY_FAMILIES) {
-      sets[family.id] = new Set(selections[family.id] ?? []);
+    for (const family of snapshot?.families ?? []) {
+      sets[family.family.id] = new Set(selections[family.family.id] ?? []);
     }
     return sets;
-  }, [selections]);
+  }, [selections, snapshot]);
 
   function toggle(familyId: CategoryFamilyId, valueId: string, checked: boolean): void {
     setSelections((current) => {

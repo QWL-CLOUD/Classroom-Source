@@ -169,3 +169,16 @@ assignments, and Standard alignments through persistent global Undo/Redo.
 Backup v13 includes canonical import history. Backups from database schemas v10, v11, and v12 remain
 restorable, with tables introduced by later schemas safely initialized empty. No new Import Center UI,
 file attachment storage, or catalog import workflow is introduced in 3I-0.5A.
+
+## Phase 3I-0.5C Activity import extension
+
+Activities remain `libraryItems` with `catalogType: "activity"`; DB v13 and the existing unique
+`importIdentityKey` index are unchanged. Activity typed fields additionally allow optional text-only
+`materials` (maximum 5,000 characters) and `notes` (maximum 10,000 characters).
+
+A strong imported Activity identity is the normalized tuple `(externalSource, externalKey)` with an
+Activity namespace prefix. Title equality is only a probable-duplicate review signal and cannot
+cause automatic overwrite. Imported Purpose and Focus values use canonical `categoryValues` and
+`categoryAssignments`, scoped to Activity catalog records. New or restored values, Activity records,
+assignments, `importRuns`, and one compound `changeLog` entry are committed atomically and share one
+global Undo/Redo operation.
