@@ -80,6 +80,26 @@ async function seedActivity(page: Page, values: Record<string, unknown>): Promis
   }, values);
 }
 
+test('Activities import offers formal Excel and CSV templates from the canonical workspace', async ({
+  page,
+}) => {
+  await page.goto('./#/import?type=activities');
+  await waitForSchema(page);
+  await expect(page.getByRole('heading', { name: 'Import Activities' })).toBeVisible();
+
+  const xlsxDownloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Excel template' }).click();
+  expect((await xlsxDownloadPromise).suggestedFilename()).toBe(
+    'Classroom-Activities-Import-Template.xlsx',
+  );
+
+  const csvDownloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'CSV template' }).click();
+  expect((await csvDownloadPromise).suggestedFilename()).toBe(
+    'Classroom-Activities-Import-Template.csv',
+  );
+});
+
 test('Activities paste-table preview is no-write, creates controlled values atomically, and globally undoes', async ({
   page,
 }) => {
