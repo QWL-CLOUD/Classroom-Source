@@ -314,4 +314,76 @@ describe('Classroom backup format', () => {
       'tasks',
     ]);
   });
+
+  it('round-trips imported Resource metadata, provenance, format assignment, and import run', () => {
+    const tables = emptyBackupTables();
+    tables.libraryItems.push({
+      id: 'resource-imported',
+      catalogType: 'resource',
+      title: 'Imported Resource',
+      tags: ['Unit: Demo'],
+      typedFields: {
+        catalogType: 'resource',
+        sourceLocation: 'https://example.invalid/resource',
+        usageNotes: 'Usage notes\nMetadata only.',
+      },
+      externalSource: 'district resource catalog',
+      externalKey: 'RES-1',
+      sourceReference: 'Fictional guide p. 2',
+      importIdentityKey: 'resource\u0000district resource catalog\u0000res-1',
+      lastImportRunId: 'resource-run-1',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    });
+    tables.categoryValues.push({
+      id: 'format-url',
+      familyId: 'resource-format',
+      name: 'URL',
+      normalizedName: 'url',
+      aliases: [],
+      normalizedAliases: [],
+      sortOrder: 0,
+      isDefault: false,
+      lifecycleState: 'active',
+      createdAt: now,
+      updatedAt: now,
+    });
+    tables.categoryAssignments.push({
+      id: 'format-assignment',
+      familyId: 'resource-format',
+      categoryValueId: 'format-url',
+      entityType: 'library-item',
+      entityId: 'resource-imported',
+      createdAt: now,
+    });
+    tables.importRuns.push({
+      id: 'resource-run-1',
+      importType: 'resources',
+      sourceKind: 'paste-url',
+      sourceLabel: 'https://example.invalid/resource',
+      worksheetName: 'URL Resource',
+      totalRows: 1,
+      createdCount: 1,
+      updatedCount: 0,
+      skippedCount: 0,
+      reviewCount: 0,
+      blockedCount: 0,
+      committedAt: now,
+    });
+    const preview = buildRestorePreview(
+      serializeBackupEnvelope(
+        createBackupEnvelope(tables, { backupId: 'resource-backup', exportedAt: now }),
+      ),
+    );
+    expect(preview.quarantineCount).toBe(0);
+    expect(preview.validTables.libraryItems[0]).toMatchObject({
+      id: 'resource-imported',
+      typedFields: { sourceLocation: 'https://example.invalid/resource' },
+      lastImportRunId: 'resource-run-1',
+    });
+    expect(preview.validTables.categoryValues).toHaveLength(1);
+    expect(preview.validTables.categoryAssignments).toHaveLength(1);
+    expect(preview.validTables.importRuns).toHaveLength(1);
+  });
 });

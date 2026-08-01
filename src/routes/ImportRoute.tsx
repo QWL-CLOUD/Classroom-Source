@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { ActivitiesImportWorkspace } from '@/features/importCenter/ActivitiesImportWorkspace';
 import sharedStyles from '@/features/importCenter/ImportCenterShared.module.css';
 import { ImportTypeSelector } from '@/features/importCenter/ImportTypeSelector';
+import { ResourcesImportWorkspace } from '@/features/importCenter/ResourcesImportWorkspace';
 import { RosterImportWorkspace } from '@/features/importCenter/RosterImportWorkspace';
 import { StandardsImportWorkspace } from '@/features/importCenter/StandardsImportWorkspace';
 import {
@@ -48,6 +49,9 @@ export function ImportRoute() {
       {!routeState.issue && routeState.importType === 'activities' ? (
         <ActivitiesImportWorkspace key="activities" />
       ) : null}
+      {!routeState.issue && routeState.importType === 'resources' ? (
+        <ResourcesImportWorkspace key="resources" />
+      ) : null}
       {!routeState.issue && routeState.importType === 'standards' ? (
         <StandardsImportWorkspace key="standards" />
       ) : null}
@@ -64,13 +68,10 @@ export function ImportRoute() {
       ) : null}
       {!routeState.issue &&
       routeState.importType &&
-      !['activities', 'standards', 'roster'].includes(routeState.importType) ? (
+      !['activities', 'resources', 'standards', 'roster'].includes(routeState.importType) ? (
         <section className={`card ${sharedStyles.plannedPanel}`} aria-label="Planned import type">
           <p className="page-eyebrow">Planned catalog import</p>
-          <h2>
-            {routeState.importType === 'resources' ? 'Resources' : 'Assessments'} import is not
-            enabled yet
-          </h2>
+          <h2>Assessment import is not enabled yet</h2>
           <p>
             This canonical route is reserved, but implementation remains in the approved later Phase
             3I-0.5 subphase. No preview or write state is created here.
@@ -82,8 +83,8 @@ export function ImportRoute() {
           <p className="page-eyebrow">Start here</p>
           <h2>Choose what you are importing</h2>
           <p>
-            Activities, Standards, and Rosters are available now. Resources and Assessments will
-            join this same Import Center without creating additional routes or duplicated state.
+            Activities, Resources, Standards, and Rosters are available now. Assessments will join
+            this same Import Center without creating additional routes or duplicated state.
           </p>
         </section>
       ) : null}

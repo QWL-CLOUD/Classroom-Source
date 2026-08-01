@@ -232,4 +232,43 @@ describe('Import Center history and commands', () => {
     expect(await database.categoryValues.get(purposeValue.id)).toEqual(purposeValue);
     expect(await database.categoryAssignments.get(assignment.id)).toEqual(assignment);
   });
+
+  it('lists Resource URL and file-metadata runs through canonical history', async () => {
+    await database.importRuns.bulkPut([
+      importRunSchema.parse({
+        id: 'run-resource-url',
+        importType: 'resources',
+        sourceKind: 'paste-url',
+        sourceLabel: 'https://example.invalid/resource',
+        worksheetName: 'URL Resource',
+        totalRows: 1,
+        createdCount: 1,
+        updatedCount: 0,
+        skippedCount: 0,
+        reviewCount: 0,
+        blockedCount: 0,
+        committedAt: '2026-08-01T04:00:00.000Z',
+      }),
+      importRunSchema.parse({
+        id: 'run-resource-files',
+        importType: 'resources',
+        sourceKind: 'file-metadata',
+        sourceLabel: '2 local file metadata rows',
+        worksheetName: 'File Metadata',
+        totalRows: 2,
+        createdCount: 2,
+        updatedCount: 0,
+        skippedCount: 0,
+        reviewCount: 0,
+        blockedCount: 0,
+        committedAt: '2026-08-01T04:01:00.000Z',
+      }),
+    ]);
+
+    const history = await new ImportHistoryReadService(database).list();
+    expect(history.map((entry) => [entry.id, entry.sourceKind])).toEqual([
+      ['run-resource-files', 'file-metadata'],
+      ['run-resource-url', 'paste-url'],
+    ]);
+  });
 });

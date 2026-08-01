@@ -241,4 +241,77 @@ describe('BackupRecoveryService', () => {
     expect(await database.restoreRuns.count()).toBe(0);
     expect(await database.restoreQuarantineRecords.count()).toBe(0);
   });
+
+  it('exports imported Resource metadata and Resource Format relationships', async () => {
+    await database.libraryItems.put({
+      id: 'resource-exported',
+      catalogType: 'resource',
+      title: 'Metadata-only Resource',
+      tags: [],
+      typedFields: {
+        catalogType: 'resource',
+        sourceLocation: 'Shared Drive / Demo / deck.pptx',
+        usageNotes: 'File contents stored by Classroom: No',
+      },
+      externalSource: 'district resource catalog',
+      externalKey: 'RES-2',
+      importIdentityKey: 'resource\u0000district resource catalog\u0000res-2',
+      lastImportRunId: 'resource-run-exported',
+      status: 'active',
+      createdAt: firstTime,
+      updatedAt: firstTime,
+    });
+    await database.categoryValues.put({
+      id: 'format-slides',
+      familyId: 'resource-format',
+      name: 'Slides',
+      normalizedName: 'slides',
+      aliases: [],
+      normalizedAliases: [],
+      sortOrder: 0,
+      isDefault: false,
+      lifecycleState: 'active',
+      createdAt: firstTime,
+      updatedAt: firstTime,
+    });
+    await database.categoryAssignments.put({
+      id: 'resource-format-assignment',
+      familyId: 'resource-format',
+      categoryValueId: 'format-slides',
+      entityType: 'library-item',
+      entityId: 'resource-exported',
+      createdAt: firstTime,
+    });
+    await database.importRuns.put({
+      id: 'resource-run-exported',
+      importType: 'resources',
+      sourceKind: 'file-metadata',
+      sourceLabel: 'One local file metadata row',
+      worksheetName: 'File Metadata',
+      totalRows: 1,
+      createdCount: 1,
+      updatedCount: 0,
+      skippedCount: 0,
+      reviewCount: 0,
+      blockedCount: 0,
+      committedAt: firstTime,
+    });
+    const envelope = await new BackupRecoveryService(database, {
+      createId: () => 'resource-backup',
+      now: () => firstTime,
+    }).createBackup();
+    const preview = buildRestorePreview(serializeBackupEnvelope(envelope));
+    expect(preview.quarantineCount).toBe(0);
+    expect(preview.validTables.libraryItems[0]).toMatchObject({
+      id: 'resource-exported',
+      typedFields: { sourceLocation: 'Shared Drive / Demo / deck.pptx' },
+    });
+    expect(preview.validTables.categoryAssignments[0]).toMatchObject({
+      familyId: 'resource-format',
+    });
+    expect(preview.validTables.importRuns[0]).toMatchObject({
+      importType: 'resources',
+      sourceKind: 'file-metadata',
+    });
+  });
 });

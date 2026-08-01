@@ -75,6 +75,20 @@ export function libraryCatalogTypedFieldsSearchText(item: LibraryCatalogItem): s
   ].join(' ');
 }
 
+export function safeLibraryResourceHref(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return undefined;
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return undefined;
+  if (!parsed.hostname || parsed.username || parsed.password) return undefined;
+  return parsed.toString();
+}
+
 export interface LibraryCatalogWorkflowDetail {
   label: string;
   value: string;
