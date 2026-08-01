@@ -14,9 +14,26 @@ Supported reviewed sources:
 - JSON workbook/table data;
 - pasted tabular text.
 
-Resource import, Assessment import, catalog templates, attachments, PDF/DOCX extraction, OCR,
-AI generation, background import, Library import deep links, and the RESOURCES → CONTENT rename
-remain outside this phase.
+Resource import, Assessment import and templates, attachments, PDF/DOCX extraction, OCR, AI
+generation, background import, Library import deep links, and the RESOURCES → CONTENT rename remain
+outside this phase.
+
+## Formal Activity templates
+
+The canonical Activities workspace provides:
+
+- `Classroom-Activities-Import-Template.csv` — a UTF-8 BOM, header-only CSV for Excel compatibility;
+- `Classroom-Activities-Import-Template.xlsx` with `Activities Import`, `Instructions`, and
+  `Examples` worksheets.
+
+The formal headers cover every reviewed Activity import field and automatically map to the existing
+Activity import model. The Instructions worksheet explains stable identity, controlled Purpose/Focus
+review, grouping and status values, text-only fields, and the difference between external source and
+source reference. Examples are entirely fictional and must be deleted or replaced before real use.
+
+The same completed table may be uploaded as CSV/XLSX or copied into the existing Pasted table source
+option. The template adds guidance and download controls only; it does not change preview, commit,
+history, Undo/Redo, DB v13, or source-adapter behavior.
 
 ## Activity persistence
 

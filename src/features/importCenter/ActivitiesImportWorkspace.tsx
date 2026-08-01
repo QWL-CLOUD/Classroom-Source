@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { AlertTriangle, CheckCircle2, Import, RefreshCcw } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Download, Import, RefreshCcw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
@@ -27,6 +27,7 @@ import {
   type ActivityImportDefaults,
   type UnmappedColumnDecisions,
 } from '@/features/activityImport/activityImportModel';
+import { downloadActivityImportTemplate } from '@/features/activityImport/activityImportTemplate';
 import { activityImportMutationService } from '@/features/activityImport/activityImportMutationService';
 
 import { ImportMappingTable, type ImportMappingField } from './ImportMappingTable';
@@ -376,6 +377,22 @@ export function ActivitiesImportWorkspace() {
             Create real Library Activities from reviewed CSV, XLSX, JSON, or pasted tables. Title
             equality never overwrites an existing record.
           </p>
+        </div>
+        <div className={styles.templateActions}>
+          <button
+            className="button"
+            type="button"
+            onClick={() => downloadActivityImportTemplate('xlsx')}
+          >
+            <Download aria-hidden="true" size={16} /> Excel template
+          </button>
+          <button
+            className="button"
+            type="button"
+            onClick={() => downloadActivityImportTemplate('csv')}
+          >
+            <Download aria-hidden="true" size={16} /> CSV template
+          </button>
         </div>
       </div>
 
