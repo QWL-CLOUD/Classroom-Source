@@ -289,7 +289,7 @@ export function AssessmentsImportWorkspace() {
 
   return (
     <section className={styles.workspace} aria-labelledby="assessment-import-heading">
-      <div className={`card ${styles.workspaceIntro}`}>
+      <div className={styles.workspaceHeader} data-testid="assessment-import-header">
         <div>
           <p className="page-eyebrow">Phase 3I-0.5E</p>
           <h2 id="assessment-import-heading">Import Assessments</h2>

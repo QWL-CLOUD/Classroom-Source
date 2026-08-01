@@ -18,8 +18,27 @@ async function openAssessmentsImport(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Import Assessments' })).toBeVisible();
 }
 
-test('Assessment workspace offers formal Excel and CSV templates', async ({ page }) => {
+test('Assessment workspace keeps its canonical header compact and offers formal templates', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
   await openAssessmentsImport(page);
+
+  const header = page.getByTestId('assessment-import-header');
+  await expect(header).toBeVisible();
+  await expect(header).not.toHaveClass(/\bcard\b/);
+  const layout = await header.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const rect = element.getBoundingClientRect();
+    return {
+      display: style.display,
+      justifyContent: style.justifyContent,
+      height: rect.height,
+    };
+  });
+  expect(layout.display).toBe('flex');
+  expect(layout.justifyContent).toBe('space-between');
+  expect(layout.height).toBeLessThan(180);
 
   const xlsxDownloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Excel template' }).click();
