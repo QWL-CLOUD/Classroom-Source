@@ -302,16 +302,16 @@ export function AssessmentsImportWorkspace() {
           <button
             type="button"
             className="button"
-            onClick={() => downloadAssessmentImportTemplate('csv')}
+            onClick={() => downloadAssessmentImportTemplate('xlsx')}
           >
-            <Download size={16} aria-hidden="true" /> CSV template
+            <Download size={16} aria-hidden="true" /> Excel template
           </button>
           <button
             type="button"
             className="button"
-            onClick={() => downloadAssessmentImportTemplate('xlsx')}
+            onClick={() => downloadAssessmentImportTemplate('csv')}
           >
-            <Download size={16} aria-hidden="true" /> Excel template
+            <Download size={16} aria-hidden="true" /> CSV template
           </button>
         </div>
       </div>
@@ -408,7 +408,7 @@ export function AssessmentsImportWorkspace() {
             headingId="assessment-mapping-heading"
             stepLabel="Step 2"
             title="Map Assessment fields"
-            helpText="Title is required. Assessment Kind must resolve to one of the five controlled values."
+            helpText="Title is required. Description summarizes the Assessment. Student Prompt is the task shown to students. Evidence to Collect describes what the teacher should observe or collect. Images and attachments are not imported. Assessment Kind must resolve to one of the five controlled values."
             headers={table.headers}
             fields={mappingFields}
             mapping={mapping}
