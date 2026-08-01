@@ -39,6 +39,7 @@ test('Assessment workspace keeps its canonical header compact and offers formal 
   expect(layout.display).toBe('flex');
   expect(layout.justifyContent).toBe('space-between');
   expect(layout.height).toBeLessThan(180);
+  await expect(header.getByRole('button')).toHaveText(['Excel template', 'CSV template']);
 
   const xlsxDownloadPromise = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Excel template' }).click();
@@ -65,6 +66,12 @@ test('Assessment preview is no-write and commits as one reviewed action', async 
       ].join('\n'),
     );
   await page.getByRole('button', { name: 'Review pasted table' }).click();
+  await expect(
+    page.getByText(
+      'Title is required. Description summarizes the Assessment. Student Prompt is the task shown to students. Evidence to Collect describes what the teacher should observe or collect. Images and attachments are not imported. Assessment Kind must resolve to one of the five controlled values.',
+      { exact: true },
+    ),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Generate reviewed preview' }).click();
   await expect(
     page.getByLabel('Assessment import preview').getByText('Create', { exact: true }),
