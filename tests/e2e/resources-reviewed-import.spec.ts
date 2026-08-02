@@ -194,7 +194,10 @@ test('Resources URL source remains local, requires reviewed format, and renders 
   await page.getByLabel(/Commit Resources, status, tags/).check();
   await page.getByRole('button', { name: 'Commit reviewed Resources' }).click();
   await page.getByRole('link', { name: 'Open Library Resources' }).click();
-  await page.getByRole('button', { name: 'Resources', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Resources', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   await page.getByRole('button', { name: new RegExp(title) }).click();
   const link = page.getByRole('link', { name: 'https://example.invalid/fictional-map' });
   await expect(link).toHaveAttribute('target', '_blank');

@@ -151,7 +151,7 @@ test('Class and Group manage independent Student rosters with global Undo', asyn
   await expect(classList.getByLabel('Amy, active student')).toBeVisible();
   await expect(classList.getByLabel('Ben Lee, archived student')).toBeVisible();
   await expect(classRoster.getByText(/1 archived Student/)).toBeVisible();
-  await expect(classRoster.getByRole('link', { name: 'Import students' })).toHaveAttribute(
+  await expect(classRoster.getByRole('link', { name: 'Import roster' })).toHaveAttribute(
     'href',
     '#/import?type=roster&context=roster-class',
   );

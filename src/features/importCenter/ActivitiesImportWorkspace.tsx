@@ -405,7 +405,7 @@ export function ActivitiesImportWorkspace() {
         <div className={styles.success} role="status">
           <CheckCircle2 size={20} aria-hidden="true" />
           <span>{success}</span>
-          <Link to="/library">Open Library Activities</Link>
+          <Link to="/library?tab=activities">Open Library Activities</Link>
         </div>
       ) : null}
 

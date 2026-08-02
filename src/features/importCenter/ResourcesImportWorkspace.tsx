@@ -663,7 +663,7 @@ export function ResourcesImportWorkspace() {
         <div className={styles.success} role="status">
           <CheckCircle2 size={19} aria-hidden="true" />
           <span>{success}</span>
-          <Link className="button" to="/library">
+          <Link className="button" to="/library?tab=resources">
             Open Library Resources
           </Link>
         </div>

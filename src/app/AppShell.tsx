@@ -52,7 +52,7 @@ const collapsibleNavigationGroups: Array<{
 }> = [
   {
     id: 'resources',
-    label: 'Resources',
+    label: 'Content',
     links: [
       { to: '/library', label: 'Library', icon: Library },
       { to: '/templates', label: 'Lesson Templates', icon: LayoutTemplate },

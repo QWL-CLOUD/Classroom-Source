@@ -70,7 +70,7 @@ test('Categories manages stable values and resolves in-use values transactionall
 
   await expect(page.getByRole('heading', { level: 1, name: 'Categories & Labels' })).toBeVisible();
   const navigation = page.getByRole('complementary', { name: 'Primary navigation' });
-  await expect(navigation.getByRole('button', { name: 'Resources' })).toHaveAttribute(
+  await expect(navigation.getByRole('button', { name: 'Content' })).toHaveAttribute(
     'aria-expanded',
     'true',
   );

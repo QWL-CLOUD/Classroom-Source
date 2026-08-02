@@ -193,7 +193,7 @@ test('CSV roster import previews duplicate decisions and commits as one global U
 }) => {
   await seed(page);
   const roster = page.getByRole('region', { name: 'Roster for Import Grade 3' });
-  await roster.getByRole('link', { name: 'Import students' }).click();
+  await roster.getByRole('link', { name: 'Import roster' }).click();
   await expect(page).toHaveURL(/#\/import\?type=roster&context=import-class$/);
   await expect(page.getByRole('heading', { name: 'Import a Class or Group roster' })).toBeVisible();
   await expect(page.getByLabel('Class or Group *')).toHaveValue('import-class');
@@ -275,7 +275,7 @@ test('Pasted roster import invalidates stale review and records canonical source
 }) => {
   await seed(page);
   const roster = page.getByRole('region', { name: 'Roster for Import Grade 3' });
-  await roster.getByRole('link', { name: 'Import students' }).click();
+  await roster.getByRole('link', { name: 'Import roster' }).click();
 
   const fileMode = page.getByLabel('File: CSV or XLSX');
   const pasteMode = page.getByLabel('Pasted table');
@@ -388,7 +388,7 @@ test('Pasted roster import invalidates stale review and records canonical source
 test('XLSX roster import requires explicit worksheet review before any write', async ({ page }) => {
   await seed(page);
   const roster = page.getByRole('region', { name: 'Roster for Import Grade 3' });
-  await roster.getByRole('link', { name: 'Import students' }).click();
+  await roster.getByRole('link', { name: 'Import roster' }).click();
 
   const cover = XLSX.utils.aoa_to_sheet([['Read me'], ['Choose the Roster Import worksheet.']]);
   const worksheet = XLSX.utils.aoa_to_sheet([

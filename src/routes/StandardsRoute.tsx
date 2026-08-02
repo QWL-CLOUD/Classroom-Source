@@ -1,6 +1,16 @@
-import { Archive, BookCheck, Pencil, Plus, RotateCcw, Search, X } from 'lucide-react';
+import {
+  Archive,
+  BookCheck,
+  Import as ImportIcon,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Search,
+  X,
+} from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { classroomDb } from '@/data/db/ClassroomDatabase';
 import {
@@ -12,6 +22,7 @@ import {
   standardSchema,
   type StandardStatus,
 } from '@/domain/models/entities';
+import { buildImportCenterHref } from '@/features/importCenter/importRouteState';
 import { StandardEditor } from '@/features/standards/StandardEditor';
 import { StandardsCoverageView } from '@/features/standards/StandardsCoverageView';
 import {
@@ -213,6 +224,9 @@ export function StandardsRoute() {
               Coverage
             </button>
           </div>
+          <Link className="button" to={buildImportCenterHref('standards')}>
+            <ImportIcon size={17} aria-hidden="true" /> Import standards
+          </Link>
           {workspaceView === 'catalog' ? (
             <button
               className="button button-primary"
