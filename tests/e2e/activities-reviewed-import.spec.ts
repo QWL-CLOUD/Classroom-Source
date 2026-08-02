@@ -169,7 +169,10 @@ test('Activities paste-table preview is no-write, creates controlled values atom
     });
 
   await page.getByRole('link', { name: 'Open Library Activities' }).click();
-  await page.getByRole('button', { name: 'Activities' }).click();
+  await expect(page.getByRole('button', { name: 'Activities' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   await page.getByRole('button', { name: new RegExp(title) }).click();
   await expect(page.getByText('Picture cards; timer')).toBeVisible();
   await expect(page.getByText('Oral rehearsal')).toBeVisible();

@@ -8,12 +8,12 @@ test('navigation prioritizes daily work and preserves collapsible group choices'
   await page.goto('./#/today?date=2026-07-20');
 
   const navigation = page.getByRole('complementary', { name: 'Primary navigation' });
-  const resources = navigation.getByRole('button', { name: 'Resources' });
+  const content = navigation.getByRole('button', { name: 'Content' });
   const reflect = navigation.getByRole('button', { name: 'Reflect' });
   const settingsData = navigation.getByRole('button', { name: 'Settings & Data' });
 
   await expect(navigation.getByRole('link', { name: 'Learners', exact: true })).toBeVisible();
-  await expect(resources).toHaveAttribute('aria-expanded', 'true');
+  await expect(content).toHaveAttribute('aria-expanded', 'true');
   await expect(navigation.getByRole('link', { name: 'Library', exact: true })).toBeVisible();
   await expect(reflect).toHaveAttribute('aria-expanded', 'false');
   await expect(navigation.getByRole('link', { name: 'Teaching Insights' })).toBeHidden();
@@ -57,23 +57,23 @@ test('mobile drawer keeps the same hierarchy and opens the active route group', 
 
   await page.getByRole('button', { name: 'Open navigation' }).click();
   const navigation = page.getByRole('complementary', { name: 'Primary navigation' });
-  const resources = navigation.getByRole('button', { name: 'Resources' });
+  const content = navigation.getByRole('button', { name: 'Content' });
 
-  await expect(resources).toHaveAttribute('aria-expanded', 'true');
-  await resources.click();
-  await expect(resources).toHaveAttribute('aria-expanded', 'false');
+  await expect(content).toHaveAttribute('aria-expanded', 'true');
+  await content.click();
+  await expect(content).toHaveAttribute('aria-expanded', 'false');
   await expect(navigation.getByRole('link', { name: 'Library', exact: true })).toBeHidden();
 
   await page.getByRole('button', { name: 'Close navigation' }).click();
   await page.getByRole('button', { name: 'Open navigation' }).click();
-  await expect(navigation.getByRole('button', { name: 'Resources' })).toHaveAttribute(
+  await expect(navigation.getByRole('button', { name: 'Content' })).toHaveAttribute(
     'aria-expanded',
     'false',
   );
 
   await page.goto('./#/library');
   await page.getByRole('button', { name: 'Open navigation' }).click();
-  await expect(navigation.getByRole('button', { name: 'Resources' })).toHaveAttribute(
+  await expect(navigation.getByRole('button', { name: 'Content' })).toHaveAttribute(
     'aria-expanded',
     'true',
   );

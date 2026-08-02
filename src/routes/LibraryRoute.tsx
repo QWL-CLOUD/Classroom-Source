@@ -4,6 +4,7 @@ import {
   Boxes,
   ClipboardCheck,
   FileText,
+  Import as ImportIcon,
   Pencil,
   Plus,
   RotateCcw,
@@ -12,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 
 import { classroomDb } from '@/data/db/ClassroomDatabase';
@@ -21,6 +23,7 @@ import {
   type LibraryCatalogType,
 } from '@/domain/models/entities';
 import { LibraryCatalogEditor } from '@/features/libraryCatalog/LibraryCatalogEditor';
+import { buildImportCenterHref } from '@/features/importCenter/importRouteState';
 import { libraryCatalogMutationService } from '@/features/libraryCatalog/libraryCatalogMutationService';
 import {
   buildLibraryCatalogItemViews,
@@ -30,6 +33,10 @@ import {
   listLibraryCatalogTags,
   type LibraryCatalogItemView,
 } from '@/features/libraryCatalog/libraryCatalogReadModel';
+import {
+  buildLibraryRouteSearch,
+  parseLibraryRouteState,
+} from '@/features/libraryCatalog/libraryRouteState';
 import {
   libraryActivityGroupingLabels,
   libraryAssessmentKindLabels,
@@ -48,6 +55,8 @@ function typeIcon(type: LibraryCatalogType): ReactNode {
 }
 
 export function LibraryRoute() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const catalogType = parseLibraryRouteState(searchParams).catalogType;
   const data = useLiveQuery(async () => {
     const [itemValues, assignments, categoryValues] = await Promise.all([
       classroomDb.libraryItems.toArray(),
@@ -70,7 +79,6 @@ export function LibraryRoute() {
   }, []);
 
   const [query, setQuery] = useState('');
-  const [catalogType, setCatalogType] = useState<'all' | LibraryCatalogType>('all');
   const [status, setStatus] = useState<'all' | LibraryCatalogStatus>('active');
   const [tag, setTag] = useState('');
   const [resourceFormatId, setResourceFormatId] = useState('');
@@ -103,6 +111,12 @@ export function LibraryRoute() {
     }
   }, [creating, selected, selectedId]);
 
+  useEffect(() => {
+    if (catalogType !== 'all' && catalogType !== 'resource') {
+      setResourceFormatId('');
+    }
+  }, [catalogType]);
+
   async function run<T>(action: () => Promise<T>): Promise<T | null> {
     if (busy) return null;
     setBusy(true);
@@ -120,15 +134,12 @@ export function LibraryRoute() {
   }
 
   function selectCatalogType(nextType: 'all' | LibraryCatalogType): void {
-    setCatalogType(nextType);
-    if (nextType !== 'all' && nextType !== 'resource') {
-      setResourceFormatId('');
-    }
+    setSearchParams(buildLibraryRouteSearch(nextType));
   }
 
   function clearFilters(): void {
     setQuery('');
-    setCatalogType('all');
+    setSearchParams(buildLibraryRouteSearch('all'));
     setStatus('active');
     setTag('');
     setResourceFormatId('');
@@ -147,6 +158,15 @@ export function LibraryRoute() {
     catalogTabs.push({ value: 'standard', label: 'Legacy Standards' });
   }
 
+  const importAction =
+    catalogType === 'activity'
+      ? { label: 'Import activities', href: buildImportCenterHref('activities') }
+      : catalogType === 'resource'
+        ? { label: 'Import resources', href: buildImportCenterHref('resources') }
+        : catalogType === 'assessment'
+          ? { label: 'Import assessments', href: buildImportCenterHref('assessments') }
+          : null;
+
   return (
     <div className={`page-shell ${styles.page}`}>
       <header className={styles.pageHeader}>
@@ -159,6 +179,11 @@ export function LibraryRoute() {
           </p>
         </div>
         <div className={styles.headerActions}>
+          {importAction ? (
+            <Link className="button" to={importAction.href}>
+              <ImportIcon size={17} aria-hidden="true" /> {importAction.label}
+            </Link>
+          ) : null}
           <button
             className="button button-primary"
             type="button"

@@ -368,7 +368,7 @@ export function RosterWorkspacePanel({ context }: { context: LearnerContext }) {
             </button>
             <Link className="button" to={buildImportCenterHref('roster', context.id)}>
               <FileSpreadsheet aria-hidden="true" size={16} />
-              Import students
+              Import roster
             </Link>
           </div>
         ) : (
@@ -513,7 +513,7 @@ export function RosterWorkspacePanel({ context }: { context: LearnerContext }) {
           <Users aria-hidden="true" size={26} />
           <div>
             <h3>No students in this roster</h3>
-            <p>Add an existing Student record, create one, or import a CSV or Excel roster.</p>
+            <p>Add an existing Student record, create one, or import a file or pasted table.</p>
           </div>
         </div>
       ) : (
