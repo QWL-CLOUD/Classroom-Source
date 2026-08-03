@@ -4,6 +4,7 @@ import { getCategoryFamily } from '@/features/categories/categoryFamilies';
 
 import {
   categoryFamilyIdsForLibraryCatalogType,
+  categoryFamilyIdsForLibraryFilterTab,
   LIBRARY_CLASSIFICATION_FAMILY_IDS,
 } from './libraryClassificationFamilies';
 
@@ -37,6 +38,20 @@ describe('Library classification families', () => {
     ]);
     expect(categoryFamilyIdsForLibraryCatalogType('standard')).toEqual([]);
     expect(LIBRARY_CLASSIFICATION_FAMILY_IDS.activity).toContain('activity-type');
+  });
+
+  it('keeps the All tab focused on families shared across major Library types', () => {
+    expect(categoryFamilyIdsForLibraryFilterTab('all')).toEqual([
+      'subject',
+      'grade-level',
+      'language',
+      'language-level',
+      'purpose-tag',
+      'focus-tag',
+    ]);
+    expect(categoryFamilyIdsForLibraryFilterTab('activity')).toContain('activity-type');
+    expect(categoryFamilyIdsForLibraryFilterTab('resource')).toContain('resource-format');
+    expect(categoryFamilyIdsForLibraryFilterTab('standard')).toEqual([]);
   });
 
   it('keeps Activity Type single-select and the shared Library facets multi-select', () => {

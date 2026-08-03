@@ -23,14 +23,22 @@ import {
   type LibraryCatalogType,
 } from '@/domain/models/entities';
 import { LibraryCatalogEditor } from '@/features/libraryCatalog/LibraryCatalogEditor';
+import {
+  buildLibraryClassificationFacetModel,
+  hasLibraryClassificationSelections,
+  libraryClassificationSelectionsEqual,
+  pruneLibraryClassificationSelections,
+  updateLibraryClassificationSelection,
+  type LibraryClassificationSelections,
+} from '@/features/libraryCatalog/libraryClassificationFacets';
 import { buildImportCenterHref } from '@/features/importCenter/importRouteState';
 import { libraryCatalogMutationService } from '@/features/libraryCatalog/libraryCatalogMutationService';
 import {
   buildLibraryCatalogItemViews,
-  filterLibraryCatalogItems,
   libraryCatalogStatusLabels,
   libraryCatalogTypeLabels,
   listLibraryCatalogTags,
+  selectVisibleLibraryCatalogItem,
   type LibraryCatalogItemView,
 } from '@/features/libraryCatalog/libraryCatalogReadModel';
 import {
@@ -67,21 +75,15 @@ export function LibraryRoute() {
     return {
       items,
       views: buildLibraryCatalogItemViews(items, assignments, categoryValues),
-      resourceFormats: categoryValues
-        .filter(
-          (value) => value.familyId === 'resource-format' && value.lifecycleState === 'active',
-        )
-        .sort(
-          (first, second) =>
-            first.sortOrder - second.sortOrder || first.name.localeCompare(second.name),
-        ),
+      categoryValues,
     };
   }, []);
 
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<'all' | LibraryCatalogStatus>('active');
   const [tag, setTag] = useState('');
-  const [resourceFormatId, setResourceFormatId] = useState('');
+  const [classificationSelections, setClassificationSelections] =
+    useState<LibraryClassificationSelections>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -90,19 +92,22 @@ export function LibraryRoute() {
 
   const tags = useMemo(() => listLibraryCatalogTags(data?.views ?? []), [data?.views]);
 
-  const visible = useMemo(
-    () =>
-      filterLibraryCatalogItems(data?.views ?? [], {
-        query,
-        catalogType,
-        status,
-        tag,
-        resourceFormatId,
-      }),
-    [catalogType, data?.views, query, resourceFormatId, status, tag],
+  const baseFilters = useMemo(
+    () => ({ query, catalogType, status, tag }),
+    [catalogType, query, status, tag],
   );
-
-  const selected = (data?.views ?? []).find((item) => item.id === selectedId) ?? visible[0] ?? null;
+  const facetModel = useMemo(
+    () =>
+      buildLibraryClassificationFacetModel({
+        items: data?.views ?? [],
+        categoryValues: data?.categoryValues ?? [],
+        filters: baseFilters,
+        selections: classificationSelections,
+      }),
+    [baseFilters, classificationSelections, data?.categoryValues, data?.views],
+  );
+  const visible = facetModel.visibleItems;
+  const selected = selectVisibleLibraryCatalogItem(visible, selectedId);
 
   useEffect(() => {
     if (creating) return;
@@ -112,10 +117,12 @@ export function LibraryRoute() {
   }, [creating, selected, selectedId]);
 
   useEffect(() => {
-    if (catalogType !== 'all' && catalogType !== 'resource') {
-      setResourceFormatId('');
-    }
-  }, [catalogType]);
+    if (!data) return;
+    setClassificationSelections((current) => {
+      const next = pruneLibraryClassificationSelections(current, catalogType, data.categoryValues);
+      return libraryClassificationSelectionsEqual(current, next) ? current : next;
+    });
+  }, [catalogType, data]);
 
   async function run<T>(action: () => Promise<T>): Promise<T | null> {
     if (busy) return null;
@@ -139,14 +146,15 @@ export function LibraryRoute() {
 
   function clearFilters(): void {
     setQuery('');
-    setSearchParams(buildLibraryRouteSearch('all'));
     setStatus('active');
     setTag('');
-    setResourceFormatId('');
+    setClassificationSelections({});
   }
 
-  const filterActive =
-    query.trim() || catalogType !== 'all' || status !== 'active' || tag || resourceFormatId;
+  const classificationFilterActive = hasLibraryClassificationSelections(facetModel.selections);
+  const filterActive = Boolean(
+    query.trim() || status !== 'active' || tag || classificationFilterActive,
+  );
   const hasLegacyStandards = (data?.views ?? []).some((item) => item.catalogType === 'standard');
   const catalogTabs: Array<{ value: 'all' | LibraryCatalogType; label: string }> = [
     { value: 'all', label: 'All' },
@@ -212,7 +220,6 @@ export function LibraryRoute() {
           </button>
         ))}
       </nav>
-
       <section className={`card ${styles.filters}`} aria-label="Library catalog filters">
         <label className={styles.searchField}>
           <span>Search</span>
@@ -221,7 +228,7 @@ export function LibraryRoute() {
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search titles, descriptions, tags, and formats"
+              placeholder="Search titles, descriptions, tags, classifications, and formats"
             />
           </div>
         </label>
@@ -250,22 +257,6 @@ export function LibraryRoute() {
           </select>
         </label>
 
-        <label>
-          <span>Resource Format</span>
-          <select
-            value={resourceFormatId}
-            disabled={catalogType !== 'all' && catalogType !== 'resource'}
-            onChange={(event) => setResourceFormatId(event.target.value)}
-          >
-            <option value="">All formats</option>
-            {(data?.resourceFormats ?? []).map((value) => (
-              <option key={value.id} value={value.id}>
-                {value.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
         <button
           className="button button-quiet"
           type="button"
@@ -275,6 +266,65 @@ export function LibraryRoute() {
           <X size={15} aria-hidden="true" /> Clear filters
         </button>
       </section>
+
+      {facetModel.groups.length > 0 ? (
+        <section
+          className={`card ${styles.classificationFilters}`}
+          aria-label="Library classification filters"
+        >
+          <div className={styles.facetHeading}>
+            <div>
+              <h2>Classification filters</h2>
+              <p>Choose multiple values within a group or combine groups to narrow the catalog.</p>
+            </div>
+            {classificationFilterActive ? (
+              <button
+                className="button button-quiet"
+                type="button"
+                onClick={() => setClassificationSelections({})}
+              >
+                Clear classifications
+              </button>
+            ) : null}
+          </div>
+          <div className={styles.facetGrid}>
+            {facetModel.groups.map((group) => (
+              <fieldset className={styles.facetGroup} key={group.familyId}>
+                <legend>{group.familyLabel}</legend>
+                <div className={styles.facetOptions}>
+                  {group.values.map((value) => (
+                    <label
+                      className={styles.facetOption}
+                      data-selected={value.selected}
+                      key={value.id}
+                    >
+                      <input
+                        type="checkbox"
+                        aria-label={`${value.name} (${value.count})`}
+                        checked={value.selected}
+                        onChange={(event) =>
+                          setClassificationSelections((current) =>
+                            updateLibraryClassificationSelection(
+                              current,
+                              group.familyId,
+                              value.id,
+                              event.target.checked,
+                            ),
+                          )
+                        }
+                      />
+                      <span className={styles.facetName}>{value.name}</span>
+                      <span className={styles.facetCount} aria-hidden="true">
+                        {value.count}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {error ? (
         <p className={styles.error} role="alert">

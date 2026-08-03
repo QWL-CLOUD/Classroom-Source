@@ -164,7 +164,10 @@ test('Library Catalog creates, filters, edits, archives, and restores stable rec
     .getByLabel('Library catalog types')
     .getByRole('button', { name: 'Resources', exact: true })
     .click();
-  await page.getByLabel('Resource Format').selectOption('format-slide-deck');
+  await page
+    .getByRole('region', { name: 'Library classification filters' })
+    .getByRole('checkbox', { name: /Slide deck/ })
+    .check();
   await page.getByLabel('Search').fill('oral language');
   await expect(
     page.getByRole('button', {
@@ -190,15 +193,27 @@ test('Library Catalog creates, filters, edits, archives, and restores stable rec
 
   await page.getByLabel('Search').fill('');
   await renamedDetails.getByRole('button', { name: 'Archive' }).click();
+  await expect(renamedDetails).toHaveCount(0);
+
+  await page.getByLabel('Status').selectOption('archived');
   await expect(renamedDetails.locator('[data-status="archived"]')).toBeVisible();
 
   await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(renamedDetails).toHaveCount(0);
+
+  await page.getByLabel('Status').selectOption('active');
   await expect(renamedDetails.locator('[data-status="active"]')).toBeVisible();
 
   await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(renamedDetails).toHaveCount(0);
+
+  await page.getByLabel('Status').selectOption('archived');
   await expect(renamedDetails.locator('[data-status="archived"]')).toBeVisible();
 
   await renamedDetails.getByRole('button', { name: 'Restore' }).click();
+  await expect(renamedDetails).toHaveCount(0);
+
+  await page.getByLabel('Status').selectOption('active');
   await expect(renamedDetails.locator('[data-status="active"]')).toBeVisible();
 
   await page.reload();

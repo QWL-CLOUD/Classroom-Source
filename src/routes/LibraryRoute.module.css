@@ -79,7 +79,7 @@
   display: grid;
   grid-template-columns:
     minmax(260px, 1.7fr)
-    repeat(3, minmax(145px, 0.8fr))
+    repeat(2, minmax(145px, 0.8fr))
     auto;
   align-items: end;
   gap: 12px;
@@ -115,6 +115,111 @@
 
 .searchField input {
   padding-left: 36px;
+}
+
+.classificationFilters {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.facetHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.facetHeading h2,
+.facetHeading p {
+  margin: 0;
+}
+
+.facetHeading h2 {
+  color: var(--heading);
+  font-size: 16px;
+}
+
+.facetHeading p {
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.facetGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.facetGroup {
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.facetGroup legend {
+  max-width: 100%;
+  padding: 0 5px;
+  overflow-wrap: anywhere;
+  color: var(--heading);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.facetOptions {
+  display: grid;
+  gap: 7px;
+}
+
+.facetOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: #fff;
+  color: var(--heading);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.facetOption:hover,
+.facetOption[data-selected='true'] {
+  border-color: #7ba99e;
+  background: #eef7f4;
+}
+
+.facetOption input {
+  flex: 0 0 auto;
+  width: auto;
+  margin: 0;
+}
+
+.facetName {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+}
+
+.facetCount {
+  display: inline-flex;
+  min-width: 24px;
+  flex: 0 0 auto;
+  justify-content: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #e4ebe8;
+  color: #3f4f49;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .createPanel {
@@ -423,8 +528,13 @@
 }
 
 @media (max-width: 680px) {
-  .filters {
+  .filters,
+  .facetGrid {
     grid-template-columns: 1fr;
+  }
+
+  .facetHeading {
+    flex-direction: column;
   }
 
   .searchField {

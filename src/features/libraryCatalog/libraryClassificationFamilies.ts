@@ -7,6 +7,12 @@ const COMMON_LIBRARY_CLASSIFICATION_FAMILIES = [
   'language-level',
 ] as const satisfies readonly CategoryFamilyId[];
 
+const COMMON_LIBRARY_FILTER_FAMILIES = [
+  ...COMMON_LIBRARY_CLASSIFICATION_FAMILIES,
+  'purpose-tag',
+  'focus-tag',
+] as const satisfies readonly CategoryFamilyId[];
+
 export const LIBRARY_CLASSIFICATION_FAMILY_IDS = {
   activity: [
     ...COMMON_LIBRARY_CLASSIFICATION_FAMILIES,
@@ -28,4 +34,11 @@ export function categoryFamilyIdsForLibraryCatalogType(
   catalogType: LibraryCatalogType,
 ): readonly CategoryFamilyId[] {
   return LIBRARY_CLASSIFICATION_FAMILY_IDS[catalogType];
+}
+
+export function categoryFamilyIdsForLibraryFilterTab(
+  catalogType: 'all' | LibraryCatalogType,
+): readonly CategoryFamilyId[] {
+  if (catalogType === 'all') return COMMON_LIBRARY_FILTER_FAMILIES;
+  return categoryFamilyIdsForLibraryCatalogType(catalogType);
 }
