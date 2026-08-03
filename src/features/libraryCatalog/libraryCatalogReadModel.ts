@@ -50,7 +50,6 @@ export interface LibraryCatalogFilters {
   catalogType: 'all' | LibraryCatalogType;
   status: 'all' | LibraryCatalogStatus;
   tag: string;
-  resourceFormatId: string;
 }
 
 export function normalizeLibraryCatalogTags(values: readonly string[]): string[] {
@@ -151,9 +150,6 @@ export function filterLibraryCatalogItems(
         return false;
       }
       if (filters.tag && !item.tags.includes(filters.tag)) return false;
-      if (filters.resourceFormatId && item.resourceFormatId !== filters.resourceFormatId) {
-        return false;
-      }
       return !query || searchableText(item).includes(query);
     })
     .sort(
@@ -169,4 +165,11 @@ export function listLibraryCatalogTags(items: readonly LibraryCatalogItemView[])
   return normalizeLibraryCatalogTags(items.flatMap((item) => item.tags)).sort((first, second) =>
     first.localeCompare(second, 'en', { sensitivity: 'base' }),
   );
+}
+
+export function selectVisibleLibraryCatalogItem(
+  items: readonly LibraryCatalogItemView[],
+  selectedId: string | null,
+): LibraryCatalogItemView | null {
+  return items.find((item) => item.id === selectedId) ?? items[0] ?? null;
 }

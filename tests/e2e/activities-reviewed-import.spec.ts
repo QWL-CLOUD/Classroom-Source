@@ -174,9 +174,12 @@ test('Activities paste-table preview is no-write, creates controlled values atom
     'true',
   );
   await page.getByRole('button', { name: new RegExp(title) }).click();
-  await expect(page.getByText('Picture cards; timer')).toBeVisible();
-  await expect(page.getByText('Oral rehearsal')).toBeVisible();
-  await expect(page.getByText('Synthetic District Catalog')).toBeVisible();
+  const importedDetails = page.getByRole('region', {
+    name: `${title} Library item details`,
+  });
+  await expect(importedDetails.getByText('Picture cards; timer')).toBeVisible();
+  await expect(importedDetails.getByText('Oral rehearsal')).toBeVisible();
+  await expect(importedDetails.getByText('Synthetic District Catalog')).toBeVisible();
 
   await page.getByRole('button', { name: 'Undo' }).click();
   await expect

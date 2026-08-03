@@ -11,6 +11,7 @@ import {
   filterLibraryCatalogItems,
   listLibraryCatalogTags,
   normalizeLibraryCatalogTags,
+  selectVisibleLibraryCatalogItem,
   type LibraryCatalogFilters,
   type LibraryCatalogItemView,
 } from './libraryCatalogReadModel';
@@ -38,7 +39,6 @@ const defaults: LibraryCatalogFilters = {
   catalogType: 'all',
   status: 'all',
   tag: '',
-  resourceFormatId: '',
 };
 
 describe('Library Catalog read model', () => {
@@ -266,7 +266,6 @@ describe('Library Catalog read model', () => {
           description: 'Picture prompts',
           tags: ['Speaking'],
         }),
-        resourceFormatId: 'format-cards',
         resourceFormatLabel: 'Printable cards',
         purposeTagLabels: [],
         focusTagLabels: [],
@@ -318,7 +317,7 @@ describe('Library Catalog read model', () => {
     expect(filterLibraryCatalogItems(values, { ...defaults, query: 'formative' })).toHaveLength(1);
   });
 
-  it('combines type, status, tag, and Resource Format filters', () => {
+  it('combines type, status, and generic-tag filters', () => {
     const values = [
       {
         ...item({
@@ -327,7 +326,6 @@ describe('Library Catalog read model', () => {
           title: 'Active cards',
           tags: ['Reading'],
         }),
-        resourceFormatId: 'format-cards',
         resourceFormatLabel: 'Cards',
         purposeTagLabels: [],
         focusTagLabels: [],
@@ -359,7 +357,6 @@ describe('Library Catalog read model', () => {
         catalogType: 'resource',
         status: 'active',
         tag: 'Reading',
-        resourceFormatId: 'format-cards',
       }).map((value) => value.id),
     ).toEqual(['resource-1']);
   });
@@ -381,5 +378,14 @@ describe('Library Catalog read model', () => {
         }),
       ]),
     ).toEqual(['Reading', 'Speaking', 'Writing']);
+  });
+
+  it('keeps the detail selection inside the visible result set', () => {
+    const first = item({ id: 'first', catalogType: 'activity', title: 'First' });
+    const second = item({ id: 'second', catalogType: 'resource', title: 'Second' });
+
+    expect(selectVisibleLibraryCatalogItem([first, second], 'second')?.id).toBe('second');
+    expect(selectVisibleLibraryCatalogItem([first], 'second')?.id).toBe('first');
+    expect(selectVisibleLibraryCatalogItem([], 'second')).toBeNull();
   });
 });
