@@ -11,6 +11,23 @@ import {
 
 const now = '2026-07-27T12:00:00.000Z';
 
+function familyIds(records: unknown[]): string[] {
+  return records
+    .map((record) => {
+      const familyId =
+        typeof record === 'object' && record !== null && 'familyId' in record
+          ? record.familyId
+          : undefined;
+
+      if (typeof familyId !== 'string') {
+        throw new Error('Expected a backup record with a string familyId.');
+      }
+
+      return familyId;
+    })
+    .sort();
+}
+
 function task(id: string) {
   return {
     id,
@@ -271,6 +288,83 @@ describe('Classroom backup format', () => {
 
     expect(preview.quarantineCount).toBe(0);
     expect(preview.validTables.assessmentEvidence).toHaveLength(1);
+  });
+
+  it('round-trips expanded Library classification families on DB v13', () => {
+    const tables = emptyBackupTables();
+    tables.libraryItems.push({
+      id: 'assessment-classified',
+      catalogType: 'assessment',
+      title: 'Classified assessment',
+      tags: [],
+      typedFields: {
+        catalogType: 'assessment',
+        assessmentKind: 'formative',
+      },
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    });
+    tables.categoryValues.push(
+      {
+        id: 'subject-mathematics',
+        familyId: 'subject',
+        name: 'Mathematics',
+        normalizedName: 'mathematics',
+        aliases: ['Math'],
+        normalizedAliases: ['math'],
+        sortOrder: 0,
+        isDefault: false,
+        lifecycleState: 'active',
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 'language-level-4',
+        familyId: 'language-level',
+        name: 'Level 4',
+        normalizedName: 'level 4',
+        aliases: ['L4'],
+        normalizedAliases: ['l4'],
+        sortOrder: 0,
+        isDefault: false,
+        lifecycleState: 'active',
+        createdAt: now,
+        updatedAt: now,
+      },
+    );
+    tables.categoryAssignments.push(
+      {
+        id: 'assessment-subject',
+        familyId: 'subject',
+        categoryValueId: 'subject-mathematics',
+        entityType: 'library-item',
+        entityId: 'assessment-classified',
+        createdAt: now,
+      },
+      {
+        id: 'assessment-language-level',
+        familyId: 'language-level',
+        categoryValueId: 'language-level-4',
+        entityType: 'library-item',
+        entityId: 'assessment-classified',
+        createdAt: now,
+      },
+    );
+
+    const envelope = createBackupEnvelope(tables, {
+      backupId: 'classification-foundation-backup',
+      exportedAt: now,
+    });
+    const preview = buildRestorePreview(serializeBackupEnvelope(envelope));
+
+    expect(envelope.databaseSchemaVersion).toBe(13);
+    expect(preview.quarantineCount).toBe(0);
+    expect(familyIds(preview.validTables.categoryValues)).toEqual(['language-level', 'subject']);
+    expect(familyIds(preview.validTables.categoryAssignments)).toEqual([
+      'language-level',
+      'subject',
+    ]);
   });
 
   it('rejects a backup whose content no longer matches its integrity hash', () => {

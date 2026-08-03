@@ -2,11 +2,16 @@ import { libraryCatalogTypedFieldsSearchText } from '@/features/libraryCatalog/l
 
 import type {
   CategoryAssignment,
+  CategoryFamilyId,
   CategoryValue,
+  CategoryValueLifecycleState,
   LibraryCatalogItem,
   LibraryCatalogStatus,
   LibraryCatalogType,
 } from '@/domain/models/entities';
+import { getCategoryFamily } from '@/features/categories/categoryFamilies';
+
+import { categoryFamilyIdsForLibraryCatalogType } from './libraryClassificationFamilies';
 
 export const libraryCatalogTypeLabels: Record<LibraryCatalogType, string> = {
   activity: 'Activity',
@@ -20,11 +25,24 @@ export const libraryCatalogStatusLabels: Record<LibraryCatalogStatus, string> = 
   archived: 'Archived',
 };
 
+export interface LibraryCatalogClassificationValueView {
+  id: string;
+  name: string;
+  lifecycleState: CategoryValueLifecycleState;
+}
+
+export interface LibraryCatalogClassificationGroupView {
+  familyId: CategoryFamilyId;
+  familyLabel: string;
+  values: LibraryCatalogClassificationValueView[];
+}
+
 export interface LibraryCatalogItemView extends LibraryCatalogItem {
   resourceFormatId?: string;
   resourceFormatLabel?: string;
   purposeTagLabels: string[];
   focusTagLabels: string[];
+  classificationGroups: LibraryCatalogClassificationGroupView[];
 }
 
 export interface LibraryCatalogFilters {
@@ -78,12 +96,24 @@ export function buildLibraryCatalogItemViews(
             first.name.localeCompare(second.name, 'en', { sensitivity: 'base' }),
         );
     const resourceFormat = labelValues('resource-format')[0];
+    const classificationGroups = categoryFamilyIdsForLibraryCatalogType(item.catalogType).map(
+      (familyId): LibraryCatalogClassificationGroupView => ({
+        familyId,
+        familyLabel: getCategoryFamily(familyId).label,
+        values: labelValues(familyId).map((value) => ({
+          id: value.id,
+          name: value.name,
+          lifecycleState: value.lifecycleState,
+        })),
+      }),
+    );
     return {
       ...item,
       resourceFormatId: resourceFormat?.id,
       resourceFormatLabel: resourceFormat?.name,
       purposeTagLabels: labelValues('purpose-tag').map((value) => value.name),
       focusTagLabels: labelValues('focus-tag').map((value) => value.name),
+      classificationGroups,
     };
   });
 }
@@ -96,6 +126,9 @@ function searchableText(item: LibraryCatalogItemView): string {
     item.resourceFormatLabel ?? '',
     item.purposeTagLabels.join(' '),
     item.focusTagLabels.join(' '),
+    item.classificationGroups
+      .flatMap((group) => [group.familyLabel, ...group.values.map((value) => value.name)])
+      .join(' '),
     libraryCatalogTypeLabels[item.catalogType],
     libraryCatalogTypedFieldsSearchText(item),
   ]

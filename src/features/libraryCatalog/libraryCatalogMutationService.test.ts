@@ -53,6 +53,26 @@ const slideDeck: CategoryValue = {
   updatedAt: timestamp,
 };
 
+function classificationValue(
+  id: string,
+  familyId: CategoryValue['familyId'],
+  name: string,
+): CategoryValue {
+  return {
+    id,
+    familyId,
+    name,
+    normalizedName: name.toLocaleLowerCase('en'),
+    aliases: [],
+    normalizedAliases: [],
+    sortOrder: 0,
+    isDefault: false,
+    lifecycleState: 'active',
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
 beforeEach(async () => {
   database = new ClassroomDatabase(`library-catalog-${globalThis.crypto.randomUUID()}`);
   await database.open();
@@ -157,6 +177,78 @@ describe('LibraryCatalogMutationService', () => {
         .map((assignment) => assignment.familyId)
         .sort(),
     ).toEqual(['focus-tag', 'purpose-tag']);
+  });
+
+  it('creates an Assessment with canonical Library classifications and one undoable transaction', async () => {
+    await database.categoryValues.bulkPut([
+      classificationValue('subject-mathematics', 'subject', 'Mathematics'),
+      classificationValue('grade-3', 'grade-level', 'Grade 3'),
+      classificationValue('language-chinese', 'language', 'Chinese'),
+      classificationValue('language-level-4', 'language-level', 'Level 4'),
+    ]);
+    const service = createService([
+      'assessment-1',
+      'assignment-subject',
+      'assignment-grade',
+      'assignment-language',
+      'assignment-language-level',
+      'assignment-focus',
+      'assignment-purpose',
+      '01-create-log',
+    ]);
+
+    const created = await service.create(
+      {
+        catalogType: 'assessment',
+        title: 'Picture retell check',
+        tags: ['Unit 1'],
+        typedFields: {
+          catalogType: 'assessment',
+          assessmentKind: 'formative',
+          studentPrompt: 'Retell the picture sequence.',
+          evidenceToCollect: 'Sequence language and complete sentences.',
+        },
+      },
+      {
+        subject: ['subject-mathematics'],
+        'grade-level': ['grade-3'],
+        language: ['language-chinese'],
+        'language-level': ['language-level-4'],
+        'purpose-tag': ['purpose-oral-language'],
+        'focus-tag': ['focus-retelling'],
+      },
+    );
+
+    expect(created).toMatchObject({
+      id: 'assessment-1',
+      catalogType: 'assessment',
+      typedFields: {
+        catalogType: 'assessment',
+        assessmentKind: 'formative',
+      },
+    });
+    expect(
+      (await database.categoryAssignments.where('entityId').equals('assessment-1').toArray())
+        .map((assignment) => assignment.familyId)
+        .sort(),
+    ).toEqual(['focus-tag', 'grade-level', 'language', 'language-level', 'purpose-tag', 'subject']);
+
+    const history = new EditHistoryService(database, {
+      now: () => '2026-07-23T12:20:00.000Z',
+    });
+    await history.undo();
+    expect(await database.libraryItems.get('assessment-1')).toBeUndefined();
+    expect(
+      await database.categoryAssignments.where('entityId').equals('assessment-1').count(),
+    ).toBe(0);
+
+    await history.redo();
+    expect(await database.libraryItems.get('assessment-1')).toMatchObject({
+      title: 'Picture retell check',
+    });
+    expect(
+      await database.categoryAssignments.where('entityId').equals('assessment-1').count(),
+    ).toBe(6);
   });
 
   it('edits metadata without replacing the item identity or type', async () => {

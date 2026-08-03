@@ -77,9 +77,25 @@ test('Categories manages stable values and resolves in-use values transactionall
   await expect(
     navigation.getByRole('link', { name: 'Categories & Labels', exact: true }),
   ).toBeVisible();
+  await expect(page.locator('.page-header .page-eyebrow')).toHaveText('Content');
 
-  await page.getByRole('button', { name: 'New Purpose Tag' }).click();
+  await page
+    .getByRole('navigation', { name: 'Category families' })
+    .getByRole('button', { name: /Subjects/ })
+    .click();
+  await expect(page.getByRole('heading', { level: 2, name: 'Subjects' })).toBeVisible();
+  await page.getByRole('button', { name: 'New Subject' }).click();
   let editor = page.getByRole('region', { name: 'Category value editor' });
+  await editor.getByLabel('Name').fill('Mathematics');
+  await editor.getByRole('button', { name: 'Create value' }).click();
+  await expect(page.getByRole('article', { name: 'Mathematics category value' })).toBeVisible();
+
+  await page
+    .getByRole('navigation', { name: 'Category families' })
+    .getByRole('button', { name: /Purpose Tags/ })
+    .click();
+  await page.getByRole('button', { name: 'New Purpose Tag' }).click();
+  editor = page.getByRole('region', { name: 'Category value editor' });
   await editor.getByLabel('Name').fill('Reading');
   await editor.getByLabel('Color').selectOption('blue');
   await editor.getByLabel('Icon').selectOption('target');

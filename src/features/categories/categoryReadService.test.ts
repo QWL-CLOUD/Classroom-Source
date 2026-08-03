@@ -41,7 +41,7 @@ afterEach(async () => {
 });
 
 describe('CategoryReadService', () => {
-  it('exposes the seven locked families and only active values in selectors', async () => {
+  it('exposes the twelve locked families and only active values in selectors', async () => {
     await database.categoryValues.bulkPut([
       value({ id: 'active', name: 'Active', sortOrder: 1 }),
       value({
@@ -54,7 +54,20 @@ describe('CategoryReadService', () => {
       }),
     ]);
 
-    expect(service.listFamilies()).toHaveLength(7);
+    expect(service.listFamilies().map((family) => family.id)).toEqual([
+      'template-format',
+      'subject',
+      'grade-level',
+      'language',
+      'language-level',
+      'activity-type',
+      'focus-tag',
+      'purpose-tag',
+      'theme-tag',
+      'resource-format',
+      'task-label',
+      'support-area',
+    ]);
     expect((await service.listSelectableValues('purpose-tag')).map((item) => item.id)).toEqual([
       'active',
     ]);

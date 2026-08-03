@@ -46,7 +46,7 @@
 
 .family > p {
   margin: 0 0 12px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font-size: 13px;
 }
 

@@ -64,6 +64,22 @@ async function seedTemplate(id = 'template-1'): Promise<void> {
   });
 }
 
+async function seedLibraryItem(id = 'library-item-1'): Promise<void> {
+  await database.libraryItems.put({
+    id,
+    catalogType: 'assessment',
+    title: 'Oral language check',
+    tags: [],
+    typedFields: {
+      catalogType: 'assessment',
+      assessmentKind: 'formative',
+    },
+    status: 'active',
+    createdAt: now,
+    updatedAt: now,
+  });
+}
+
 beforeEach(async () => {
   database = new ClassroomDatabase(`category-mutation-${crypto.randomUUID()}`);
   await database.open();
@@ -359,5 +375,28 @@ describe('CategoryMutationService', () => {
     expect(await database.categoryAssignments.get('assignment-template')).toBeUndefined();
 
     await expect(service.assign('purpose', 'task', 'task-1')).rejects.toThrow(/cannot be assigned/);
+  });
+
+  it('assigns canonical Library classifications through the shared category service', async () => {
+    await seedLibraryItem();
+    await database.categoryValues.put(value('subject-mathematics', 'Mathematics', 'subject'));
+    ids = ['assignment-library-subject', 'log-library-subject'];
+
+    await service.assign('subject-mathematics', 'library-item', 'library-item-1');
+
+    expect(await database.categoryAssignments.get('assignment-library-subject')).toMatchObject({
+      familyId: 'subject',
+      categoryValueId: 'subject-mathematics',
+      entityType: 'library-item',
+      entityId: 'library-item-1',
+    });
+
+    await history.undo();
+    expect(await database.categoryAssignments.get('assignment-library-subject')).toBeUndefined();
+
+    ids = ['unused-assignment', 'unused-log'];
+    await expect(
+      service.assign('subject-mathematics', 'library-item', 'missing-library-item'),
+    ).rejects.toThrow(/target record no longer exists/);
   });
 });

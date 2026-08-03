@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   assessmentEvidenceRecordSchema,
+  categoryFamilyIdSchema,
   categoryValueSchema,
   learnerNoticeSchema,
   importRunSchema,
@@ -124,6 +125,14 @@ describe('domain schemas', () => {
       status: 'active',
     });
   });
+  it('accepts the canonical Library classification family IDs', () => {
+    expect(
+      ['subject', 'grade-level', 'language', 'language-level', 'activity-type'].map((value) =>
+        categoryFamilyIdSchema.parse(value),
+      ),
+    ).toEqual(['subject', 'grade-level', 'language', 'language-level', 'activity-type']);
+  });
+
   it('requires category lifecycle metadata to remain internally consistent', () => {
     const active = categoryValueSchema.parse({
       id: 'purpose-reading',

@@ -25,7 +25,10 @@ import {
   type LibraryCatalogCommandPair,
   type LibraryCatalogOperation,
 } from './libraryCatalogCommands';
+import { categoryFamilyIdsForLibraryCatalogType } from './libraryClassificationFamilies';
 import { normalizeLibraryCatalogTags } from './libraryCatalogReadModel';
+
+export { categoryFamilyIdsForLibraryCatalogType } from './libraryClassificationFamilies';
 import { typedFieldsForCatalogType } from './libraryCatalogTypedFields';
 
 const optionalTrimmedString = (maximum: number) =>
@@ -82,14 +85,6 @@ export interface LibraryCatalogMutationDependencies {
 interface CommitResult<T> {
   value: T;
   log: ChangeLog;
-}
-
-export function categoryFamilyIdsForLibraryCatalogType(
-  catalogType: LibraryCatalogItem['catalogType'],
-): readonly CategoryFamilyId[] {
-  if (catalogType === 'activity') return ['purpose-tag', 'focus-tag'];
-  if (catalogType === 'resource') return ['resource-format'];
-  return [];
 }
 
 function categorySelectionsForType(

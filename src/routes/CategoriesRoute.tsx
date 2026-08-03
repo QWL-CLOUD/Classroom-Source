@@ -318,11 +318,11 @@ export function CategoriesRoute() {
     <section>
       <header className="page-header">
         <div>
-          <p className="page-eyebrow">Resources</p>
+          <p className="page-eyebrow">Content</p>
           <h1 className="page-title">Categories &amp; Labels</h1>
           <p className="page-subtitle">
-            Manage stable shared vocabulary without breaking linked plans, tasks, notices, or future
-            catalog records.
+            Manage stable shared vocabulary without breaking linked plans, tasks, notices, or
+            Library records.
           </p>
         </div>
         <button className="button button-primary" type="button" onClick={openCreate}>
