@@ -19,7 +19,7 @@ import {
 } from '@/features/libraryCatalog/libraryCatalogTypedFields';
 
 import { parseLibraryCatalogTags } from './libraryCatalogReadModel';
-import { categoryFamilyIdsForLibraryCatalogType } from './libraryCatalogMutationService';
+import { categoryFamilyIdsForLibraryCatalogType } from './libraryClassificationFamilies';
 import styles from './LibraryCatalogEditor.module.css';
 
 export interface LibraryCatalogEditorSubmission {
@@ -360,7 +360,7 @@ export function LibraryCatalogEditor({
         <small>Separate reusable search tags with commas.</small>
       </label>
 
-      {catalogType === 'activity' || catalogType === 'resource' ? (
+      {catalogType !== 'standard' ? (
         <CategoryAssignmentFields
           snapshot={categoryDraft.snapshot}
           selectedSets={categoryDraft.selectedSets}

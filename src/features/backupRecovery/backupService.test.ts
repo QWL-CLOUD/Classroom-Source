@@ -16,6 +16,24 @@ import { BackupRecoveryService } from './backupService';
 const names: string[] = [];
 const firstTime = '2026-07-27T12:00:00.000Z';
 const secondTime = '2026-07-27T12:00:01.000Z';
+
+function familyIds(records: unknown[]): string[] {
+  return records
+    .map((record) => {
+      const familyId =
+        typeof record === 'object' && record !== null && 'familyId' in record
+          ? record.familyId
+          : undefined;
+
+      if (typeof familyId !== 'string') {
+        throw new Error('Expected a backup record with a string familyId.');
+      }
+
+      return familyId;
+    })
+    .sort();
+}
+
 let database: ClassroomDatabase;
 
 function task(id: string, title: string) {
@@ -313,6 +331,79 @@ describe('BackupRecoveryService', () => {
       importType: 'resources',
       sourceKind: 'file-metadata',
     });
+  });
+
+  it('exports expanded Library classification families without a DB migration', async () => {
+    await database.libraryItems.put({
+      id: 'assessment-classified',
+      catalogType: 'assessment',
+      title: 'Classified assessment',
+      tags: [],
+      typedFields: {
+        catalogType: 'assessment',
+        assessmentKind: 'formative',
+      },
+      status: 'active',
+      createdAt: firstTime,
+      updatedAt: firstTime,
+    });
+    await database.categoryValues.bulkPut([
+      {
+        id: 'subject-mathematics',
+        familyId: 'subject',
+        name: 'Mathematics',
+        normalizedName: 'mathematics',
+        aliases: ['Math'],
+        normalizedAliases: ['math'],
+        sortOrder: 0,
+        isDefault: false,
+        lifecycleState: 'active',
+        createdAt: firstTime,
+        updatedAt: firstTime,
+      },
+      {
+        id: 'language-chinese',
+        familyId: 'language',
+        name: 'Chinese',
+        normalizedName: 'chinese',
+        aliases: [],
+        normalizedAliases: [],
+        sortOrder: 0,
+        isDefault: false,
+        lifecycleState: 'active',
+        createdAt: firstTime,
+        updatedAt: firstTime,
+      },
+    ]);
+    await database.categoryAssignments.bulkPut([
+      {
+        id: 'assessment-subject',
+        familyId: 'subject',
+        categoryValueId: 'subject-mathematics',
+        entityType: 'library-item',
+        entityId: 'assessment-classified',
+        createdAt: firstTime,
+      },
+      {
+        id: 'assessment-language',
+        familyId: 'language',
+        categoryValueId: 'language-chinese',
+        entityType: 'library-item',
+        entityId: 'assessment-classified',
+        createdAt: firstTime,
+      },
+    ]);
+
+    const envelope = await new BackupRecoveryService(database, {
+      createId: () => 'classification-foundation-backup',
+      now: () => firstTime,
+    }).createBackup();
+    const preview = buildRestorePreview(serializeBackupEnvelope(envelope));
+
+    expect(envelope.databaseSchemaVersion).toBe(13);
+    expect(preview.quarantineCount).toBe(0);
+    expect(familyIds(preview.validTables.categoryValues)).toEqual(['language', 'subject']);
+    expect(familyIds(preview.validTables.categoryAssignments)).toEqual(['language', 'subject']);
   });
 
   it('preserves imported Assessment catalog fields and provenance', async () => {

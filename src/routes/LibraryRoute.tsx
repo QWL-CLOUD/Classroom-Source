@@ -474,24 +474,22 @@ function LibraryItemDetail({
           <dt>Status</dt>
           <dd>{libraryCatalogStatusLabels[item.status]}</dd>
         </div>
-        {item.catalogType === 'resource' ? (
-          <div>
-            <dt>Resource Format</dt>
-            <dd>{item.resourceFormatLabel ?? 'Not assigned'}</dd>
+        {item.classificationGroups.map((group) => (
+          <div key={group.familyId}>
+            <dt>{group.familyLabel}</dt>
+            <dd>
+              {group.values.length
+                ? group.values
+                    .map((value) =>
+                      value.lifecycleState === 'active'
+                        ? value.name
+                        : `${value.name} (${value.lifecycleState === 'archived' ? 'Archived' : 'Merged'})`,
+                    )
+                    .join(', ')
+                : 'Not assigned'}
+            </dd>
           </div>
-        ) : null}
-        {item.catalogType === 'activity' ? (
-          <>
-            <div>
-              <dt>Purpose Tags</dt>
-              <dd>{item.purposeTagLabels.join(', ') || 'Not assigned'}</dd>
-            </div>
-            <div>
-              <dt>Focus Tags</dt>
-              <dd>{item.focusTagLabels.join(', ') || 'Not assigned'}</dd>
-            </div>
-          </>
-        ) : null}
+        ))}
         {item.externalSource ? (
           <div>
             <dt>External source</dt>

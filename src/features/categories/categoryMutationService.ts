@@ -454,6 +454,7 @@ export class CategoryMutationService {
         this.db.lessonTemplates,
         this.db.tasks,
         this.db.learnerNotices,
+        this.db.libraryItems,
         this.db.changeLog,
       ],
       async (): Promise<CommitResult<CategoryAssignment>> => {
@@ -772,8 +773,10 @@ export class CategoryMutationService {
     } else if (entityType === 'task') exists = Boolean(await this.db.tasks.get(entityId));
     else if (entityType === 'learner-notice') {
       exists = Boolean(await this.db.learnerNotices.get(entityId));
+    } else if (entityType === 'library-item') {
+      exists = Boolean(await this.db.libraryItems.get(entityId));
     } else {
-      throw new Error(`Assignments to ${entityType} records are not available in Phase 3E-1A.`);
+      throw new Error(`Assignments to ${entityType} records are not available.`);
     }
     if (!exists) throw new Error('The category target record no longer exists.');
   }

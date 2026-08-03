@@ -23,6 +23,7 @@ function item(
   return {
     purposeTagLabels: [],
     focusTagLabels: [],
+    classificationGroups: [],
     description: undefined,
     tags: [],
     status: 'active',
@@ -145,6 +146,114 @@ describe('Library Catalog read model', () => {
       focusTagLabels: ['Retelling'],
       resourceFormatId: undefined,
     });
+  });
+
+  it('joins all canonical Assessment classifications and keeps archived values visible', () => {
+    const values: CategoryValue[] = [
+      {
+        id: 'subject-mathematics',
+        familyId: 'subject',
+        name: 'Mathematics',
+        normalizedName: 'mathematics',
+        aliases: ['Math'],
+        normalizedAliases: ['math'],
+        sortOrder: 0,
+        isDefault: false,
+        lifecycleState: 'active',
+        createdAt,
+        updatedAt: createdAt,
+      },
+      {
+        id: 'grade-3',
+        familyId: 'grade-level',
+        name: 'Grade 3',
+        normalizedName: 'grade 3',
+        aliases: [],
+        normalizedAliases: [],
+        sortOrder: 0,
+        isDefault: false,
+        lifecycleState: 'archived',
+        archivedAt: createdAt,
+        createdAt,
+        updatedAt: createdAt,
+      },
+    ];
+    const assignments: CategoryAssignment[] = [
+      {
+        id: 'subject-assignment',
+        familyId: 'subject',
+        categoryValueId: 'subject-mathematics',
+        entityType: 'library-item',
+        entityId: 'assessment-1',
+        createdAt,
+      },
+      {
+        id: 'grade-assignment',
+        familyId: 'grade-level',
+        categoryValueId: 'grade-3',
+        entityType: 'library-item',
+        entityId: 'assessment-1',
+        createdAt,
+      },
+    ];
+
+    const view = buildLibraryCatalogItemViews(
+      [
+        item({
+          id: 'assessment-1',
+          catalogType: 'assessment',
+          title: 'Fraction explanation',
+        }),
+      ],
+      assignments,
+      values,
+    )[0];
+
+    if (!view) {
+      throw new Error('Expected the Assessment Library view to be built.');
+    }
+
+    expect(view.classificationGroups).toEqual([
+      {
+        familyId: 'subject',
+        familyLabel: 'Subjects',
+        values: [
+          {
+            id: 'subject-mathematics',
+            name: 'Mathematics',
+            lifecycleState: 'active',
+          },
+        ],
+      },
+      {
+        familyId: 'grade-level',
+        familyLabel: 'Grade Levels',
+        values: [{ id: 'grade-3', name: 'Grade 3', lifecycleState: 'archived' }],
+      },
+      {
+        familyId: 'language',
+        familyLabel: 'Languages',
+        values: [],
+      },
+      {
+        familyId: 'language-level',
+        familyLabel: 'Language Levels',
+        values: [],
+      },
+      {
+        familyId: 'purpose-tag',
+        familyLabel: 'Purpose Tags',
+        values: [],
+      },
+      {
+        familyId: 'focus-tag',
+        familyLabel: 'Focus Tags',
+        values: [],
+      },
+    ]);
+    expect(filterLibraryCatalogItems([view], { ...defaults, query: 'mathematics' })).toHaveLength(
+      1,
+    );
   });
 
   it('searches title, description, tags, type, and Resource Format', () => {

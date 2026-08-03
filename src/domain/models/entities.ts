@@ -977,6 +977,11 @@ export const taskSchema = z
 
 export const categoryFamilyIdSchema = z.enum([
   'template-format',
+  'subject',
+  'grade-level',
+  'language',
+  'language-level',
+  'activity-type',
   'focus-tag',
   'purpose-tag',
   'theme-tag',
