@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { ClassroomDatabase } from '@/data/db/ClassroomDatabase';
+import { categoryValueSchema } from '@/domain/models/entities';
 import { EditHistoryService } from '@/features/editing/editHistoryService';
 import { buildImportTable } from '@/features/importCenter/importTableModel';
 
@@ -128,5 +129,70 @@ describe('AssessmentImportMutationService', () => {
     expect(await db.categoryAssignments.count()).toBe(0);
     expect(await db.importRuns.count()).toBe(0);
     expect(await db.changeLog.count()).toBe(0);
+  });
+
+  it('saves a reviewed mapping atomically with an Assessment', async () => {
+    const db = new ClassroomDatabase(`assessment-import-mapping-${crypto.randomUUID()}`);
+    databases.push(db);
+    const now = '2026-08-01T00:00:00.000Z';
+    const subject = categoryValueSchema.parse({
+      id: 'subject-ela',
+      familyId: 'subject',
+      name: 'English Language Arts',
+      normalizedName: 'english language arts',
+      aliases: [],
+      normalizedAliases: [],
+      sortOrder: 0,
+      isDefault: false,
+      lifecycleState: 'active',
+      createdAt: now,
+      updatedAt: now,
+    });
+    await db.categoryValues.put(subject);
+    const source = buildImportTable([
+      ['Title', 'Assessment Kind', 'Subject'],
+      ['Quick check', 'Formative', 'ELA'],
+    ]);
+    const reviewKey = 'subject\u0000ela';
+    const preview = buildAssessmentImportPreview(
+      {
+        table: source,
+        mapping: suggestAssessmentImportMapping(source.headers),
+        defaults: {},
+        unmappedDecisions: {},
+        duplicateDecisions: {},
+        kindDecisions: {},
+        classificationDecisions: {
+          [reviewKey]: { action: 'use', categoryValueId: subject.id },
+        },
+        mappingPersistenceDecisions: { [reviewKey]: 'save' },
+        existingItems: [],
+        categoryValues: [subject],
+        categoryAssignments: [],
+        mappingPresets: [],
+      },
+      {
+        createId: (() => {
+          let index = 0;
+          return () => `mapping-preview-${++index}`;
+        })(),
+        now: () => now,
+      },
+    );
+
+    const result = await new AssessmentImportMutationService(db, {
+      createId: () => 'mapping-log',
+    }).commit(preview, {
+      sourceKind: 'csv',
+      confirmCommit: true,
+      confirmUpdates: false,
+    });
+
+    expect(result.createdMappingPresets).toHaveLength(1);
+    expect(await db.classificationMappingPresets.count()).toBe(1);
+    expect(
+      JSON.parse((await db.importRuns.get(preview.importRunId))?.summaryJson ?? '{}')
+        .classificationMappingAudit,
+    ).toEqual([expect.objectContaining({ action: 'created', importedText: 'ELA' })]);
   });
 });

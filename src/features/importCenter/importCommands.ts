@@ -3,6 +3,7 @@ import { z } from 'zod';
 import {
   categoryAssignmentSchema,
   categoryValueSchema,
+  classificationMappingPresetSchema,
   importRunSchema,
   libraryCatalogItemSchema,
   rosterMembershipSchema,
@@ -11,6 +12,7 @@ import {
   studentRecordSchema,
   type CategoryAssignment,
   type CategoryValue,
+  type ClassificationMappingPreset,
   type ImportRun,
   type LibraryCatalogItem,
   type RosterMembership,
@@ -59,6 +61,16 @@ const putCategoryAssignmentOperationSchema = z.object({
 const deleteCategoryAssignmentOperationSchema = z.object({
   action: z.literal('delete'),
   table: z.literal('categoryAssignments'),
+  id: z.string().min(1),
+});
+const putClassificationMappingPresetOperationSchema = z.object({
+  action: z.literal('put'),
+  table: z.literal('classificationMappingPresets'),
+  record: classificationMappingPresetSchema,
+});
+const deleteClassificationMappingPresetOperationSchema = z.object({
+  action: z.literal('delete'),
+  table: z.literal('classificationMappingPresets'),
   id: z.string().min(1),
 });
 
@@ -113,6 +125,8 @@ export const importOperationSchema = z.union([
   deleteCategoryValueOperationSchema,
   putCategoryAssignmentOperationSchema,
   deleteCategoryAssignmentOperationSchema,
+  putClassificationMappingPresetOperationSchema,
+  deleteClassificationMappingPresetOperationSchema,
   putStandardAlignmentOperationSchema,
   deleteStandardAlignmentOperationSchema,
   putStandardOperationSchema,
@@ -190,6 +204,20 @@ export function putImportCategoryAssignmentOperation(record: CategoryAssignment)
 
 export function deleteImportCategoryAssignmentOperation(id: string): ImportOperation {
   return { action: 'delete', table: 'categoryAssignments', id };
+}
+
+export function putImportClassificationMappingPresetOperation(
+  record: ClassificationMappingPreset,
+): ImportOperation {
+  return {
+    action: 'put',
+    table: 'classificationMappingPresets',
+    record: classificationMappingPresetSchema.parse(record),
+  };
+}
+
+export function deleteImportClassificationMappingPresetOperation(id: string): ImportOperation {
+  return { action: 'delete', table: 'classificationMappingPresets', id };
 }
 
 export function putImportStandardAlignmentOperation(record: StandardAlignment): ImportOperation {

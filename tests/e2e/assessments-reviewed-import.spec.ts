@@ -6,7 +6,7 @@ async function waitForSchema(page: Page): Promise<void> {
     .poll(async () => {
       const databases = await page.evaluate(() => indexedDB.databases());
       return databases.some(
-        (database) => database.name === 'classroom-v20' && (database.version ?? 0) >= 13,
+        (database) => database.name === 'classroom-v20' && (database.version ?? 0) >= 14,
       );
     })
     .toBe(true);
@@ -16,6 +16,26 @@ async function openAssessmentsImport(page: Page): Promise<void> {
   await page.goto('./#/import?type=assessments');
   await waitForSchema(page);
   await expect(page.getByRole('heading', { name: 'Import Assessments' })).toBeVisible();
+}
+
+async function readAssessmentMappingCount(page: Page): Promise<number> {
+  return page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('classroom-v20');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    try {
+      return await new Promise<number>((resolve, reject) => {
+        const transaction = database.transaction('classificationMappingPresets', 'readonly');
+        const request = transaction.objectStore('classificationMappingPresets').count();
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+      });
+    } finally {
+      database.close();
+    }
+  });
 }
 
 test('Assessment workspace keeps its canonical header compact and offers formal templates', async ({
@@ -86,6 +106,7 @@ test('Assessment preview is no-write and commits as one reviewed action', async 
   await page.getByLabel('Commit the complete reviewed Assessment preview.').check();
   await page.getByRole('button', { name: 'Commit reviewed Assessments' }).click();
   await expect(page.getByText(/Committed 1 new/)).toBeVisible();
+  await expect.poll(() => readAssessmentMappingCount(page)).toBe(0);
 });
 
 test('unknown Assessment Kind requires an explicit reviewed value', async ({ page }) => {

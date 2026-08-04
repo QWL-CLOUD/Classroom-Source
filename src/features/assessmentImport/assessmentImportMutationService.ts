@@ -7,6 +7,7 @@ import {
   libraryCatalogItemSchema,
   type CategoryAssignment,
   type CategoryValue,
+  type ClassificationMappingPreset,
   type ChangeLog,
   type ImportRunSourceKind,
   type LibraryCatalogItem,
@@ -15,6 +16,10 @@ import { clearSupportedRedoBranch } from '@/features/editing/editCommandRegistry
 import { notifyEditHistoryChanged } from '@/features/editing/editHistorySignal';
 import { applyImportOperations } from '@/features/importCenter/applyImportOperations';
 import { classificationSummaryJson } from '@/features/importCenter/importClassificationResolution';
+import {
+  importClassificationMappingPresetOperations,
+  validateImportClassificationMappingPresetState,
+} from '@/features/importCenter/importClassificationMappingPresetPlan';
 import {
   createImportCommand,
   deleteImportCategoryAssignmentOperation,
@@ -52,6 +57,8 @@ export interface AssessmentImportCommitResult {
   skippedCount: number;
   createdCategoryValues: CategoryValue[];
   restoredCategoryValues: CategoryValue[];
+  createdMappingPresets: ClassificationMappingPreset[];
+  updatedMappingPresets: ClassificationMappingPreset[];
   log: ChangeLog;
 }
 
@@ -111,6 +118,7 @@ export class AssessmentImportMutationService {
         this.db.libraryItems,
         this.db.categoryValues,
         this.db.categoryAssignments,
+        this.db.classificationMappingPresets,
         this.db.importRuns,
         this.db.changeLog,
       ],
@@ -120,6 +128,7 @@ export class AssessmentImportMutationService {
         }
 
         await this.validateCategoryState(preview);
+        await this.validateMappingState(preview);
 
         const currentAssessments = (
           await this.db.libraryItems.where('catalogType').equals('assessment').toArray()
@@ -226,6 +235,8 @@ export class AssessmentImportMutationService {
           inverseCategoryValues.unshift(putImportCategoryValueOperation(change.before));
         }
 
+        const mappingOperations = importClassificationMappingPresetOperations(preview);
+
         const importRun = importRunSchema.parse({
           id: preview.importRunId,
           importType: 'assessments',
@@ -244,12 +255,14 @@ export class AssessmentImportMutationService {
             newCategoryValues: preview.newCategoryValues,
             restoredCategoryValues: preview.restoredCategoryValues,
             classificationAudit: preview.classificationAudit,
+            classificationMappingAudit: preview.classificationMappingAudit,
           }),
           committedAt: preview.generatedAt,
         });
 
         const forward = createImportCommand([
           ...forwardCategoryValues,
+          ...mappingOperations.forward,
           ...forwardItems,
           ...forwardAssignments,
           putImportRunOperation(importRun),
@@ -257,6 +270,7 @@ export class AssessmentImportMutationService {
         const inverse = createImportCommand([
           ...inverseAssignments,
           ...inverseItems,
+          ...mappingOperations.inverse,
           ...inverseCategoryValues,
           deleteImportRunOperation(importRun.id),
         ]);
@@ -287,6 +301,8 @@ export class AssessmentImportMutationService {
           skippedCount: preview.summary.skipCount,
           createdCategoryValues: preview.newCategoryValues,
           restoredCategoryValues: preview.restoredCategoryValues.map((value) => value.after),
+          createdMappingPresets: preview.newMappingPresets,
+          updatedMappingPresets: preview.updatedMappingPresets.map((value) => value.after),
           log,
         };
       },
@@ -344,6 +360,25 @@ export class AssessmentImportMutationService {
         `Row ${sourceRow} Assessment classification assignments changed after preview. Generate a new preview.`,
       );
     }
+  }
+
+  private async validateMappingState(preview: AssessmentImportPreview): Promise<void> {
+    const valuesAfterCommit = new Map(
+      (await this.db.categoryValues.toArray())
+        .map((value) => categoryValueSchema.parse(value))
+        .map((value) => [value.id, value] as const),
+    );
+    for (const value of preview.newCategoryValues) valuesAfterCommit.set(value.id, value);
+    for (const change of preview.restoredCategoryValues) {
+      valuesAfterCommit.set(change.after.id, change.after);
+    }
+    await validateImportClassificationMappingPresetState({
+      db: this.db,
+      expectedMappingPresets: preview.expectedMappingPresets,
+      newMappingPresets: preview.newMappingPresets,
+      updatedMappingPresets: preview.updatedMappingPresets,
+      categoryValuesAfterCommit: [...valuesAfterCommit.values()],
+    });
   }
 
   private async validateCategoryState(preview: AssessmentImportPreview): Promise<void> {

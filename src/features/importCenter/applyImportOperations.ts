@@ -19,6 +19,12 @@ export async function applyImportOperations(
     } else if (operation.table === 'categoryAssignments') {
       if (operation.action === 'put') await db.categoryAssignments.put(operation.record);
       else await db.categoryAssignments.delete(operation.id);
+    } else if (operation.table === 'classificationMappingPresets') {
+      if (operation.action === 'put') {
+        await db.classificationMappingPresets.put(operation.record);
+      } else {
+        await db.classificationMappingPresets.delete(operation.id);
+      }
     } else if (operation.table === 'standardAlignments') {
       if (operation.action === 'put') await db.standardAlignments.put(operation.record);
       else await db.standardAlignments.delete(operation.id);

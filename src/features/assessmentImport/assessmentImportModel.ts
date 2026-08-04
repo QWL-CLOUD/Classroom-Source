@@ -3,6 +3,7 @@ import {
   libraryCatalogItemSchema,
   type CategoryAssignment,
   type CategoryValue,
+  type ClassificationMappingPreset,
   type LibraryAssessmentFields,
   type LibraryAssessmentKind,
   type LibraryCatalogItem,
@@ -21,6 +22,10 @@ import {
   type ImportClassificationDecisions,
   type ImportClassificationReview,
 } from '@/features/importCenter/importClassificationResolution';
+import type {
+  ImportClassificationMappingAuditRecord,
+  ImportClassificationMappingPersistenceDecisions,
+} from '@/features/importCenter/importClassificationMappingPresetPlan';
 import {
   createEmptyImportColumnMapping,
   mappedImportValue,
@@ -238,6 +243,13 @@ export interface AssessmentImportPreview extends Omit<
   expectedCategoryValues: CategoryValue[];
   classificationReviews: ImportClassificationReview[];
   classificationAudit: ImportClassificationAuditRecord[];
+  newMappingPresets: ClassificationMappingPreset[];
+  updatedMappingPresets: Array<{
+    before: ClassificationMappingPreset;
+    after: ClassificationMappingPreset;
+  }>;
+  expectedMappingPresets: ClassificationMappingPreset[];
+  classificationMappingAudit: ImportClassificationMappingAuditRecord[];
 }
 
 export interface BuildAssessmentImportPreviewInput {
@@ -248,8 +260,10 @@ export interface BuildAssessmentImportPreviewInput {
   duplicateDecisions: AssessmentDuplicateDecisions;
   kindDecisions: AssessmentKindDecisions;
   classificationDecisions?: ImportClassificationDecisions;
+  mappingPersistenceDecisions?: ImportClassificationMappingPersistenceDecisions;
   existingItems: LibraryCatalogItem[];
   categoryValues?: readonly CategoryValue[];
+  mappingPresets?: readonly ClassificationMappingPreset[];
   categoryAssignments?: readonly CategoryAssignment[];
 }
 
@@ -577,7 +591,9 @@ export function buildAssessmentImportPreview(
   const classificationSession = createImportClassificationResolutionSession({
     catalogType: 'assessment',
     categoryValues: input.categoryValues ?? [],
+    mappingPresets: input.mappingPresets ?? [],
     decisions: input.classificationDecisions ?? {},
+    mappingPersistenceDecisions: input.mappingPersistenceDecisions ?? {},
     createId,
     generatedAt,
   });
@@ -887,6 +903,7 @@ export function buildAssessmentImportPreview(
         sourceRow: normalized.sourceRow,
         classification: 'create',
         reasons: [
+          ...classification.mappingNotes,
           duplicateReview
             ? 'The reviewed decision creates a separate Assessment.'
             : 'No strong existing identity was selected; create a new Assessment.',
@@ -940,15 +957,19 @@ export function buildAssessmentImportPreview(
       ...classificationSnapshot.newCategoryValues.map((value) => value.id),
       ...classificationSnapshot.restoredCategoryValues.map((value) => value.after.id),
     ]);
+    const mappingChanged = classification.mappingPersistencePlanned;
     const classificationChanged =
       assignmentPlan.assignmentsToDelete.length > 0 ||
       assignmentPlan.assignmentsToCreate.length > 0 ||
       assignmentPlan.desiredCategoryValueIds.some((id) => lifecycleIds.has(id));
-    if (sameRecord(withoutRun, target) && !classificationChanged) {
+    if (sameRecord(withoutRun, target) && !classificationChanged && !mappingChanged) {
       return {
         sourceRow: normalized.sourceRow,
         classification: 'skip',
-        reasons: ['The stable Assessment identity already has the same reviewed values.'],
+        reasons: [
+          'The stable Assessment identity already has the same reviewed values.',
+          ...classification.mappingNotes,
+        ],
         normalized: classifiedNormalized,
         duplicateReview,
         kindReview,
@@ -972,6 +993,7 @@ export function buildAssessmentImportPreview(
       sourceRow: normalized.sourceRow,
       classification: 'update',
       reasons: [
+        ...classification.mappingNotes,
         'The reviewed stable identity or explicit duplicate decision updates this Assessment.',
         ...(classificationChanged
           ? ['Apply the reviewed Library classification assignments.']
@@ -1008,6 +1030,7 @@ export function buildAssessmentImportPreview(
       duplicateDecisions: input.duplicateDecisions,
       kindDecisions: input.kindDecisions,
       classificationDecisions: input.classificationDecisions,
+      mappingPersistenceDecisions: input.mappingPersistenceDecisions ?? {},
     },
     generatedAt,
   );
@@ -1027,5 +1050,9 @@ export function buildAssessmentImportPreview(
     expectedCategoryValues: classificationSnapshot.expectedCategoryValues,
     classificationReviews: classificationSnapshot.classificationReviews,
     classificationAudit: classificationSnapshot.classificationAudit,
+    newMappingPresets: classificationSnapshot.newMappingPresets,
+    updatedMappingPresets: classificationSnapshot.updatedMappingPresets,
+    expectedMappingPresets: classificationSnapshot.expectedMappingPresets,
+    classificationMappingAudit: classificationSnapshot.classificationMappingAudit,
   };
 }

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ClassroomDatabase } from '@/data/db/ClassroomDatabase';
 import {
   changeLogSchema,
+  classificationMappingPresetSchema,
   importRunSchema,
   libraryCatalogItemSchema,
 } from '@/domain/models/entities';
@@ -16,11 +17,13 @@ import {
   createImportCommand,
   deleteImportCategoryAssignmentOperation,
   deleteImportCategoryValueOperation,
+  deleteImportClassificationMappingPresetOperation,
   deleteImportedLibraryItemOperation,
   deleteImportRunOperation,
   parseImportCommand,
   putImportCategoryAssignmentOperation,
   putImportCategoryValueOperation,
+  putImportClassificationMappingPresetOperation,
   putImportedLibraryItemOperation,
   putImportRunOperation,
   serializeImportCommand,
@@ -180,8 +183,19 @@ describe('Import Center history and commands', () => {
       entityId: item.id,
       createdAt: committedAt,
     };
+    const mappingPreset = classificationMappingPresetSchema.parse({
+      id: 'mapping-imported',
+      familyId: 'purpose-tag',
+      sourceText: 'Oral',
+      normalizedSourceText: 'oral',
+      targetCategoryValueId: purposeValue.id,
+      status: 'active',
+      createdAt: committedAt,
+      updatedAt: committedAt,
+    });
     const forward = createImportCommand([
       putImportCategoryValueOperation(purposeValue),
+      putImportClassificationMappingPresetOperation(mappingPreset),
       putImportedLibraryItemOperation(item),
       putImportCategoryAssignmentOperation(assignment),
       putImportRunOperation(run),
@@ -189,6 +203,7 @@ describe('Import Center history and commands', () => {
     const inverse = createImportCommand([
       deleteImportCategoryAssignmentOperation(assignment.id),
       deleteImportedLibraryItemOperation(item.id),
+      deleteImportClassificationMappingPresetOperation(mappingPreset.id),
       deleteImportCategoryValueOperation(purposeValue.id),
       deleteImportRunOperation(run.id),
     ]);
@@ -200,6 +215,7 @@ describe('Import Center history and commands', () => {
         database.libraryItems,
         database.categoryValues,
         database.categoryAssignments,
+        database.classificationMappingPresets,
         database.changeLog,
       ],
       async () => {
@@ -225,12 +241,16 @@ describe('Import Center history and commands', () => {
     expect(await database.libraryItems.get(item.id)).toBeUndefined();
     expect(await database.categoryValues.get(purposeValue.id)).toBeUndefined();
     expect(await database.categoryAssignments.get(assignment.id)).toBeUndefined();
+    expect(await database.classificationMappingPresets.get(mappingPreset.id)).toBeUndefined();
 
     await history.redo();
     expect(await database.importRuns.get(run.id)).toEqual(run);
     expect(await database.libraryItems.get(item.id)).toEqual(item);
     expect(await database.categoryValues.get(purposeValue.id)).toEqual(purposeValue);
     expect(await database.categoryAssignments.get(assignment.id)).toEqual(assignment);
+    expect(await database.classificationMappingPresets.get(mappingPreset.id)).toEqual(
+      mappingPreset,
+    );
   });
 
   it('lists Resource URL and file-metadata runs through canonical history', async () => {

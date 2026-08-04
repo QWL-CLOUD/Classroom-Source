@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   categoryValueSchema,
+  classificationMappingPresetSchema,
   libraryCatalogItemSchema,
   type CategoryAssignment,
   type CategoryValue,
+  type ClassificationMappingPreset,
   type LibraryCatalogItem,
 } from '@/domain/models/entities';
 import { buildImportTable } from '@/features/importCenter/importTableModel';
@@ -68,6 +70,10 @@ function preview(
     duplicateDecisions?: ResourceDuplicateDecisions;
     formatDecisions?: ResourceFormatDecisions;
     classificationDecisions?: ResourceClassificationDecisions;
+    mappingPersistenceDecisions?: Parameters<
+      typeof buildResourceImportPreview
+    >[0]['mappingPersistenceDecisions'];
+    mappingPresets?: ClassificationMappingPreset[];
     sourceDecisions?: ResourceSourceDecisions;
     unmappedDecisions?: UnmappedColumnDecisions;
   } = {},
@@ -82,10 +88,12 @@ function preview(
       duplicateDecisions: options.duplicateDecisions ?? {},
       formatDecisions: options.formatDecisions ?? {},
       classificationDecisions: options.classificationDecisions ?? {},
+      mappingPersistenceDecisions: options.mappingPersistenceDecisions ?? {},
       sourceDecisions: options.sourceDecisions ?? {},
       existingItems: options.existingItems ?? [],
       categoryValues: options.categoryValues ?? [],
       categoryAssignments: options.categoryAssignments ?? [],
+      mappingPresets: options.mappingPresets ?? [],
     },
     { createId: ids(), now: () => timestamp },
   );
@@ -357,5 +365,46 @@ describe('Resource import model', () => {
     expect(fields?.catalogType === 'resource' ? fields.usageNotes : '').toContain(
       'Imported column: legacy_column\nKeep this detail',
     );
+  });
+
+  it('keeps an inactive mapping in explicit review and plans Update only when selected', () => {
+    const subject = format({
+      id: 'subject-ela',
+      familyId: 'subject',
+      name: 'English Language Arts',
+      normalizedName: 'english language arts',
+    });
+    const mappingPreset = classificationMappingPresetSchema.parse({
+      id: 'mapping-ela',
+      familyId: 'subject',
+      sourceText: 'ELA',
+      normalizedSourceText: 'ela',
+      targetCategoryValueId: subject.id,
+      status: 'inactive',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      deactivatedAt: timestamp,
+    });
+    const key = 'subject\u0000ela';
+    const result = preview(
+      [
+        ['title', 'subject'],
+        ['Weather deck', 'ELA'],
+      ],
+      {
+        categoryValues: [subject],
+        mappingPresets: [mappingPreset],
+        classificationDecisions: { [key]: { action: 'use', categoryValueId: subject.id } },
+        mappingPersistenceDecisions: { [key]: 'update' },
+      },
+    );
+
+    expect(result.updatedMappingPresets).toEqual([
+      {
+        before: expect.objectContaining({ id: 'mapping-ela', status: 'inactive' }),
+        after: expect.objectContaining({ id: 'mapping-ela', status: 'active' }),
+      },
+    ]);
+    expect(result.rows[0]?.classification).toBe('create');
   });
 });

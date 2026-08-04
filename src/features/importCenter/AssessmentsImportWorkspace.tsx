@@ -7,6 +7,7 @@ import { classroomDb } from '@/data/db/ClassroomDatabase';
 import {
   categoryAssignmentSchema,
   categoryValueSchema,
+  classificationMappingPresetSchema,
   libraryCatalogItemSchema,
   type LibraryAssessmentKind,
 } from '@/domain/models/entities';
@@ -30,6 +31,7 @@ import { assessmentImportMutationService } from '@/features/assessmentImport/ass
 import { downloadAssessmentImportTemplate } from '@/features/assessmentImport/assessmentImportTemplate';
 
 import { ImportClassificationReview } from './ImportClassificationReview';
+import type { ImportClassificationMappingPersistenceDecisions } from './importClassificationMappingPresetPlan';
 import type { ImportClassificationDecisions } from './importClassificationResolution';
 import { ImportMappingTable, type ImportMappingField } from './ImportMappingTable';
 import { ImportPreviewTable, type ImportPreviewColumn } from './ImportPreviewTable';
@@ -137,15 +139,17 @@ function decodeDuplicateDecision(value: string): AssessmentDuplicateDecision | u
 
 export function AssessmentsImportWorkspace() {
   const data = useLiveQuery(async () => {
-    const [items, values, assignments] = await Promise.all([
+    const [items, values, assignments, mappingPresets] = await Promise.all([
       classroomDb.libraryItems.toArray(),
       classroomDb.categoryValues.toArray(),
       classroomDb.categoryAssignments.where('entityType').equals('library-item').toArray(),
+      classroomDb.classificationMappingPresets.toArray(),
     ]);
     return {
       items: items.map((value) => libraryCatalogItemSchema.parse(value)),
       categoryValues: values.map((value) => categoryValueSchema.parse(value)),
       categoryAssignments: assignments.map((value) => categoryAssignmentSchema.parse(value)),
+      mappingPresets: mappingPresets.map((value) => classificationMappingPresetSchema.parse(value)),
     };
   }, []);
   const [sourceMode, setSourceMode] = useState<ImportSourcePanelMode>('file');
@@ -163,6 +167,8 @@ export function AssessmentsImportWorkspace() {
   const [kindDecisions, setKindDecisions] = useState<AssessmentKindDecisions>({});
   const [classificationDecisions, setClassificationDecisions] =
     useState<ImportClassificationDecisions>({});
+  const [mappingPersistenceDecisions, setMappingPersistenceDecisions] =
+    useState<ImportClassificationMappingPersistenceDecisions>({});
   const [preview, setPreview] = useState<AssessmentImportPreview | null>(null);
   const [reviewDirty, setReviewDirty] = useState(false);
   const [confirmUpdates, setConfirmUpdates] = useState(false);
@@ -205,6 +211,7 @@ export function AssessmentsImportWorkspace() {
     setDuplicateDecisions({});
     setKindDecisions({});
     setClassificationDecisions({});
+    setMappingPersistenceDecisions({});
     setPreview(null);
     setReviewDirty(false);
     setConfirmUpdates(false);
@@ -238,6 +245,7 @@ export function AssessmentsImportWorkspace() {
     setDuplicateDecisions({});
     setKindDecisions({});
     setClassificationDecisions({});
+    setMappingPersistenceDecisions({});
     setPreview(null);
     setReviewDirty(false);
   }
@@ -264,6 +272,8 @@ export function AssessmentsImportWorkspace() {
           duplicateDecisions,
           kindDecisions,
           classificationDecisions,
+          mappingPersistenceDecisions,
+          mappingPresets: data.mappingPresets,
           existingItems: data.items,
           categoryValues: data.categoryValues,
           categoryAssignments: data.categoryAssignments,
@@ -293,8 +303,12 @@ export function AssessmentsImportWorkspace() {
         confirmUpdates,
         confirmCommit,
       });
+      const mappingSummary =
+        result.createdMappingPresets.length > 0 || result.updatedMappingPresets.length > 0
+          ? ` Saved ${result.createdMappingPresets.length} and updated ${result.updatedMappingPresets.length} import mappings.`
+          : '';
       setSuccess(
-        `Committed ${result.created.length} new and ${result.updated.length} updated Assessments as one global Undo action.`,
+        `Committed ${result.created.length} new and ${result.updated.length} updated Assessments as one global Undo action.${mappingSummary}`,
       );
       setPreview(null);
       setConfirmUpdates(false);
@@ -602,6 +616,7 @@ export function AssessmentsImportWorkspace() {
                 <ImportClassificationReview
                   reviews={classificationReviews}
                   decisions={classificationDecisions}
+                  mappingPersistenceDecisions={mappingPersistenceDecisions}
                   categoryValues={data?.categoryValues ?? []}
                   disabled={busy}
                   onDecision={(key, decision) => {
@@ -610,6 +625,14 @@ export function AssessmentsImportWorkspace() {
                       [key]: decision,
                     }));
                     markReviewDirty();
+                  }}
+                  onMappingPersistenceDecision={(key, mappingDecision) => {
+                    setMappingPersistenceDecisions((current) => ({
+                      ...current,
+                      [key]: mappingDecision,
+                    }));
+                    setReviewDirty(true);
+                    setConfirmCommit(false);
                   }}
                 />
               </div>

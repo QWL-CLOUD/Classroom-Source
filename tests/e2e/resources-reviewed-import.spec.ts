@@ -6,7 +6,7 @@ async function waitForSchema(page: Page): Promise<void> {
     .poll(async () => {
       const databases = await page.evaluate(() => indexedDB.databases());
       return databases.some(
-        (database) => database.name === 'classroom-v20' && (database.version ?? 0) >= 13,
+        (database) => database.name === 'classroom-v20' && (database.version ?? 0) >= 14,
       );
     })
     .toBe(true);
@@ -21,7 +21,13 @@ async function readResourceState(page: Page, title: string) {
     });
     try {
       const transaction = database.transaction(
-        ['libraryItems', 'categoryValues', 'categoryAssignments', 'importRuns'],
+        [
+          'libraryItems',
+          'categoryValues',
+          'categoryAssignments',
+          'classificationMappingPresets',
+          'importRuns',
+        ],
         'readonly',
       );
       const all = <T>(store: string) =>
@@ -30,10 +36,11 @@ async function readResourceState(page: Page, title: string) {
           request.onerror = () => reject(request.error);
           request.onsuccess = () => resolve(request.result as T[]);
         });
-      const [items, values, assignments, runs] = await Promise.all([
+      const [items, values, assignments, mappings, runs] = await Promise.all([
         all<Record<string, unknown>>('libraryItems'),
         all<Record<string, unknown>>('categoryValues'),
         all<Record<string, unknown>>('categoryAssignments'),
+        all<Record<string, unknown>>('classificationMappingPresets'),
         all<Record<string, unknown>>('importRuns'),
       ]);
       const item = items.find(
@@ -54,6 +61,7 @@ async function readResourceState(page: Page, title: string) {
           (candidate) =>
             candidate.entityId === item?.id && candidate.categoryValueId === format?.id,
         ),
+        mappingCount: mappings.length,
         resourceRuns: runs.filter((run) => run.importType === 'resources').length,
       };
     } finally {
@@ -127,6 +135,7 @@ test('Resources pasted-table preview is no-write, commits format atomically, and
     .poll(() => readResourceState(page, title))
     .toMatchObject({
       item: undefined,
+      mappingCount: 0,
       resourceRuns: 0,
     });
   await page
@@ -151,6 +160,7 @@ test('Resources pasted-table preview is no-write, commits format atomically, and
       },
       format: { name: 'Slides' },
       assignment: { familyId: 'resource-format' },
+      mappingCount: 0,
       resourceRuns: 1,
     });
 

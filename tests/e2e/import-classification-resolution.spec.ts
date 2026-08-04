@@ -6,7 +6,7 @@ async function waitForSchema(page: Page): Promise<void> {
     .poll(async () => {
       const databases = await page.evaluate(() => indexedDB.databases());
       return databases.some(
-        (database) => database.name === 'classroom-v20' && (database.version ?? 0) >= 13,
+        (database) => database.name === 'classroom-v20' && (database.version ?? 0) >= 14,
       );
     })
     .toBe(true);
@@ -74,7 +74,7 @@ async function readLibraryClassificationState(page: Page, title: string) {
     });
     try {
       const transaction = database.transaction(
-        ['libraryItems', 'categoryValues', 'categoryAssignments'],
+        ['libraryItems', 'categoryValues', 'categoryAssignments', 'classificationMappingPresets'],
         'readonly',
       );
       const all = <T>(store: string) =>
@@ -83,10 +83,11 @@ async function readLibraryClassificationState(page: Page, title: string) {
           request.onerror = () => reject(request.error);
           request.onsuccess = () => resolve(request.result as T[]);
         });
-      const [items, values, assignments] = await Promise.all([
+      const [items, values, assignments, mappings] = await Promise.all([
         all<Record<string, unknown>>('libraryItems'),
         all<Record<string, unknown>>('categoryValues'),
         all<Record<string, unknown>>('categoryAssignments'),
+        all<Record<string, unknown>>('classificationMappingPresets'),
       ]);
       const item = items.find((candidate) => candidate.title === expectedTitle);
       const itemAssignments = assignments.filter((assignment) => assignment.entityId === item?.id);
@@ -95,6 +96,7 @@ async function readLibraryClassificationState(page: Page, title: string) {
         values,
         assignments: itemAssignments,
         assignedFamilies: itemAssignments.map((assignment) => assignment.familyId).sort(),
+        mappingCount: mappings.length,
       };
     } finally {
       database.close();
@@ -224,6 +226,7 @@ test('archived, merged, and generic-tag decisions are explicit, compact, and ato
 
   const state = await readLibraryClassificationState(page, title);
   expect(state.item).toMatchObject({ title, tags: ['Focus: New focus'] });
+  expect(state.mappingCount).toBe(0);
   expect(state.assignedFamilies).toEqual(['language-level', 'purpose-tag']);
   expect(state.values).toEqual(
     expect.arrayContaining([
