@@ -3,6 +3,7 @@ import {
   assessmentEvidenceRecordSchema,
   categoryFamilyIdSchema,
   categoryValueSchema,
+  classificationMappingPresetSchema,
   learnerNoticeSchema,
   importRunSchema,
   learnerServiceOccurrenceSchema,
@@ -156,6 +157,32 @@ describe('domain schemas', () => {
         mergedAt: undefined,
       }),
     ).toThrow('requires its replacement');
+  });
+
+  it('validates classification mapping preset lifecycle metadata', () => {
+    const active = classificationMappingPresetSchema.parse({
+      id: 'mapping-ela',
+      familyId: 'subject',
+      sourceText: 'ELA',
+      normalizedSourceText: 'ela',
+      targetCategoryValueId: 'subject-english-language-arts',
+      status: 'active',
+      createdAt: '2026-08-03T12:00:00.000Z',
+      updatedAt: '2026-08-03T12:00:00.000Z',
+    });
+    expect(active.status).toBe('active');
+    expect(() =>
+      classificationMappingPresetSchema.parse({
+        ...active,
+        status: 'inactive',
+      }),
+    ).toThrow('requires deactivatedAt');
+    expect(() =>
+      classificationMappingPresetSchema.parse({
+        ...active,
+        deactivatedAt: '2026-08-03T13:00:00.000Z',
+      }),
+    ).toThrow('cannot contain deactivatedAt');
   });
 
   it('keeps existing school years compatible while preventing archived active records', () => {

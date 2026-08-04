@@ -3,12 +3,20 @@ import type {
   CategoryAssignment,
   CategoryFamilyId,
   CategoryValue,
+  ClassificationMappingPreset,
+  ClassificationMappingPresetStatus,
   CategoryValueLifecycleState,
 } from '@/domain/models/entities';
 
 export interface CategoryValueQuery {
   familyId?: CategoryFamilyId;
   lifecycleStates?: readonly CategoryValueLifecycleState[];
+}
+
+export interface ClassificationMappingPresetQuery {
+  familyId?: CategoryFamilyId;
+  status?: ClassificationMappingPresetStatus;
+  targetCategoryValueId?: string;
 }
 
 export interface CategoryAssignmentQuery {
@@ -24,4 +32,12 @@ export interface CategoryRepository {
   listAssignments(query?: CategoryAssignmentQuery): Promise<CategoryAssignment[]>;
   countAssignments(categoryValueId: string): Promise<number>;
   countMergedSources(categoryValueId: string): Promise<number>;
+  listMappingPresets(
+    query?: ClassificationMappingPresetQuery,
+  ): Promise<ClassificationMappingPreset[]>;
+  getMappingPreset(id: string): Promise<ClassificationMappingPreset | null>;
+  countMappingPresets(
+    categoryValueId: string,
+    status?: ClassificationMappingPresetStatus,
+  ): Promise<number>;
 }

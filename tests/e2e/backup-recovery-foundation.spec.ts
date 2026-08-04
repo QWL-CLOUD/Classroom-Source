@@ -209,7 +209,7 @@ test('Backup & Recovery downloads a privacy-safe full local backup', async ({ pa
   const envelope = JSON.parse(await readFile(path!, 'utf8')) as Record<string, unknown>;
 
   expect(envelope.format).toBe('classroom-v20-backup-v1');
-  expect(envelope.databaseSchemaVersion).toBe(13);
+  expect(envelope.databaseSchemaVersion).toBe(14);
   expect(envelope).not.toHaveProperty('filePath');
   expect(envelope.tables).toMatchObject({
     tasks: [expect.objectContaining({ id: 'current-task', title: 'Current task before restore' })],
@@ -217,6 +217,7 @@ test('Backup & Recovery downloads a privacy-safe full local backup', async ({ pa
     rosterMemberships: [],
     assessmentEvidence: [],
     importRuns: [expect.objectContaining({ id: 'current-import-run', importType: 'activities' })],
+    classificationMappingPresets: [],
   });
   expect(envelope.tables).not.toHaveProperty('backupSnapshots');
 

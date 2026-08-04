@@ -115,6 +115,16 @@ describe('BackupRecoveryService', () => {
       entityId: 'current-activity',
       createdAt: firstTime,
     });
+    await database.classificationMappingPresets.put({
+      id: 'current-purpose-mapping',
+      familyId: 'purpose-tag',
+      sourceText: 'Oral Language',
+      normalizedSourceText: 'oral language',
+      targetCategoryValueId: 'current-purpose',
+      status: 'active',
+      createdAt: firstTime,
+      updatedAt: firstTime,
+    });
     await database.importRuns.put({
       id: 'current-import-run',
       importType: 'assessments',
@@ -154,6 +164,7 @@ describe('BackupRecoveryService', () => {
     });
     expect(envelope.tables.categoryValues).toHaveLength(1);
     expect(envelope.tables.categoryAssignments).toHaveLength(1);
+    expect(envelope.tables.classificationMappingPresets).toHaveLength(1);
     expect(envelope.tables).not.toHaveProperty('backupSnapshots');
     expect(envelope.tableCounts.tasks).toBe(1);
   });
@@ -188,6 +199,29 @@ describe('BackupRecoveryService', () => {
       blockedCount: 0,
       committedAt: firstTime,
     });
+    incoming.categoryValues.push({
+      id: 'restored-subject',
+      familyId: 'subject',
+      name: 'English Language Arts',
+      normalizedName: 'english language arts',
+      aliases: [],
+      normalizedAliases: [],
+      sortOrder: 0,
+      isDefault: false,
+      lifecycleState: 'active',
+      createdAt: firstTime,
+      updatedAt: firstTime,
+    });
+    incoming.classificationMappingPresets.push({
+      id: 'restored-mapping',
+      familyId: 'subject',
+      sourceText: 'ELA',
+      normalizedSourceText: 'ela',
+      targetCategoryValueId: 'restored-subject',
+      status: 'active',
+      createdAt: firstTime,
+      updatedAt: firstTime,
+    });
     const preview = buildRestorePreview(
       serializeBackupEnvelope(
         createBackupEnvelope(incoming, { backupId: 'incoming-backup', exportedAt: firstTime }),
@@ -212,6 +246,7 @@ describe('BackupRecoveryService', () => {
     expect(await database.tasks.toArray()).toEqual([task('new-task', 'After restore')]);
     expect(await database.assessmentEvidence.get('restored-evidence')).toBeDefined();
     expect(await database.importRuns.get('restored-import-run')).toBeDefined();
+    expect(await database.classificationMappingPresets.get('restored-mapping')).toBeDefined();
     expect(await database.backupSnapshots.count()).toBe(1);
     expect(await database.restoreRuns.count()).toBe(1);
     expect(await database.restoreQuarantineRecords.count()).toBe(1);
@@ -220,6 +255,7 @@ describe('BackupRecoveryService', () => {
     expect(safetyPreview.validTables.tasks).toEqual([task('old-task', 'Before restore')]);
     expect(safetyPreview.validTables.assessmentEvidence).toEqual([]);
     expect(safetyPreview.validTables.importRuns).toEqual([]);
+    expect(safetyPreview.validTables.classificationMappingPresets).toEqual([]);
   });
 
   it('rolls back the safety snapshot and every table change if restore writing fails', async () => {
@@ -394,16 +430,28 @@ describe('BackupRecoveryService', () => {
       },
     ]);
 
+    await database.classificationMappingPresets.put({
+      id: 'mapping-mathematics',
+      familyId: 'subject',
+      sourceText: 'Math',
+      normalizedSourceText: 'math',
+      targetCategoryValueId: 'subject-mathematics',
+      status: 'active',
+      createdAt: firstTime,
+      updatedAt: firstTime,
+    });
+
     const envelope = await new BackupRecoveryService(database, {
       createId: () => 'classification-foundation-backup',
       now: () => firstTime,
     }).createBackup();
     const preview = buildRestorePreview(serializeBackupEnvelope(envelope));
 
-    expect(envelope.databaseSchemaVersion).toBe(13);
+    expect(envelope.databaseSchemaVersion).toBe(14);
     expect(preview.quarantineCount).toBe(0);
     expect(familyIds(preview.validTables.categoryValues)).toEqual(['language', 'subject']);
     expect(familyIds(preview.validTables.categoryAssignments)).toEqual(['language', 'subject']);
+    expect(preview.validTables.classificationMappingPresets).toHaveLength(1);
   });
 
   it('preserves imported Assessment catalog fields and provenance', async () => {

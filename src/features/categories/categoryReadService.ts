@@ -21,6 +21,8 @@ export interface CategoryUsageSummary {
   total: number;
   byEntityType: Partial<Record<CategoryAssignableEntityType, number>>;
   mergedSourceCount: number;
+  mappingPresetCount?: number;
+  activeMappingPresetCount?: number;
 }
 
 export class CategoryReadService {
@@ -58,10 +60,17 @@ export class CategoryReadService {
     for (const assignment of assignments) {
       byEntityType[assignment.entityType] = (byEntityType[assignment.entityType] ?? 0) + 1;
     }
+    const [mergedSourceCount, mappingPresetCount, activeMappingPresetCount] = await Promise.all([
+      this.repository.countMergedSources(categoryValueId),
+      this.repository.countMappingPresets(categoryValueId),
+      this.repository.countMappingPresets(categoryValueId, 'active'),
+    ]);
     return {
       total: assignments.length,
       byEntityType,
-      mergedSourceCount: await this.repository.countMergedSources(categoryValueId),
+      mergedSourceCount,
+      mappingPresetCount,
+      activeMappingPresetCount,
     };
   }
 

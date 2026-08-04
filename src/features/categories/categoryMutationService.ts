@@ -7,6 +7,7 @@ import {
   categoryFamilyIdSchema,
   categoryIconKeySchema,
   categoryValueSchema,
+  classificationMappingPresetSchema,
   changeLogSchema,
   type CategoryAssignableEntityType,
   type CategoryAssignment,
@@ -21,6 +22,7 @@ import {
   createCategoryCommand,
   deleteCategoryAssignmentOperation,
   deleteCategoryValueOperation,
+  putClassificationMappingPresetOperation,
   putCategoryAssignmentOperation,
   putCategoryValueOperation,
   serializeCategoryCommand,
@@ -81,6 +83,26 @@ export class CategoryMergeHistoryDependencyError extends Error {
       }. Merge it into the replacement so former names remain resolvable.`,
     );
     this.name = 'CategoryMergeHistoryDependencyError';
+  }
+}
+
+export class CategoryMappingPresetDependencyError extends Error {
+  constructor(
+    readonly categoryValueId: string,
+    readonly presetCount: number,
+    readonly activePresetCount: number,
+    readonly attemptedOperation: 'archive' | 'delete',
+  ) {
+    super(
+      attemptedOperation === 'archive'
+        ? `This category value is the target of ${activePresetCount} active import ${
+            activePresetCount === 1 ? 'mapping' : 'mappings'
+          }. Retarget or deactivate the mapping before archiving it.`
+        : `This category value is referenced by ${presetCount} import ${
+            presetCount === 1 ? 'mapping' : 'mappings'
+          }. Retarget or delete the mapping before deleting the value.`,
+    );
+    this.name = 'CategoryMappingPresetDependencyError';
   }
 }
 
@@ -359,6 +381,7 @@ export class CategoryMutationService {
       'rw',
       this.db.categoryValues,
       this.db.categoryAssignments,
+      this.db.classificationMappingPresets,
       this.db.changeLog,
       async (): Promise<CommitResult<CategoryValue>> => {
         const existing = await this.requireValue(id);
@@ -419,6 +442,7 @@ export class CategoryMutationService {
       'rw',
       this.db.categoryValues,
       this.db.categoryAssignments,
+      this.db.classificationMappingPresets,
       this.db.changeLog,
       async (): Promise<ChangeLog> => {
         const existing = await this.requireValue(id);
@@ -541,6 +565,7 @@ export class CategoryMutationService {
       'rw',
       this.db.categoryValues,
       this.db.categoryAssignments,
+      this.db.classificationMappingPresets,
       this.db.changeLog,
       async (): Promise<CommitResult<CategoryValue>> => {
         if (sourceId === targetId) throw new Error('Choose a different replacement value.');
@@ -568,6 +593,12 @@ export class CategoryMutationService {
         const targetAssignments = (
           await this.db.categoryAssignments.where('categoryValueId').equals(target.id).toArray()
         ).map((assignment) => categoryAssignmentSchema.parse(assignment));
+        const sourceMappingPresets = (
+          await this.db.classificationMappingPresets
+            .where('targetCategoryValueId')
+            .equals(source.id)
+            .toArray()
+        ).map((preset) => classificationMappingPresetSchema.parse(preset));
         const targetAssignmentKeys = new Set(
           targetAssignments.map((assignment) =>
             this.assignmentEntityKey(assignment.entityType, assignment.entityId),
@@ -590,6 +621,19 @@ export class CategoryMutationService {
             targetAssignmentKeys.add(key);
           }
         }
+
+        const mappingForward: CategoryOperation[] = sourceMappingPresets.map((preset) =>
+          putClassificationMappingPresetOperation(
+            classificationMappingPresetSchema.parse({
+              ...preset,
+              targetCategoryValueId: target.id,
+              updatedAt: now,
+            }),
+          ),
+        );
+        const mappingInverse: CategoryOperation[] = sourceMappingPresets.map(
+          putClassificationMappingPresetOperation,
+        );
 
         let updatedTarget = target;
         if (mode === 'merge') {
@@ -635,12 +679,14 @@ export class CategoryMutationService {
         const commands: CategoryCommandPair = {
           forward: createCategoryCommand([
             ...assignmentForward,
+            ...mappingForward,
             putCategoryValueOperation(updatedSource),
             ...(targetChanged ? [putCategoryValueOperation(updatedTarget)] : []),
           ]),
           inverse: createCategoryCommand([
             putCategoryValueOperation(source),
             ...(targetChanged ? [putCategoryValueOperation(target)] : []),
+            ...mappingInverse,
             ...assignmentInverse,
           ]),
         };
@@ -685,6 +731,12 @@ export class CategoryMutationService {
       if (operation.table === 'categoryValues') {
         if (operation.action === 'put') await this.db.categoryValues.put(operation.record);
         else await this.db.categoryValues.delete(operation.id);
+      } else if (operation.table === 'classificationMappingPresets') {
+        if (operation.action === 'put') {
+          await this.db.classificationMappingPresets.put(operation.record);
+        } else {
+          await this.db.classificationMappingPresets.delete(operation.id);
+        }
       } else if (operation.action === 'put') {
         await this.db.categoryAssignments.put(operation.record);
       } else {
@@ -732,6 +784,25 @@ export class CategoryMutationService {
     categoryValueId: string,
     operation: 'archive' | 'delete',
   ): Promise<void> {
+    const mappingPresets = (
+      await this.db.classificationMappingPresets
+        .where('targetCategoryValueId')
+        .equals(categoryValueId)
+        .toArray()
+    ).map((preset) => classificationMappingPresetSchema.parse(preset));
+    const activePresetCount = mappingPresets.filter((preset) => preset.status === 'active').length;
+    if (
+      (operation === 'archive' && activePresetCount > 0) ||
+      (operation === 'delete' && mappingPresets.length > 0)
+    ) {
+      throw new CategoryMappingPresetDependencyError(
+        categoryValueId,
+        mappingPresets.length,
+        activePresetCount,
+        operation,
+      );
+    }
+
     const usageCount = await this.db.categoryAssignments
       .where('categoryValueId')
       .equals(categoryValueId)

@@ -79,6 +79,15 @@ test('Categories manages stable values and resolves in-use values transactionall
   ).toBeVisible();
   await expect(page.locator('.page-header .page-eyebrow')).toHaveText('Content');
 
+  const workspaceMode = page.getByRole('group', { name: 'Category workspace mode' });
+  await expect(workspaceMode.getByRole('button', { name: 'Controlled values' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await workspaceMode.getByRole('button', { name: 'Import mappings' }).click();
+  await expect(page.getByRole('heading', { level: 2, name: 'Import mappings' })).toBeVisible();
+  await workspaceMode.getByRole('button', { name: 'Controlled values' }).click();
+
   await page
     .getByRole('navigation', { name: 'Category families' })
     .getByRole('button', { name: /Subjects/ })
@@ -140,7 +149,9 @@ test('Categories manages stable values and resolves in-use values transactionall
   await inUseValue.getByRole('button', { name: 'Resolve use' }).click();
 
   const resolution = page.getByRole('region', { name: 'Resolve category use' });
-  await expect(resolution).toContainText('1 use must be moved');
+  await expect(resolution).toContainText(
+    '1 use will move to the replacement in one undoable transaction.',
+  );
   await resolution.getByLabel('Replacement value').selectOption({ label: 'Speaking' });
   await expect(resolution.getByLabel('Replace and Archive')).toBeChecked();
   page.once('dialog', (dialog) => dialog.accept());

@@ -6,6 +6,7 @@ import {
   calendarEventSchema,
   categoryAssignmentSchema,
   categoryValueSchema,
+  classificationMappingPresetSchema,
   changeLogSchema,
   contextMembershipSchema,
   importRunSchema,
@@ -33,10 +34,11 @@ import {
 } from '@/domain/models/entities';
 
 export const CLASSROOM_BACKUP_FORMAT = 'classroom-v20-backup-v1' as const;
-export const CLASSROOM_DATABASE_SCHEMA_VERSION = 13;
+export const CLASSROOM_DATABASE_SCHEMA_VERSION = 14;
 const LEGACY_ROSTERLESS_SCHEMA_VERSION = 10;
 const LEGACY_EVIDENCELESS_SCHEMA_VERSION = 11;
 const LEGACY_IMPORTLESS_SCHEMA_VERSION = 12;
+const LEGACY_PRESETLESS_SCHEMA_VERSION = 13;
 export const CLASSROOM_APP_VERSION = '20.0.0-alpha.0';
 export const MAX_BACKUP_FILE_BYTES = 100 * 1024 * 1024;
 
@@ -54,6 +56,7 @@ export const BACKUP_TABLE_NAMES = [
   'calendarEvents',
   'categoryValues',
   'categoryAssignments',
+  'classificationMappingPresets',
   'libraryItems',
   'importRuns',
   'lessonSeries',
@@ -89,6 +92,7 @@ const backupSchemas: Record<BackupTableName, ZodType> = {
   calendarEvents: calendarEventSchema,
   categoryValues: categoryValueSchema,
   categoryAssignments: categoryAssignmentSchema,
+  classificationMappingPresets: classificationMappingPresetSchema,
   libraryItems: libraryCatalogItemSchema,
   importRuns: importRunSchema,
   lessonSeries: lessonSeriesSchema,
@@ -265,12 +269,13 @@ export function buildRestorePreview(rawText: string): RestorePreview {
   }
   if (
     parsed.databaseSchemaVersion !== CLASSROOM_DATABASE_SCHEMA_VERSION &&
+    parsed.databaseSchemaVersion !== LEGACY_PRESETLESS_SCHEMA_VERSION &&
     parsed.databaseSchemaVersion !== LEGACY_IMPORTLESS_SCHEMA_VERSION &&
     parsed.databaseSchemaVersion !== LEGACY_EVIDENCELESS_SCHEMA_VERSION &&
     parsed.databaseSchemaVersion !== LEGACY_ROSTERLESS_SCHEMA_VERSION
   ) {
     throw new Error(
-      `This backup uses database schema ${String(parsed.databaseSchemaVersion)}. Classroom supports schemas ${LEGACY_ROSTERLESS_SCHEMA_VERSION}, ${LEGACY_EVIDENCELESS_SCHEMA_VERSION}, ${LEGACY_IMPORTLESS_SCHEMA_VERSION}, and ${CLASSROOM_DATABASE_SCHEMA_VERSION}.`,
+      `This backup uses database schema ${String(parsed.databaseSchemaVersion)}. Classroom supports schemas ${LEGACY_ROSTERLESS_SCHEMA_VERSION}, ${LEGACY_EVIDENCELESS_SCHEMA_VERSION}, ${LEGACY_IMPORTLESS_SCHEMA_VERSION}, ${LEGACY_PRESETLESS_SCHEMA_VERSION}, and ${CLASSROOM_DATABASE_SCHEMA_VERSION}.`,
     );
   }
   if (
@@ -323,12 +328,20 @@ export function buildRestorePreview(rawText: string): RestorePreview {
 
   const legacyMissingTables = new Set<BackupTableName>(
     parsed.databaseSchemaVersion === LEGACY_ROSTERLESS_SCHEMA_VERSION
-      ? ['studentRecords', 'rosterMemberships', 'assessmentEvidence', 'importRuns']
+      ? [
+          'studentRecords',
+          'rosterMemberships',
+          'assessmentEvidence',
+          'importRuns',
+          'classificationMappingPresets',
+        ]
       : parsed.databaseSchemaVersion === LEGACY_EVIDENCELESS_SCHEMA_VERSION
-        ? ['assessmentEvidence', 'importRuns']
+        ? ['assessmentEvidence', 'importRuns', 'classificationMappingPresets']
         : parsed.databaseSchemaVersion === LEGACY_IMPORTLESS_SCHEMA_VERSION
-          ? ['importRuns']
-          : [],
+          ? ['importRuns', 'classificationMappingPresets']
+          : parsed.databaseSchemaVersion === LEGACY_PRESETLESS_SCHEMA_VERSION
+            ? ['classificationMappingPresets']
+            : [],
   );
   for (const tableName of BACKUP_TABLE_NAMES) {
     const source = parsed.tables[tableName];
@@ -398,15 +411,19 @@ export function buildRestorePreview(rawText: string): RestorePreview {
   const warnings: string[] = [];
   if (parsed.databaseSchemaVersion === LEGACY_ROSTERLESS_SCHEMA_VERSION) {
     warnings.push(
-      'This backup predates independent Student, roster, Assessment Evidence, and canonical Import Center history. Those newer tables will be restored empty.',
+      'This backup predates independent Student, roster, Assessment Evidence, canonical Import Center history, and classification mapping presets. Those newer tables will be restored empty.',
     );
   } else if (parsed.databaseSchemaVersion === LEGACY_EVIDENCELESS_SCHEMA_VERSION) {
     warnings.push(
-      'This backup predates Assessment Evidence and canonical Import Center history. Those newer tables will be restored empty.',
+      'This backup predates Assessment Evidence, canonical Import Center history, and classification mapping presets. Those newer tables will be restored empty.',
     );
   } else if (parsed.databaseSchemaVersion === LEGACY_IMPORTLESS_SCHEMA_VERSION) {
     warnings.push(
-      'This backup predates canonical Import Center history. The new importRuns table will be restored empty.',
+      'This backup predates canonical Import Center history and classification mapping presets. Those newer tables will be restored empty.',
+    );
+  } else if (parsed.databaseSchemaVersion === LEGACY_PRESETLESS_SCHEMA_VERSION) {
+    warnings.push(
+      'This backup predates classification mapping presets. The classificationMappingPresets table will be restored empty.',
     );
   }
   if (quarantined.length > 0) {

@@ -575,3 +575,152 @@
     gap: 9px;
   }
 }
+
+.workspaceModes {
+  display: inline-flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface-soft);
+}
+
+.workspaceModes button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  color: var(--heading);
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.workspaceModes button[data-selected='true'] {
+  color: #fff;
+  background: var(--accent-strong);
+  box-shadow: 0 4px 12px rgb(52 78 74 / 14%);
+}
+
+.mappingEditor {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.mappingEditor h3,
+.mappingRow h3 {
+  margin: 0;
+  color: var(--heading);
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.mappingEditor p,
+.mappingRow p {
+  margin: 5px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.mappingEditorGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 1fr);
+  gap: 14px;
+}
+
+.mappingEditorGrid label {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  color: var(--heading);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.mappingEditorGrid input,
+.mappingEditorGrid select {
+  width: 100%;
+  min-width: 0;
+}
+
+.mappingList {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.mappingRow {
+  min-width: 0;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.mappingRow[data-status='inactive'] {
+  background: #f5f6f5;
+}
+
+.mappingIdentity {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+}
+
+.mappingIdentity > div {
+  min-width: 0;
+}
+
+.mappingHealth {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: #31594e;
+  background: #e3eee8;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.mappingHealth:not([data-health='ready']) {
+  color: #6b4d23;
+  background: #f6ead4;
+}
+
+@media (max-width: 760px) {
+  .mappingEditorGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .mappingRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 520px) {
+  .workspaceModes {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .workspaceModes button {
+    width: 100%;
+  }
+}

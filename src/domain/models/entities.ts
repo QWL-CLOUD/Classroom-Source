@@ -1104,6 +1104,37 @@ export const categoryValueSchema = z
     }
   });
 
+export const classificationMappingPresetStatusSchema = z.enum(['active', 'inactive']);
+
+export const classificationMappingPresetSchema = z
+  .object({
+    id: idSchema,
+    familyId: categoryFamilyIdSchema,
+    sourceText: z.string().trim().min(1).max(240),
+    normalizedSourceText: z.string().trim().min(1).max(240),
+    targetCategoryValueId: idSchema,
+    status: classificationMappingPresetStatusSchema.default('active'),
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+    deactivatedAt: timestampSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.status === 'active' && value.deactivatedAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An active classification mapping preset cannot contain deactivatedAt.',
+        path: ['deactivatedAt'],
+      });
+    }
+    if (value.status === 'inactive' && !value.deactivatedAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An inactive classification mapping preset requires deactivatedAt.',
+        path: ['deactivatedAt'],
+      });
+    }
+  });
+
 export const categoryAssignableEntityTypeSchema = z.enum([
   'lesson-plan',
   'task',
@@ -1260,6 +1291,10 @@ export type CategoryColorKey = z.infer<typeof categoryColorKeySchema>;
 export type CategoryIconKey = z.infer<typeof categoryIconKeySchema>;
 export type CategoryValueLifecycleState = z.infer<typeof categoryValueLifecycleStateSchema>;
 export type CategoryValue = z.infer<typeof categoryValueSchema>;
+export type ClassificationMappingPresetStatus = z.infer<
+  typeof classificationMappingPresetStatusSchema
+>;
+export type ClassificationMappingPreset = z.infer<typeof classificationMappingPresetSchema>;
 export type CategoryAssignableEntityType = z.infer<typeof categoryAssignableEntityTypeSchema>;
 export type CategoryAssignment = z.infer<typeof categoryAssignmentSchema>;
 export type QuickCapture = z.infer<typeof quickCaptureSchema>;

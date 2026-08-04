@@ -2,11 +2,14 @@ import { classroomDb, type ClassroomDatabase } from '@/data/db/ClassroomDatabase
 import {
   categoryAssignmentSchema,
   categoryValueSchema,
+  classificationMappingPresetSchema,
   type CategoryAssignment,
   type CategoryValue,
+  type ClassificationMappingPreset,
 } from '@/domain/models/entities';
 import type {
   CategoryAssignmentQuery,
+  ClassificationMappingPresetQuery,
   CategoryRepository,
   CategoryValueQuery,
 } from '@/domain/repositories/CategoryRepository';
@@ -26,6 +29,17 @@ function compareAssignments(first: CategoryAssignment, second: CategoryAssignmen
     first.entityId.localeCompare(second.entityId) ||
     first.familyId.localeCompare(second.familyId) ||
     first.categoryValueId.localeCompare(second.categoryValueId) ||
+    first.id.localeCompare(second.id)
+  );
+}
+
+function compareMappingPresets(
+  first: ClassificationMappingPreset,
+  second: ClassificationMappingPreset,
+): number {
+  return (
+    first.familyId.localeCompare(second.familyId) ||
+    first.sourceText.localeCompare(second.sourceText, 'en', { sensitivity: 'base' }) ||
     first.id.localeCompare(second.id)
   );
 }
@@ -86,6 +100,60 @@ export class DexieCategoryRepository implements CategoryRepository {
 
   async countMergedSources(categoryValueId: string): Promise<number> {
     return this.db.categoryValues.where('mergedIntoId').equals(categoryValueId).count();
+  }
+
+  async listMappingPresets(
+    query: ClassificationMappingPresetQuery = {},
+  ): Promise<ClassificationMappingPreset[]> {
+    let source: ClassificationMappingPreset[];
+    if (query.targetCategoryValueId) {
+      source = await this.db.classificationMappingPresets
+        .where('targetCategoryValueId')
+        .equals(query.targetCategoryValueId)
+        .toArray();
+    } else if (query.familyId && query.status) {
+      source = await this.db.classificationMappingPresets
+        .where('[familyId+status]')
+        .equals([query.familyId, query.status])
+        .toArray();
+    } else if (query.familyId) {
+      source = await this.db.classificationMappingPresets
+        .where('familyId')
+        .equals(query.familyId)
+        .toArray();
+    } else {
+      source = await this.db.classificationMappingPresets.toArray();
+    }
+
+    return source
+      .map((preset) => classificationMappingPresetSchema.parse(preset))
+      .filter(
+        (preset) =>
+          (!query.familyId || preset.familyId === query.familyId) &&
+          (!query.status || preset.status === query.status) &&
+          (!query.targetCategoryValueId ||
+            preset.targetCategoryValueId === query.targetCategoryValueId),
+      )
+      .sort(compareMappingPresets);
+  }
+
+  async getMappingPreset(id: string): Promise<ClassificationMappingPreset | null> {
+    const preset = await this.db.classificationMappingPresets.get(id);
+    return preset ? classificationMappingPresetSchema.parse(preset) : null;
+  }
+
+  async countMappingPresets(
+    categoryValueId: string,
+    status?: ClassificationMappingPreset['status'],
+  ): Promise<number> {
+    const values = await this.db.classificationMappingPresets
+      .where('targetCategoryValueId')
+      .equals(categoryValueId)
+      .toArray();
+    return status
+      ? values.filter((value) => classificationMappingPresetSchema.parse(value).status === status)
+          .length
+      : values.length;
   }
 }
 
