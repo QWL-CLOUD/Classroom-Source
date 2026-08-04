@@ -135,8 +135,8 @@ test('Activities paste-table preview is no-write, creates controlled values atom
     });
 
   await page
-    .getByLabel('Purpose: Oral rehearsal')
-    .selectOption({ label: 'Create reviewed controlled value' });
+    .getByLabel('Purpose resolution for Oral rehearsal')
+    .selectOption({ label: 'Create “Oral rehearsal”' });
   await page.getByRole('button', { name: 'Apply decisions and regenerate preview' }).click();
   await expect(
     page.getByLabel('Activity import preview summary').getByText('Create', { exact: true }),

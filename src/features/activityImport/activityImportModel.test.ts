@@ -97,6 +97,7 @@ describe('Activity import model', () => {
           'subject',
           'skill',
           'grade_level',
+          'language',
           'language_level',
           'duration_minutes',
           'grouping',
@@ -118,6 +119,7 @@ describe('Activity import model', () => {
           'Chinese',
           'Speaking',
           '3',
+          'Chinese',
           'Intermediate',
           '12',
           'partners',
@@ -136,6 +138,10 @@ describe('Activity import model', () => {
       {
         defaults: { externalSource: 'District Activity Catalog' },
         categoryDecisions: {
+          'subject\u0000chinese': { action: 'create' },
+          'grade-level\u00003': { action: 'create' },
+          'language\u0000chinese': { action: 'create' },
+          'language-level\u0000intermediate': { action: 'create' },
           'purpose-tag\u0000practice': { action: 'create' },
           'focus-tag\u0000speaking': { action: 'create' },
         },
@@ -150,13 +156,7 @@ describe('Activity import model', () => {
       externalKey: 'ACT-101',
       sourceReference: 'Curriculum guide p. 12',
       status: 'active',
-      tags: [
-        'Oral language',
-        'Unit 1',
-        'Subject: Chinese',
-        'Grade: 3',
-        'Language level: Intermediate',
-      ],
+      tags: ['Oral language', 'Unit 1'],
       typedFields: {
         catalogType: 'activity',
         grouping: 'partners',
@@ -168,7 +168,10 @@ describe('Activity import model', () => {
     expect(
       planned?.typedFields?.catalogType === 'activity' ? planned.typedFields.notes : '',
     ).toContain('Teacher language\n先说第一句。');
-    expect(result.newCategoryValues.map((value) => value.name)).toEqual(['Practice', 'Speaking']);
+    expect(result.newCategoryValues.map((value) => value.name)).toEqual(
+      expect.arrayContaining(['Chinese', '3', 'Intermediate', 'Practice', 'Speaking']),
+    );
+    expect(result.rows[0]?.planned?.assignmentsToCreate).toHaveLength(6);
   });
 
   it('never turns title equality alone into an automatic update', () => {

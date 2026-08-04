@@ -24,8 +24,8 @@ describe('AssessmentImportMutationService', () => {
     const db = new ClassroomDatabase(`assessment-import-${crypto.randomUUID()}`);
     databases.push(db);
     const source = buildImportTable([
-      ['External Source', 'Assessment ID', 'Title', 'Assessment Kind'],
-      ['District', 'ASM-1', 'Quick check', 'Formative'],
+      ['External Source', 'Assessment ID', 'Title', 'Assessment Kind', 'Subject', 'Purpose'],
+      ['District', 'ASM-1', 'Quick check', 'Formative', 'Mathematics', 'Exit ticket'],
     ]);
     const preview = buildAssessmentImportPreview(
       {
@@ -35,7 +35,13 @@ describe('AssessmentImportMutationService', () => {
         unmappedDecisions: {},
         duplicateDecisions: {},
         kindDecisions: {},
+        classificationDecisions: {
+          'subject\u0000mathematics': { action: 'create' },
+          'purpose-tag\u0000exit ticket': { action: 'create' },
+        },
         existingItems: [],
+        categoryValues: [],
+        categoryAssignments: [],
       },
       {
         createId: (() => {
@@ -56,7 +62,18 @@ describe('AssessmentImportMutationService', () => {
 
     expect(result.created).toHaveLength(1);
     expect(await db.libraryItems.count()).toBe(1);
+    expect(await db.categoryValues.count()).toBe(2);
+    expect(await db.categoryAssignments.count()).toBe(2);
     expect(await db.importRuns.count()).toBe(1);
+    expect(
+      JSON.parse((await db.importRuns.get(preview.importRunId))?.summaryJson ?? '{}')
+        .classificationAudit,
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ familyId: 'subject', resolution: 'created' }),
+        expect.objectContaining({ familyId: 'purpose-tag', resolution: 'created' }),
+      ]),
+    );
     expect(await db.assessmentEvidence.count()).toBe(0);
 
     const history = new EditHistoryService(db, {
@@ -64,11 +81,15 @@ describe('AssessmentImportMutationService', () => {
     });
     await history.undo();
     expect(await db.libraryItems.count()).toBe(0);
+    expect(await db.categoryValues.count()).toBe(0);
+    expect(await db.categoryAssignments.count()).toBe(0);
     expect(await db.importRuns.count()).toBe(0);
     expect(await db.assessmentEvidence.count()).toBe(0);
 
     await history.redo();
     expect(await db.libraryItems.count()).toBe(1);
+    expect(await db.categoryValues.count()).toBe(2);
+    expect(await db.categoryAssignments.count()).toBe(2);
     expect(await db.importRuns.count()).toBe(1);
     expect(await db.assessmentEvidence.count()).toBe(0);
   });
@@ -103,6 +124,8 @@ describe('AssessmentImportMutationService', () => {
       }),
     ).rejects.toThrow('forced failure');
     expect(await db.libraryItems.count()).toBe(0);
+    expect(await db.categoryValues.count()).toBe(0);
+    expect(await db.categoryAssignments.count()).toBe(0);
     expect(await db.importRuns.count()).toBe(0);
     expect(await db.changeLog.count()).toBe(0);
   });

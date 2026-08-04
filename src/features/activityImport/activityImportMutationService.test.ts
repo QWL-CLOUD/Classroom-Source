@@ -85,12 +85,20 @@ describe('ActivityImportMutationService', () => {
   it('commits Activities, controlled values, assignments, metadata, and one global Undo/Redo', async () => {
     const preview = await buildPreview(
       [
-        ['activity_id', 'title', 'purpose', 'steps', 'materials'],
-        ['ACT-1', 'Partner retell', 'Discussion', 'Retell in pairs.', 'Picture cards'],
+        ['activity_id', 'title', 'subject', 'purpose', 'steps', 'materials'],
+        [
+          'ACT-1',
+          'Partner retell',
+          'Chinese Language Arts',
+          'Discussion',
+          'Retell in pairs.',
+          'Picture cards',
+        ],
       ],
       {
         defaults: { externalSource: 'District Activity Catalog', sourceReference: 'Guide p. 10' },
         categoryDecisions: {
+          'subject\u0000chinese language arts': { action: 'create' },
           'purpose-tag\u0000discussion': { action: 'create' },
         },
       },
@@ -106,14 +114,21 @@ describe('ActivityImportMutationService', () => {
 
     expect(result.created).toHaveLength(1);
     expect(await database.libraryItems.count()).toBe(1);
-    expect(await database.categoryValues.count()).toBe(1);
-    expect(await database.categoryAssignments.count()).toBe(1);
-    expect(await database.importRuns.get(preview.importRunId)).toMatchObject({
+    expect(await database.categoryValues.count()).toBe(2);
+    expect(await database.categoryAssignments.count()).toBe(2);
+    const importRun = await database.importRuns.get(preview.importRunId);
+    expect(importRun).toMatchObject({
       importType: 'activities',
       sourceKind: 'csv',
       createdCount: 1,
       updatedCount: 0,
     });
+    expect(JSON.parse(importRun?.summaryJson ?? '{}').classificationAudit).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ familyId: 'subject', resolution: 'created' }),
+        expect.objectContaining({ familyId: 'purpose-tag', resolution: 'created' }),
+      ]),
+    );
     const stored = (await database.libraryItems.toArray())[0];
     expect(stored).toMatchObject({
       title: 'Partner retell',
@@ -138,8 +153,8 @@ describe('ActivityImportMutationService', () => {
 
     await history.redo();
     expect(await database.libraryItems.count()).toBe(1);
-    expect(await database.categoryValues.count()).toBe(1);
-    expect(await database.categoryAssignments.count()).toBe(1);
+    expect(await database.categoryValues.count()).toBe(2);
+    expect(await database.categoryAssignments.count()).toBe(2);
     expect(await database.importRuns.count()).toBe(1);
   });
 

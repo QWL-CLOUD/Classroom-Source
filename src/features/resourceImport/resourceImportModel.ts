@@ -1,6 +1,5 @@
 import {
   categoryAssignmentSchema,
-  categoryValueSchema,
   libraryCatalogItemSchema,
   type CategoryAssignment,
   type CategoryValue,
@@ -8,13 +7,20 @@ import {
   type LibraryCatalogStatus,
   type LibraryResourceFields,
 } from '@/domain/models/entities';
-import { normalizeCategoryName } from '@/features/categories/categoryNormalization';
 import {
   buildImportPreview,
   stableImportFingerprint,
   type ImportPreview,
   type ImportPreviewRow,
 } from '@/features/importCenter/importPreviewModel';
+import {
+  createImportClassificationResolutionSession,
+  planImportClassificationAssignments,
+  type ImportClassificationAuditRecord,
+  type ImportClassificationDecision,
+  type ImportClassificationDecisions,
+  type ImportClassificationReview,
+} from '@/features/importCenter/importClassificationResolution';
 import {
   createEmptyImportColumnMapping,
   mappedImportValue,
@@ -42,7 +48,10 @@ export const resourceImportFieldKeys = [
   'usageNotes',
   'subject',
   'gradeLevel',
+  'language',
   'languageLevel',
+  'purpose',
+  'skill',
   'versionYear',
   'owner',
   'lastChecked',
@@ -68,7 +77,10 @@ export const resourceImportFieldLabels: Record<ResourceImportFieldKey, string> =
   usageNotes: 'Usage notes',
   subject: 'Subject',
   gradeLevel: 'Grade level',
+  language: 'Language',
   languageLevel: 'Language level',
+  purpose: 'Purpose',
+  skill: 'Skill / focus',
   versionYear: 'Version / year',
   owner: 'Owner / author',
   lastChecked: 'Last checked',
@@ -86,7 +98,15 @@ const aliases: ImportHeaderAliases<ResourceImportFieldKey> = {
   externalKey: ['resourceid', 'materialid', 'externalkey', 'resourcekey', 'catalogid', 'id'],
   title: ['title', 'resourcetitle', 'materialtitle', 'name'],
   description: ['description', 'summary', 'overview'],
-  resourceFormat: ['resourceformat', 'format', 'type', 'category', 'filetype', 'mediatype'],
+  resourceFormat: [
+    'resourceformat',
+    'resourcetype',
+    'format',
+    'type',
+    'category',
+    'filetype',
+    'mediatype',
+  ],
   sourceLocation: [
     'sourceorlocation',
     'sourcelocation',
@@ -99,7 +119,10 @@ const aliases: ImportHeaderAliases<ResourceImportFieldKey> = {
   usageNotes: ['usagenotes', 'use', 'usenotes', 'preparation', 'instructions'],
   subject: ['subject', 'subjects', 'contentarea'],
   gradeLevel: ['gradelevel', 'grade', 'grades'],
+  language: ['language', 'languages', 'instructionallanguage', 'targetlanguage'],
   languageLevel: ['languagelevel', 'proficiencylevel', 'clalevel'],
+  purpose: ['purpose', 'purposes', 'purposetag', 'purposetags'],
+  skill: ['skill', 'skills', 'focus', 'focustag', 'focustags'],
   versionYear: ['versionyear', 'version', 'year', 'edition'],
   owner: ['owner', 'creator', 'author', 'provider'],
   lastChecked: ['lastchecked', 'checkedon', 'reviewedon', 'lastreviewed'],
@@ -166,12 +189,11 @@ export type ResourceDuplicateDecision =
 export type ResourceDuplicateDecisions = Record<number, ResourceDuplicateDecision | undefined>;
 
 export type ResourceFormatDecision =
-  | { action: 'use'; categoryValueId: string }
-  | { action: 'restore'; categoryValueId: string }
-  | { action: 'create' }
+  | Extract<ImportClassificationDecision, { action: 'use' | 'restore' | 'create' }>
   | { action: 'none' };
 
 export type ResourceFormatDecisions = Record<string, ResourceFormatDecision | undefined>;
+export type ResourceClassificationDecisions = ImportClassificationDecisions;
 
 export type ResourceSourceDecision = { action: 'keep' } | { action: 'skip' };
 export type ResourceSourceDecisions = Record<number, ResourceSourceDecision | undefined>;
@@ -192,14 +214,7 @@ export interface ResourceDuplicateReview {
   candidates: ResourceDuplicateCandidate[];
 }
 
-export interface ResourceFormatReview {
-  key: string;
-  displayValue: string;
-  normalizedValue: string;
-  kind: 'unknown' | 'archived' | 'merged';
-  matchedValue?: CategoryValue;
-  replacementValue?: CategoryValue;
-}
+export type ResourceFormatReview = ImportClassificationReview;
 
 export interface ResourceSourceReview {
   kind: 'credential-url';
@@ -220,7 +235,10 @@ export interface NormalizedResourceImportRow {
   usageNotes?: string;
   subject?: string;
   gradeLevel?: string;
+  language?: string;
   languageLevel?: string;
+  purpose?: string;
+  skill?: string;
   versionYear?: string;
   owner?: string;
   lastChecked?: string;
@@ -246,6 +264,7 @@ export interface PlannedResourceImportRow {
   resourceFormatValueId?: string;
   duplicateReview?: ResourceDuplicateReview;
   formatReview?: ResourceFormatReview;
+  classificationReviews?: ImportClassificationReview[];
   sourceReview?: ResourceSourceReview;
 }
 
@@ -253,6 +272,7 @@ export interface ResourceImportPreviewRow extends ImportPreviewRow<PlannedResour
   normalized: NormalizedResourceImportRow;
   duplicateReview?: ResourceDuplicateReview;
   formatReview?: ResourceFormatReview;
+  classificationReviews?: ImportClassificationReview[];
   sourceReview?: ResourceSourceReview;
 }
 
@@ -267,6 +287,8 @@ export interface ResourceImportPreview extends Omit<
   restoredCategoryValues: Array<{ before: CategoryValue; after: CategoryValue }>;
   expectedCategoryValues: CategoryValue[];
   formatReviews: ResourceFormatReview[];
+  classificationReviews: ImportClassificationReview[];
+  classificationAudit: ImportClassificationAuditRecord[];
 }
 
 export interface BuildResourceImportPreviewInput {
@@ -276,6 +298,7 @@ export interface BuildResourceImportPreviewInput {
   unmappedDecisions: UnmappedColumnDecisions;
   duplicateDecisions: ResourceDuplicateDecisions;
   formatDecisions: ResourceFormatDecisions;
+  classificationDecisions?: ResourceClassificationDecisions;
   sourceDecisions: ResourceSourceDecisions;
   existingItems: readonly LibraryCatalogItem[];
   categoryValues: readonly CategoryValue[];
@@ -395,13 +418,13 @@ function normalizeRow(
 
   const subject = optional(valueFor(row, mapping, 'subject'));
   const gradeLevel = optional(valueFor(row, mapping, 'gradeLevel'));
+  const language = optional(valueFor(row, mapping, 'language'));
   const languageLevel = optional(valueFor(row, mapping, 'languageLevel'));
+  const purpose = optional(valueFor(row, mapping, 'purpose'));
+  const skill = optional(valueFor(row, mapping, 'skill'));
   const relatedUnit = optional(valueFor(row, mapping, 'relatedUnit'));
   const tagMap = new Map<string, string>();
   for (const tag of splitTags(valueFor(row, mapping, 'tags'))) addUniqueTag(tagMap, tag);
-  if (subject) addUniqueTag(tagMap, `Subject: ${subject}`);
-  if (gradeLevel) addUniqueTag(tagMap, `Grade: ${gradeLevel}`);
-  if (languageLevel) addUniqueTag(tagMap, `Language level: ${languageLevel}`);
   if (relatedUnit) addUniqueTag(tagMap, `Unit: ${relatedUnit}`);
 
   const description = optional(valueFor(row, mapping, 'description'));
@@ -455,7 +478,10 @@ function normalizeRow(
     usageNotes,
     subject,
     gradeLevel,
+    language,
     languageLevel,
+    purpose,
+    skill,
     versionYear: optional(valueFor(row, mapping, 'versionYear')),
     owner: optional(valueFor(row, mapping, 'owner')),
     lastChecked: optional(valueFor(row, mapping, 'lastChecked')),
@@ -500,10 +526,6 @@ function mergeImportedNotes(
   if (!existing) return imported;
   if (existing.includes(imported)) return existing;
   return `${existing}\n\n${imported}`;
-}
-
-function formatReviewKey(displayValue: string): string {
-  return `resource-format\u0000${normalizeCategoryName(displayValue)}`;
 }
 
 function duplicateCandidate(
@@ -570,116 +592,43 @@ export function buildResourceImportPreview(
 
   const assignmentsByItem = new Map<string, CategoryAssignment[]>();
   for (const assignment of input.categoryAssignments) {
-    if (assignment.entityType !== 'library-item' || assignment.familyId !== 'resource-format') {
-      continue;
-    }
+    if (assignment.entityType !== 'library-item') continue;
     assignmentsByItem.set(assignment.entityId, [
       ...(assignmentsByItem.get(assignment.entityId) ?? []),
       categoryAssignmentSchema.parse(assignment),
     ]);
   }
 
-  const categoryValues = input.categoryValues
-    .map((value) => categoryValueSchema.parse(value))
-    .filter((value) => value.familyId === 'resource-format');
-  const valueById = new Map(categoryValues.map((value) => [value.id, value] as const));
-  let nextSortOrder = Math.max(-1, ...categoryValues.map((value) => value.sortOrder)) + 1;
-  const newCategoryByKey = new Map<string, CategoryValue>();
-  const restoredCategoryById = new Map<string, { before: CategoryValue; after: CategoryValue }>();
-  const expectedCategoryById = new Map<string, CategoryValue>();
-  const formatReviewsByKey = new Map<string, ResourceFormatReview>();
-
-  function resolveFormat(displayValue: string | undefined): {
-    valueId?: string;
-    review?: ResourceFormatReview;
-    reason?: string;
-  } {
-    if (!displayValue) return {};
-    const normalizedValue = normalizeCategoryName(displayValue);
-    const exact = categoryValues.find((value) => value.normalizedName === normalizedValue);
-    const alias = categoryValues.find((value) => value.normalizedAliases.includes(normalizedValue));
-    const matched = exact ?? alias;
-    if (matched?.lifecycleState === 'active') {
-      expectedCategoryById.set(matched.id, matched);
-      return { valueId: matched.id };
-    }
-    const replacement =
-      matched?.lifecycleState === 'merged' && matched.mergedIntoId
-        ? valueById.get(matched.mergedIntoId)
-        : undefined;
-    const key = formatReviewKey(displayValue);
-    const review: ResourceFormatReview = {
-      key,
-      displayValue,
-      normalizedValue,
-      kind:
-        matched?.lifecycleState === 'archived'
-          ? 'archived'
-          : matched?.lifecycleState === 'merged'
-            ? 'merged'
-            : 'unknown',
-      matchedValue: matched,
-      replacementValue: replacement,
-    };
-    formatReviewsByKey.set(key, review);
-    const decision = input.formatDecisions[key];
-    if (!decision) return { review, reason: `Review Resource Format “${displayValue}”.` };
-    if (decision.action === 'none') return {};
-    if (decision.action === 'create') {
-      if (matched) {
-        return {
-          review,
-          reason: `Resource Format “${displayValue}” already exists and cannot be recreated.`,
-        };
-      }
-      let created = newCategoryByKey.get(key);
-      if (!created) {
-        created = categoryValueSchema.parse({
-          id: createId(),
-          familyId: 'resource-format',
-          name: displayValue,
-          normalizedName: normalizedValue,
-          aliases: [],
-          normalizedAliases: [],
-          sortOrder: nextSortOrder,
-          isDefault: false,
-          lifecycleState: 'active',
-          createdAt: generatedAt,
-          updatedAt: generatedAt,
-        });
-        nextSortOrder += 1;
-        newCategoryByKey.set(key, created);
-      }
-      return { valueId: created.id };
-    }
-    const selected = valueById.get(decision.categoryValueId);
-    if (!selected) return { review, reason: 'The selected Resource Format no longer exists.' };
-    if (decision.action === 'use') {
-      if (selected.lifecycleState !== 'active') {
-        return { review, reason: `Resource Format “${selected.name}” is no longer active.` };
-      }
-      expectedCategoryById.set(selected.id, selected);
-      return { valueId: selected.id };
-    }
-    if (selected.lifecycleState !== 'archived') {
-      return { review, reason: `Only an archived Resource Format can be restored.` };
-    }
-    let restored = restoredCategoryById.get(selected.id);
-    if (!restored) {
-      restored = {
-        before: selected,
-        after: categoryValueSchema.parse({
-          ...selected,
-          lifecycleState: 'active',
-          isDefault: false,
-          archivedAt: undefined,
-          updatedAt: generatedAt,
-        }),
-      };
-      restoredCategoryById.set(selected.id, restored);
-    }
-    return { valueId: restored.after.id };
+  const legacyFormatDecisions: ImportClassificationDecisions = {};
+  for (const [key, decision] of Object.entries(input.formatDecisions)) {
+    if (!decision) continue;
+    legacyFormatDecisions[key] = decision.action === 'none' ? { action: 'ignore' } : decision;
   }
+  const classificationSession = createImportClassificationResolutionSession({
+    catalogType: 'resource',
+    categoryValues: input.categoryValues,
+    decisions: { ...legacyFormatDecisions, ...(input.classificationDecisions ?? {}) },
+    createId,
+    generatedAt,
+  });
+  const applicableFamilyIds = classificationSession.applicableFamilyIds;
+  for (const [entityId, assignments] of assignmentsByItem) {
+    assignmentsByItem.set(
+      entityId,
+      assignments
+        .filter((assignment) => applicableFamilyIds.includes(assignment.familyId))
+        .sort(compareAssignment),
+    );
+  }
+  const presentFamilyIds = [
+    ...(input.mapping.subject !== null ? (['subject'] as const) : []),
+    ...(input.mapping.gradeLevel !== null ? (['grade-level'] as const) : []),
+    ...(input.mapping.language !== null ? (['language'] as const) : []),
+    ...(input.mapping.languageLevel !== null ? (['language-level'] as const) : []),
+    ...(input.mapping.resourceFormat !== null ? (['resource-format'] as const) : []),
+    ...(input.mapping.purpose !== null ? (['purpose-tag'] as const) : []),
+    ...(input.mapping.skill !== null ? (['focus-tag'] as const) : []),
+  ];
 
   const normalizedRows = input.table.rows.map((row) =>
     normalizeRow(row, input.table, input.mapping, input.defaults, input.unmappedDecisions),
@@ -899,15 +848,43 @@ export function buildResourceImportPreview(
       continue;
     }
 
-    const format = resolveFormat(normalized.resourceFormat);
-    if (format.review) {
+    const classification = classificationSession.resolveRow({
+      sourceRow: normalized.sourceRow,
+      values: {
+        subject: normalized.subject,
+        'grade-level': normalized.gradeLevel,
+        language: normalized.language,
+        'language-level': normalized.languageLevel,
+        'resource-format': normalized.resourceFormat,
+        'purpose-tag': normalized.purpose,
+        'focus-tag': normalized.skill,
+      },
+      presentFamilyIds,
+    });
+    if (classification.blockingReasons.length > 0) {
+      rows.push({
+        sourceRow: normalized.sourceRow,
+        classification: 'blocked',
+        reasons: classification.blockingReasons,
+        normalized,
+        duplicateReview,
+        classificationReviews: [],
+      });
+      continue;
+    }
+    const classificationReviews = classification.reviews;
+    const formatReview = classificationReviews.find(
+      (review) => review.familyId === 'resource-format',
+    );
+    if (classificationReviews.length > 0) {
       rows.push({
         sourceRow: normalized.sourceRow,
         classification: 'review',
-        reasons: [format.reason ?? 'Review the Resource Format.'],
+        reasons: classification.reviewReasons,
         normalized,
         duplicateReview,
-        formatReview: format.review,
+        formatReview,
+        classificationReviews,
         planned: {
           normalized,
           existingItem: target,
@@ -917,7 +894,8 @@ export function buildResourceImportPreview(
           assignmentsToDelete: [],
           assignmentsToCreate: [],
           duplicateReview,
-          formatReview: format.review,
+          formatReview,
+          classificationReviews,
           sourceReview: normalized.sourceReview,
         },
       });
@@ -927,6 +905,7 @@ export function buildResourceImportPreview(
     const tagMap = new Map<string, string>();
     for (const tag of target?.tags ?? []) addUniqueTag(tagMap, tag);
     for (const tag of normalized.tags) addUniqueTag(tagMap, tag);
+    for (const tag of classification.genericTags) addUniqueTag(tagMap, tag);
     const mergedTags = [...tagMap.values()];
     if (mergedTags.length > 30 || mergedTags.some((tag) => tag.length > 80)) {
       rows.push({
@@ -983,36 +962,27 @@ export function buildResourceImportPreview(
       archivedAt: status === 'archived' ? (target?.archivedAt ?? generatedAt) : undefined,
     });
 
-    const expectedAssignments = target
-      ? [...(assignmentsByItem.get(target.id) ?? [])].sort(compareAssignment)
-      : [];
-    const existingFormatId = expectedAssignments[0]?.categoryValueId;
-    const desiredFormatId = normalized.resourceFormat
-      ? (format.valueId ?? existingFormatId)
-      : existingFormatId;
-    const assignmentsToDelete = desiredFormatId
-      ? expectedAssignments.filter((assignment) => assignment.categoryValueId !== desiredFormatId)
-      : [];
-    const assignmentsToCreate =
-      desiredFormatId &&
-      !expectedAssignments.some((assignment) => assignment.categoryValueId === desiredFormatId)
-        ? [
-            categoryAssignmentSchema.parse({
-              id: createId(),
-              familyId: 'resource-format',
-              categoryValueId: desiredFormatId,
-              entityType: 'library-item',
-              entityId: itemId,
-              createdAt: generatedAt,
-            }),
-          ]
-        : [];
-
-    const categoryLifecycleChange = Boolean(
-      desiredFormatId &&
-      (restoredCategoryById.has(desiredFormatId) ||
-        [...newCategoryByKey.values()].some((value) => value.id === desiredFormatId)),
+    const assignmentPlan = planImportClassificationAssignments({
+      entityId: itemId,
+      existingAssignments: target ? (assignmentsByItem.get(target.id) ?? []) : [],
+      resolution: classification,
+      applicableFamilyIds,
+      createId,
+      generatedAt,
+    });
+    const expectedAssignments = assignmentPlan.expectedAssignments;
+    const assignmentsToDelete = assignmentPlan.assignmentsToDelete;
+    const assignmentsToCreate = assignmentPlan.assignmentsToCreate;
+    const desiredFormatId = assignmentPlan.desiredCategoryValueIdsByFamily['resource-format']?.[0];
+    const currentClassificationSnapshot = classificationSession.snapshot();
+    const lifecycleIds = new Set([
+      ...currentClassificationSnapshot.newCategoryValues.map((value) => value.id),
+      ...currentClassificationSnapshot.restoredCategoryValues.map((value) => value.after.id),
+    ]);
+    const categoryLifecycleChange = assignmentPlan.desiredCategoryValueIds.some((id) =>
+      lifecycleIds.has(id),
     );
+
     const itemChanged = !target || !sameRecord(withoutRun, target);
     const assignmentChanged = assignmentsToDelete.length > 0 || assignmentsToCreate.length > 0;
     if (target && !itemChanged && !assignmentChanged && !categoryLifecycleChange) {
@@ -1030,6 +1000,7 @@ export function buildResourceImportPreview(
           assignmentsToCreate: [],
           resourceFormatValueId: desiredFormatId,
           duplicateReview,
+          classificationReviews: [],
           sourceReview: normalized.sourceReview,
         },
       });
@@ -1044,10 +1015,11 @@ export function buildResourceImportPreview(
         target
           ? 'The reviewed stable identity or explicit duplicate decision updates this Resource.'
           : 'No strong existing identity was selected; create a new Resource.',
-        ...(assignmentChanged ? ['Replace the reviewed single Resource Format assignment.'] : []),
+        ...(assignmentChanged ? ['Apply the reviewed Library classification assignments.'] : []),
       ],
       normalized,
       duplicateReview,
+      classificationReviews: [],
       sourceReview: normalized.sourceReview,
       planned: {
         normalized,
@@ -1058,6 +1030,7 @@ export function buildResourceImportPreview(
         assignmentsToCreate,
         resourceFormatValueId: desiredFormatId,
         duplicateReview,
+        classificationReviews: [],
         sourceReview: normalized.sourceReview,
       },
     });
@@ -1077,11 +1050,13 @@ export function buildResourceImportPreview(
       unmappedDecisions: input.unmappedDecisions,
       duplicateDecisions: input.duplicateDecisions,
       formatDecisions: input.formatDecisions,
+      classificationDecisions: input.classificationDecisions,
       sourceDecisions: input.sourceDecisions,
     },
     generatedAt,
   );
 
+  const classificationSnapshot = classificationSession.snapshot();
   return {
     ...genericPreview,
     importRunId,
@@ -1090,9 +1065,13 @@ export function buildResourceImportPreview(
       externalSource: optional(normalizeImportText(input.defaults.externalSource ?? '')),
       sourceReference: optional(normalizeImportText(input.defaults.sourceReference ?? '')),
     },
-    newCategoryValues: [...newCategoryByKey.values()],
-    restoredCategoryValues: [...restoredCategoryById.values()],
-    expectedCategoryValues: [...expectedCategoryById.values()],
-    formatReviews: [...formatReviewsByKey.values()],
+    newCategoryValues: classificationSnapshot.newCategoryValues,
+    restoredCategoryValues: classificationSnapshot.restoredCategoryValues,
+    expectedCategoryValues: classificationSnapshot.expectedCategoryValues,
+    formatReviews: classificationSnapshot.classificationReviews.filter(
+      (review) => review.familyId === 'resource-format',
+    ),
+    classificationReviews: classificationSnapshot.classificationReviews,
+    classificationAudit: classificationSnapshot.classificationAudit,
   };
 }

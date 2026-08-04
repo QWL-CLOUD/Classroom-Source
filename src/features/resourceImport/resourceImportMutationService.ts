@@ -14,6 +14,7 @@ import {
 import { clearSupportedRedoBranch } from '@/features/editing/editCommandRegistry';
 import { notifyEditHistoryChanged } from '@/features/editing/editHistorySignal';
 import { applyImportOperations } from '@/features/importCenter/applyImportOperations';
+import { classificationSummaryJson } from '@/features/importCenter/importClassificationResolution';
 import {
   createImportCommand,
   deleteImportCategoryAssignmentOperation,
@@ -195,7 +196,7 @@ export class ResourceImportMutationService {
               .first();
             if (existing) {
               throw new Error(
-                `Row ${row.sourceRow} Resource Format assignments changed after preview.`,
+                `Row ${row.sourceRow} Resource classification assignments changed after preview.`,
               );
             }
             forwardAssignments.push(putImportCategoryAssignmentOperation(assignment));
@@ -226,11 +227,20 @@ export class ResourceImportMutationService {
           skippedCount: preview.summary.skipCount,
           reviewCount: 0,
           blockedCount: 0,
-          summaryJson: JSON.stringify({
+          summaryJson: classificationSummaryJson({
             sourceFingerprint: preview.sourceFingerprint,
             defaults: preview.defaults,
-            createdResourceFormats: preview.newCategoryValues.length,
-            restoredResourceFormats: preview.restoredCategoryValues.length,
+            newCategoryValues: preview.newCategoryValues,
+            restoredCategoryValues: preview.restoredCategoryValues,
+            classificationAudit: preview.classificationAudit,
+            additionalSummary: {
+              createdResourceFormats: preview.newCategoryValues.filter(
+                (value) => value.familyId === 'resource-format',
+              ).length,
+              restoredResourceFormats: preview.restoredCategoryValues.filter(
+                ({ after }) => after.familyId === 'resource-format',
+              ).length,
+            },
           }),
           committedAt: preview.generatedAt,
         });
@@ -303,7 +313,9 @@ export class ResourceImportMutationService {
   ): Promise<void> {
     if (!entityId) {
       if (expected.length) {
-        throw new Error(`Row ${sourceRow} contains invalid expected Resource Format assignments.`);
+        throw new Error(
+          `Row ${sourceRow} contains invalid expected Resource classification assignments.`,
+        );
       }
       return;
     }
@@ -314,10 +326,20 @@ export class ResourceImportMutationService {
         .toArray()
     )
       .map((value) => categoryAssignmentSchema.parse(value))
-      .filter((value) => value.familyId === 'resource-format');
+      .filter((value) =>
+        [
+          'subject',
+          'grade-level',
+          'language',
+          'language-level',
+          'resource-format',
+          'purpose-tag',
+          'focus-tag',
+        ].includes(value.familyId),
+      );
     if (!sameRecord(sortedAssignments(current), sortedAssignments(expected))) {
       throw new Error(
-        `Row ${sourceRow} Resource Format assignments changed after preview. Generate a new preview.`,
+        `Row ${sourceRow} Resource classification assignments changed after preview. Generate a new preview.`,
       );
     }
   }
@@ -327,7 +349,7 @@ export class ResourceImportMutationService {
       const current = await this.db.categoryValues.get(expected.id);
       if (!current || !sameRecord(categoryValueSchema.parse(current), expected)) {
         throw new Error(
-          `Resource Format “${expected.name}” changed after preview. Generate a new preview.`,
+          `Classification “${expected.name}” changed after preview. Generate a new preview.`,
         );
       }
     }
@@ -335,7 +357,7 @@ export class ResourceImportMutationService {
       const current = await this.db.categoryValues.get(change.before.id);
       if (!current || !sameRecord(categoryValueSchema.parse(current), change.before)) {
         throw new Error(
-          `Resource Format “${change.before.name}” changed after preview. Generate a new preview.`,
+          `Classification “${change.before.name}” changed after preview. Generate a new preview.`,
         );
       }
     }
@@ -344,17 +366,17 @@ export class ResourceImportMutationService {
     );
     for (const value of preview.newCategoryValues) {
       if (await this.db.categoryValues.get(value.id)) {
-        throw new Error(`New Resource Format “${value.name}” changed after preview.`);
+        throw new Error(`New classification “${value.name}” changed after preview.`);
       }
       const collision = currentValues.find(
         (current) =>
-          current.familyId === 'resource-format' &&
+          current.familyId === value.familyId &&
           (current.normalizedName === value.normalizedName ||
             current.normalizedAliases.includes(value.normalizedName)),
       );
       if (collision) {
         throw new Error(
-          `Resource Format “${value.name}” now conflicts with “${collision.name}”. Generate a new preview.`,
+          `Classification “${value.name}” now conflicts with “${collision.name}”. Generate a new preview.`,
         );
       }
     }

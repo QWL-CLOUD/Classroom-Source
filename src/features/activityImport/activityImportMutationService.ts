@@ -14,6 +14,7 @@ import {
 import { clearSupportedRedoBranch } from '@/features/editing/editCommandRegistry';
 import { notifyEditHistoryChanged } from '@/features/editing/editHistorySignal';
 import { applyImportOperations } from '@/features/importCenter/applyImportOperations';
+import { classificationSummaryJson } from '@/features/importCenter/importClassificationResolution';
 import {
   createImportCommand,
   deleteImportCategoryAssignmentOperation,
@@ -128,8 +129,14 @@ export class ActivityImportMutationService {
         for (const row of preview.rows) {
           const plan = row.planned;
           if (row.classification === 'skip') {
-            if (plan?.existingItem)
+            if (plan?.existingItem) {
               await this.validateExpectedItem(plan.existingItem, row.sourceRow);
+              await this.validateExpectedAssignments(
+                plan.existingItem.id,
+                plan.expectedAssignments,
+                row.sourceRow,
+              );
+            }
             continue;
           }
           if (row.classification !== 'create' && row.classification !== 'update') {
@@ -174,6 +181,10 @@ export class ActivityImportMutationService {
             plan.expectedAssignments,
             row.sourceRow,
           );
+          for (const assignment of plan.assignmentsToDelete) {
+            forwardAssignments.push(deleteImportCategoryAssignmentOperation(assignment.id));
+            inverseAssignments.unshift(putImportCategoryAssignmentOperation(assignment));
+          }
           for (const assignmentPlan of plan.assignmentsToCreate) {
             const assignment = categoryAssignmentSchema.parse(assignmentPlan.record);
             const existing = await this.db.categoryAssignments
@@ -211,11 +222,12 @@ export class ActivityImportMutationService {
           skippedCount: preview.summary.skipCount,
           reviewCount: 0,
           blockedCount: 0,
-          summaryJson: JSON.stringify({
+          summaryJson: classificationSummaryJson({
             sourceFingerprint: preview.sourceFingerprint,
             defaults: preview.defaults,
-            createdCategoryValues: preview.newCategoryValues.length,
-            restoredCategoryValues: preview.restoredCategoryValues.length,
+            newCategoryValues: preview.newCategoryValues,
+            restoredCategoryValues: preview.restoredCategoryValues,
+            classificationAudit: preview.classificationAudit,
           }),
           committedAt: preview.generatedAt,
         });
@@ -298,7 +310,17 @@ export class ActivityImportMutationService {
         .toArray()
     )
       .map((value) => categoryAssignmentSchema.parse(value))
-      .filter((value) => value.familyId === 'purpose-tag' || value.familyId === 'focus-tag');
+      .filter((value) =>
+        [
+          'subject',
+          'grade-level',
+          'language',
+          'language-level',
+          'activity-type',
+          'purpose-tag',
+          'focus-tag',
+        ].includes(value.familyId),
+      );
     if (!sameRecord(sortedAssignments(current), sortedAssignments(expected))) {
       throw new Error(
         `Row ${sourceRow} category assignments changed after preview. Generate a new preview.`,

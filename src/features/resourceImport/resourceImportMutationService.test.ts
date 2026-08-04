@@ -51,6 +51,9 @@ async function buildPreview(
   options: {
     defaults?: { externalSource?: string; sourceReference?: string };
     formatDecisions?: Parameters<typeof buildResourceImportPreview>[0]['formatDecisions'];
+    classificationDecisions?: Parameters<
+      typeof buildResourceImportPreview
+    >[0]['classificationDecisions'];
     duplicateDecisions?: Parameters<typeof buildResourceImportPreview>[0]['duplicateDecisions'];
   } = {},
 ) {
@@ -68,6 +71,7 @@ async function buildPreview(
       unmappedDecisions: {},
       duplicateDecisions: options.duplicateDecisions ?? {},
       formatDecisions: options.formatDecisions ?? {},
+      classificationDecisions: options.classificationDecisions ?? {},
       sourceDecisions: {},
       existingItems,
       categoryValues,
@@ -90,12 +94,32 @@ describe('ResourceImportMutationService', () => {
   it('commits Resources, Resource Format, metadata, and one global Undo/Redo', async () => {
     const preview = await buildPreview(
       [
-        ['resource_id', 'title', 'resource_format', 'source_location', 'usage_notes'],
-        ['RES-1', 'Weather deck', 'Slides', 'Shared Drive / Weather.pptx', 'Use in pairs.'],
+        [
+          'resource_id',
+          'title',
+          'subject',
+          'purpose',
+          'resource_format',
+          'source_location',
+          'usage_notes',
+        ],
+        [
+          'RES-1',
+          'Weather deck',
+          'Chinese Language Arts',
+          'Oral rehearsal',
+          'Slides',
+          'Shared Drive / Weather.pptx',
+          'Use in pairs.',
+        ],
       ],
       {
         defaults: { externalSource: 'District Resource Catalog', sourceReference: 'Guide p. 10' },
-        formatDecisions: { 'resource-format\u0000slides': { action: 'create' } },
+        classificationDecisions: {
+          'subject\u0000chinese language arts': { action: 'create' },
+          'purpose-tag\u0000oral rehearsal': { action: 'create' },
+          'resource-format\u0000slides': { action: 'create' },
+        },
       },
     );
     const service = new ResourceImportMutationService(database, { createId: ids('commit') });
@@ -109,13 +133,27 @@ describe('ResourceImportMutationService', () => {
 
     expect(result.created).toHaveLength(1);
     expect(await database.libraryItems.count()).toBe(1);
-    expect(await database.categoryValues.count()).toBe(1);
-    expect(await database.categoryAssignments.count()).toBe(1);
-    expect(await database.importRuns.get(preview.importRunId)).toMatchObject({
+    expect(await database.categoryValues.count()).toBe(3);
+    expect(await database.categoryAssignments.count()).toBe(3);
+    const importRun = await database.importRuns.get(preview.importRunId);
+    expect(importRun).toMatchObject({
       importType: 'resources',
       sourceKind: 'csv',
       createdCount: 1,
     });
+    const importSummary = JSON.parse(importRun?.summaryJson ?? '{}');
+    expect(importSummary).toMatchObject({
+      createdCategoryValues: 3,
+      createdResourceFormats: 1,
+      restoredResourceFormats: 0,
+    });
+    expect(importSummary.classificationAudit).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ familyId: 'subject', resolution: 'created' }),
+        expect.objectContaining({ familyId: 'purpose-tag', resolution: 'created' }),
+        expect.objectContaining({ familyId: 'resource-format', resolution: 'created' }),
+      ]),
+    );
     expect((await database.libraryItems.toArray())[0]).toMatchObject({
       sourceReference: 'Guide p. 10',
       typedFields: {
@@ -136,8 +174,8 @@ describe('ResourceImportMutationService', () => {
 
     await history.redo();
     expect(await database.libraryItems.count()).toBe(1);
-    expect(await database.categoryValues.count()).toBe(1);
-    expect(await database.categoryAssignments.count()).toBe(1);
+    expect(await database.categoryValues.count()).toBe(3);
+    expect(await database.categoryAssignments.count()).toBe(3);
     expect(await database.importRuns.count()).toBe(1);
   });
 

@@ -13,6 +13,7 @@ import {
   buildResourceImportIdentity,
   buildResourceImportPreview,
   suggestResourceImportMapping,
+  type ResourceClassificationDecisions,
   type ResourceDuplicateDecisions,
   type ResourceFormatDecisions,
   type ResourceSourceDecisions,
@@ -66,6 +67,7 @@ function preview(
     defaults?: { externalSource?: string; sourceReference?: string };
     duplicateDecisions?: ResourceDuplicateDecisions;
     formatDecisions?: ResourceFormatDecisions;
+    classificationDecisions?: ResourceClassificationDecisions;
     sourceDecisions?: ResourceSourceDecisions;
     unmappedDecisions?: UnmappedColumnDecisions;
   } = {},
@@ -79,6 +81,7 @@ function preview(
       unmappedDecisions: options.unmappedDecisions ?? {},
       duplicateDecisions: options.duplicateDecisions ?? {},
       formatDecisions: options.formatDecisions ?? {},
+      classificationDecisions: options.classificationDecisions ?? {},
       sourceDecisions: options.sourceDecisions ?? {},
       existingItems: options.existingItems ?? [],
       categoryValues: options.categoryValues ?? [],
@@ -146,6 +149,61 @@ describe('Resource import model', () => {
       familyId: 'resource-format',
       name: 'Slides',
     });
+  });
+
+  it('resolves shared Resource classification fields into canonical assignments', () => {
+    const result = preview(
+      [
+        [
+          'title',
+          'subject',
+          'grade_level',
+          'language',
+          'language_level',
+          'purpose',
+          'skill',
+          'resource_type',
+        ],
+        [
+          'Conversation cards',
+          'Chinese Language Arts',
+          'Grade 3',
+          'Chinese',
+          'Intermediate',
+          'Oral rehearsal',
+          'Speaking',
+          'Cards',
+        ],
+      ],
+      {
+        classificationDecisions: {
+          'subject\u0000chinese language arts': { action: 'create' },
+          'grade-level\u0000grade 3': { action: 'create' },
+          'language\u0000chinese': { action: 'create' },
+          'language-level\u0000intermediate': { action: 'create' },
+          'purpose-tag\u0000oral rehearsal': { action: 'create' },
+          'focus-tag\u0000speaking': { action: 'create' },
+          'resource-format\u0000cards': { action: 'create' },
+        },
+      },
+    );
+
+    expect(result.rows[0]?.classification).toBe('create');
+    expect(result.rows[0]?.planned?.assignmentsToCreate).toHaveLength(7);
+    const plannedItem = result.rows[0]?.planned?.item;
+    expect(plannedItem).toBeDefined();
+    expect(plannedItem?.tags).toEqual([]);
+    expect(result.newCategoryValues.map((value) => value.familyId)).toEqual(
+      expect.arrayContaining([
+        'subject',
+        'grade-level',
+        'language',
+        'language-level',
+        'purpose-tag',
+        'focus-tag',
+        'resource-format',
+      ]),
+    );
   });
 
   it('uses only external source plus Resource ID for automatic update', () => {

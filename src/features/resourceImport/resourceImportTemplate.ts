@@ -12,7 +12,10 @@ export const resourceImportTemplateHeaders = [
   'Usage Notes',
   'Subject',
   'Grade Level',
+  'Language',
   'Language Level',
+  'Purpose',
+  'Skill',
   'Version / Year',
   'Owner',
   'Last Checked',
@@ -35,7 +38,7 @@ const instructionRows: string[][] = [
     'External Source and Resource ID together form the stable update identity. Title, URL, or file-name equality alone never overwrites an existing Resource.',
   ],
   [
-    'Resource Format is a single controlled value. Unknown, archived, or merged values require an explicit preview decision.',
+    'Subject, Grade Level, Language, Language Level, Resource Format, Purpose, and Skill resolve to controlled classifications. Resource Format accepts one value. Unknown, archived, merged, or ambiguous values require an explicit preview decision.',
   ],
   [
     'Source or Location may be an http/https URL, shared-drive label, binder location, book/page reference, or other teacher-readable location.',
@@ -67,7 +70,10 @@ const exampleRows: Array<Array<string | number>> = [
     'Use during partner speaking practice.',
     'Chinese Language Arts',
     'Grade 3',
+    'Chinese',
     'Intermediate',
+    'Oral rehearsal',
+    'Speaking',
     '2026 demo',
     'Example curriculum team',
     '2026-07-20',
@@ -89,7 +95,10 @@ const exampleRows: Array<Array<string | number>> = [
     'Preview the route before class.',
     'Social Studies',
     'Grade 5',
+    'English',
     '',
+    'Reference',
+    'Map reading',
     '',
     'Example author',
     '2026-07-21',
@@ -103,9 +112,9 @@ const exampleRows: Array<Array<string | number>> = [
   ],
 ];
 
-const widths = [26, 18, 36, 48, 22, 54, 48, 24, 18, 20, 20, 24, 18, 42, 24, 34, 30, 36, 14, 48].map(
-  (wch) => ({ wch }),
-);
+const widths = [
+  26, 18, 36, 48, 22, 54, 48, 24, 18, 18, 20, 22, 22, 20, 24, 18, 42, 24, 34, 30, 36, 14, 48,
+].map((wch) => ({ wch }));
 
 function range(rowCount: number): string {
   return `A1:${XLSX.utils.encode_col(resourceImportTemplateHeaders.length - 1)}${rowCount}`;

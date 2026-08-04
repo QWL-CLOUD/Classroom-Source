@@ -61,8 +61,8 @@ test('Assessment preview is no-write and commits as one reviewed action', async 
     .getByLabel('Paste Assessment rows with one header row')
     .fill(
       [
-        'External Source\tAssessment ID\tTitle\tAssessment Kind\tStudent Prompt',
-        'DEMO Catalog\tDEMO-ASM-101\tFictional quick check\tFormative\tShow a fictional response.',
+        'External Source\tAssessment ID\tTitle\tAssessment Kind\tStudent Prompt\tSubject',
+        'DEMO Catalog\tDEMO-ASM-101\tFictional quick check\tFormative\tShow a fictional response.\tMathematics',
       ].join('\n'),
     );
   await page.getByRole('button', { name: 'Review pasted table' }).click();
@@ -73,6 +73,13 @@ test('Assessment preview is no-write and commits as one reviewed action', async 
     ),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Generate reviewed preview' }).click();
+  await expect(
+    page.getByLabel('Assessment import preview').getByText('Review', { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByLabel('Subject resolution for Mathematics')
+    .selectOption({ label: 'Create “Mathematics”' });
+  await page.getByRole('button', { name: 'Regenerate reviewed preview' }).click();
   await expect(
     page.getByLabel('Assessment import preview').getByText('Create', { exact: true }),
   ).toBeVisible();

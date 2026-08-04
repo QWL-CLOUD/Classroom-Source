@@ -4,7 +4,12 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { classroomDb } from '@/data/db/ClassroomDatabase';
-import { libraryCatalogItemSchema, type LibraryAssessmentKind } from '@/domain/models/entities';
+import {
+  categoryAssignmentSchema,
+  categoryValueSchema,
+  libraryCatalogItemSchema,
+  type LibraryAssessmentKind,
+} from '@/domain/models/entities';
 import {
   assessmentImportFieldKeys,
   assessmentImportFieldLabels,
@@ -24,6 +29,8 @@ import {
 import { assessmentImportMutationService } from '@/features/assessmentImport/assessmentImportMutationService';
 import { downloadAssessmentImportTemplate } from '@/features/assessmentImport/assessmentImportTemplate';
 
+import { ImportClassificationReview } from './ImportClassificationReview';
+import type { ImportClassificationDecisions } from './importClassificationResolution';
 import { ImportMappingTable, type ImportMappingField } from './ImportMappingTable';
 import { ImportPreviewTable, type ImportPreviewColumn } from './ImportPreviewTable';
 import { ImportSourcePanel, type ImportSourcePanelMode } from './ImportSourcePanel';
@@ -129,9 +136,17 @@ function decodeDuplicateDecision(value: string): AssessmentDuplicateDecision | u
 }
 
 export function AssessmentsImportWorkspace() {
-  const existingItems = useLiveQuery(async () => {
-    const items = await classroomDb.libraryItems.toArray();
-    return items.map((value) => libraryCatalogItemSchema.parse(value));
+  const data = useLiveQuery(async () => {
+    const [items, values, assignments] = await Promise.all([
+      classroomDb.libraryItems.toArray(),
+      classroomDb.categoryValues.toArray(),
+      classroomDb.categoryAssignments.where('entityType').equals('library-item').toArray(),
+    ]);
+    return {
+      items: items.map((value) => libraryCatalogItemSchema.parse(value)),
+      categoryValues: values.map((value) => categoryValueSchema.parse(value)),
+      categoryAssignments: assignments.map((value) => categoryAssignmentSchema.parse(value)),
+    };
   }, []);
   const [sourceMode, setSourceMode] = useState<ImportSourcePanelMode>('file');
   const [pastedText, setPastedText] = useState('');
@@ -146,6 +161,8 @@ export function AssessmentsImportWorkspace() {
   const [unmappedDecisions, setUnmappedDecisions] = useState<UnmappedColumnDecisions>({});
   const [duplicateDecisions, setDuplicateDecisions] = useState<AssessmentDuplicateDecisions>({});
   const [kindDecisions, setKindDecisions] = useState<AssessmentKindDecisions>({});
+  const [classificationDecisions, setClassificationDecisions] =
+    useState<ImportClassificationDecisions>({});
   const [preview, setPreview] = useState<AssessmentImportPreview | null>(null);
   const [reviewDirty, setReviewDirty] = useState(false);
   const [confirmUpdates, setConfirmUpdates] = useState(false);
@@ -187,6 +204,7 @@ export function AssessmentsImportWorkspace() {
     setUnmappedDecisions({});
     setDuplicateDecisions({});
     setKindDecisions({});
+    setClassificationDecisions({});
     setPreview(null);
     setReviewDirty(false);
     setConfirmUpdates(false);
@@ -219,6 +237,7 @@ export function AssessmentsImportWorkspace() {
     setUnmappedDecisions({});
     setDuplicateDecisions({});
     setKindDecisions({});
+    setClassificationDecisions({});
     setPreview(null);
     setReviewDirty(false);
   }
@@ -232,7 +251,7 @@ export function AssessmentsImportWorkspace() {
   }
 
   function generatePreview(): void {
-    if (!table || !existingItems) return;
+    if (!table || !data) return;
     setError(null);
     setSuccess(null);
     try {
@@ -244,7 +263,10 @@ export function AssessmentsImportWorkspace() {
           unmappedDecisions,
           duplicateDecisions,
           kindDecisions,
-          existingItems,
+          classificationDecisions,
+          existingItems: data.items,
+          categoryValues: data.categoryValues,
+          categoryAssignments: data.categoryAssignments,
         }),
       );
       setReviewDirty(false);
@@ -286,6 +308,7 @@ export function AssessmentsImportWorkspace() {
 
   const kindReviewRows = preview?.rows.filter((row) => row.kindReview) ?? [];
   const duplicateReviewRows = preview?.rows.filter((row) => row.duplicateReview) ?? [];
+  const classificationReviews = preview?.classificationReviews ?? [];
 
   return (
     <section className={styles.workspace} aria-labelledby="assessment-import-heading">
@@ -506,7 +529,7 @@ export function AssessmentsImportWorkspace() {
             />
           </section>
 
-          {kindReviewRows.length || duplicateReviewRows.length ? (
+          {kindReviewRows.length || duplicateReviewRows.length || classificationReviews.length ? (
             <section
               className={`card ${styles.reviewCard}`}
               aria-labelledby="assessment-decisions-heading"
@@ -576,6 +599,19 @@ export function AssessmentsImportWorkspace() {
                     </select>
                   </label>
                 ))}
+                <ImportClassificationReview
+                  reviews={classificationReviews}
+                  decisions={classificationDecisions}
+                  categoryValues={data?.categoryValues ?? []}
+                  disabled={busy}
+                  onDecision={(key, decision) => {
+                    setClassificationDecisions((current) => ({
+                      ...current,
+                      [key]: decision,
+                    }));
+                    markReviewDirty();
+                  }}
+                />
               </div>
               <button type="button" className="button" onClick={generatePreview}>
                 <Import size={16} aria-hidden="true" /> Regenerate reviewed preview
