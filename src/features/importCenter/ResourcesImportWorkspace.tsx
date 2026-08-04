@@ -17,7 +17,6 @@ import {
   categoryAssignmentSchema,
   categoryValueSchema,
   libraryCatalogItemSchema,
-  type CategoryValue,
 } from '@/domain/models/entities';
 import {
   buildResourceImportPreview,
@@ -28,8 +27,7 @@ import {
   suggestResourceImportMapping,
   type ResourceDuplicateDecision,
   type ResourceDuplicateDecisions,
-  type ResourceFormatDecision,
-  type ResourceFormatDecisions,
+  type ResourceClassificationDecisions,
   type ResourceImportColumnMapping,
   type ResourceImportDefaults,
   type ResourceImportPreview,
@@ -46,6 +44,7 @@ import {
 } from '@/features/resourceImport/resourceImportSourceAdapters';
 import { downloadResourceImportTemplate } from '@/features/resourceImport/resourceImportTemplate';
 
+import { ImportClassificationReview } from './ImportClassificationReview';
 import { ImportMappingTable, type ImportMappingField } from './ImportMappingTable';
 import { ImportPreviewTable, type ImportPreviewColumn } from './ImportPreviewTable';
 import { ImportSourcePanel } from './ImportSourcePanel';
@@ -164,23 +163,6 @@ function decodeDuplicateDecision(value: string): ResourceDuplicateDecision | und
   return undefined;
 }
 
-function encodeFormatDecision(decision: ResourceFormatDecision | undefined): string {
-  if (!decision) return '';
-  if (decision.action === 'create' || decision.action === 'none') return decision.action;
-  return `${decision.action}:${decision.categoryValueId}`;
-}
-
-function decodeFormatDecision(value: string): ResourceFormatDecision | undefined {
-  if (!value) return undefined;
-  if (value === 'create' || value === 'none') return { action: value };
-  const separator = value.indexOf(':');
-  if (separator < 0) return undefined;
-  const action = value.slice(0, separator);
-  const categoryValueId = value.slice(separator + 1);
-  if (action === 'use' || action === 'restore') return { action, categoryValueId };
-  return undefined;
-}
-
 function encodeSourceDecision(decision: ResourceSourceDecision | undefined): string {
   return decision?.action ?? '';
 }
@@ -218,7 +200,8 @@ export function ResourcesImportWorkspace() {
   const [defaults, setDefaults] = useState<ResourceImportDefaults>(emptyDefaults);
   const [unmappedDecisions, setUnmappedDecisions] = useState<UnmappedColumnDecisions>({});
   const [duplicateDecisions, setDuplicateDecisions] = useState<ResourceDuplicateDecisions>({});
-  const [formatDecisions, setFormatDecisions] = useState<ResourceFormatDecisions>({});
+  const [classificationDecisions, setClassificationDecisions] =
+    useState<ResourceClassificationDecisions>({});
   const [sourceDecisions, setSourceDecisions] = useState<ResourceSourceDecisions>({});
   const [preview, setPreview] = useState<ResourceImportPreview | null>(null);
   const [reviewDirty, setReviewDirty] = useState(false);
@@ -257,7 +240,7 @@ export function ResourcesImportWorkspace() {
     setMapping(createEmptyResourceImportMapping());
     setUnmappedDecisions({});
     setDuplicateDecisions({});
-    setFormatDecisions({});
+    setClassificationDecisions({});
     setSourceDecisions({});
     invalidatePreview();
   }
@@ -277,7 +260,7 @@ export function ResourcesImportWorkspace() {
     setMapping(suggestResourceImportMapping(nextTable.headers));
     setUnmappedDecisions({});
     setDuplicateDecisions({});
-    setFormatDecisions({});
+    setClassificationDecisions({});
     setSourceDecisions({});
     invalidatePreview();
   }
@@ -356,7 +339,8 @@ export function ResourcesImportWorkspace() {
           defaults,
           unmappedDecisions,
           duplicateDecisions,
-          formatDecisions,
+          formatDecisions: {},
+          classificationDecisions,
           sourceDecisions,
           existingItems: data.items,
           categoryValues: data.categoryValues,
@@ -400,7 +384,7 @@ export function ResourcesImportWorkspace() {
 
   const duplicateReviewRows = preview?.rows.filter((row) => row.duplicateReview) ?? [];
   const sourceReviewRows = preview?.rows.filter((row) => row.sourceReview) ?? [];
-  const formatReviews = preview?.formatReviews ?? [];
+  const classificationReviews = preview?.classificationReviews ?? [];
 
   return (
     <section className={styles.workspace} aria-labelledby="resources-import-title">
@@ -811,13 +795,13 @@ export function ResourcesImportWorkspace() {
             rowKey={(row) => `${row.sourceRow}-${row.normalized.title}`}
           />
 
-          {duplicateReviewRows.length || formatReviews.length || sourceReviewRows.length ? (
+          {duplicateReviewRows.length || classificationReviews.length || sourceReviewRows.length ? (
             <section className={styles.reviewCard} aria-labelledby="resource-decisions-heading">
               <div className={styles.sectionHeading}>
                 <div>
                   <p className="page-eyebrow">Explicit decisions</p>
                   <h3 id="resource-decisions-heading">
-                    Resolve duplicates, URLs, and Resource Formats
+                    Resolve duplicates, URLs, and controlled classifications
                   </h3>
                 </div>
                 {reviewDirty ? (
@@ -902,64 +886,20 @@ export function ResourcesImportWorkspace() {
                   </label>
                 ))}
 
-                {formatReviews.map((review) => {
-                  const activeValues = (data?.categoryValues ?? [])
-                    .filter(
-                      (value) =>
-                        value.familyId === 'resource-format' && value.lifecycleState === 'active',
-                    )
-                    .sort(
-                      (first, second) =>
-                        first.sortOrder - second.sortOrder || first.name.localeCompare(second.name),
-                    );
-                  return (
-                    <label key={review.key}>
-                      <span>
-                        Resource Format: {review.displayValue}
-                        <small>
-                          {review.kind === 'unknown'
-                            ? 'Unknown controlled value'
-                            : review.kind === 'archived'
-                              ? 'Archived controlled value'
-                              : 'Merged controlled value'}
-                        </small>
-                      </span>
-                      <select
-                        value={encodeFormatDecision(formatDecisions[review.key])}
-                        disabled={busy}
-                        onChange={(event) => {
-                          setFormatDecisions((current) => ({
-                            ...current,
-                            [review.key]: decodeFormatDecision(event.target.value),
-                          }));
-                          setReviewDirty(true);
-                          setConfirmCommit(false);
-                        }}
-                      >
-                        <option value="">Decision required</option>
-                        {review.replacementValue?.lifecycleState === 'active' ? (
-                          <option value={`use:${review.replacementValue.id}`}>
-                            Use merged replacement “{review.replacementValue.name}”
-                          </option>
-                        ) : null}
-                        {review.matchedValue?.lifecycleState === 'archived' ? (
-                          <option value={`restore:${review.matchedValue.id}`}>
-                            Restore and use “{review.matchedValue.name}”
-                          </option>
-                        ) : null}
-                        {activeValues.map((value: CategoryValue) => (
-                          <option key={value.id} value={`use:${value.id}`}>
-                            Use existing “{value.name}”
-                          </option>
-                        ))}
-                        {review.kind === 'unknown' ? (
-                          <option value="create">Create reviewed Resource Format</option>
-                        ) : null}
-                        <option value="none">Keep no new format — confirmed</option>
-                      </select>
-                    </label>
-                  );
-                })}
+                <ImportClassificationReview
+                  reviews={classificationReviews}
+                  decisions={classificationDecisions}
+                  categoryValues={data?.categoryValues ?? []}
+                  disabled={busy}
+                  onDecision={(key, decision) => {
+                    setClassificationDecisions((current) => ({
+                      ...current,
+                      [key]: decision,
+                    }));
+                    setReviewDirty(true);
+                    setConfirmCommit(false);
+                  }}
+                />
               </div>
               <div className={styles.reviewActions}>
                 <button className="button" type="button" disabled={busy} onClick={generatePreview}>

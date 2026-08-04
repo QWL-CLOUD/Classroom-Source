@@ -1,9 +1,7 @@
 import {
   categoryAssignmentSchema,
-  categoryValueSchema,
   libraryCatalogItemSchema,
   type CategoryAssignment,
-  type CategoryFamilyId,
   type CategoryValue,
   type LibraryActivityFields,
   type LibraryActivityGrouping,
@@ -17,6 +15,14 @@ import {
   type ImportPreview,
   type ImportPreviewRow,
 } from '@/features/importCenter/importPreviewModel';
+import {
+  createImportClassificationResolutionSession,
+  planImportClassificationAssignments,
+  type ImportClassificationAuditRecord,
+  type ImportClassificationDecision,
+  type ImportClassificationDecisions,
+  type ImportClassificationReview,
+} from '@/features/importCenter/importClassificationResolution';
 import {
   createEmptyImportColumnMapping,
   mappedImportValue,
@@ -39,6 +45,7 @@ export const activityImportFieldKeys = [
   'subject',
   'skill',
   'gradeLevel',
+  'language',
   'languageLevel',
   'durationMinutes',
   'grouping',
@@ -68,6 +75,7 @@ export const activityImportFieldLabels: Record<ActivityImportFieldKey, string> =
   subject: 'Subject',
   skill: 'Skill / focus',
   gradeLevel: 'Grade level',
+  language: 'Language',
   languageLevel: 'Language level',
   durationMinutes: 'Duration minutes',
   grouping: 'Grouping',
@@ -94,6 +102,7 @@ const aliases: ImportHeaderAliases<ActivityImportFieldKey> = {
   subject: ['subject', 'subjects', 'contentarea'],
   skill: ['skill', 'skills', 'focus', 'focustag', 'focustags'],
   gradeLevel: ['gradelevel', 'grade', 'grades'],
+  language: ['language', 'languages', 'instructionallanguage', 'targetlanguage'],
   languageLevel: ['languagelevel', 'proficiencylevel', 'clalevel'],
   durationMinutes: ['durationminutes', 'duration', 'minutes', 'estimatedminutes'],
   grouping: ['grouping', 'group', 'groupingtype'],
@@ -168,14 +177,8 @@ export type ActivityDuplicateDecision =
 
 export type ActivityDuplicateDecisions = Record<number, ActivityDuplicateDecision | undefined>;
 
-export type ActivityCategoryDecision =
-  | { action: 'use'; categoryValueId: string }
-  | { action: 'restore'; categoryValueId: string }
-  | { action: 'create' }
-  | { action: 'generic-tag' }
-  | { action: 'ignore' };
-
-export type ActivityCategoryDecisions = Record<string, ActivityCategoryDecision | undefined>;
+export type ActivityCategoryDecision = ImportClassificationDecision;
+export type ActivityCategoryDecisions = ImportClassificationDecisions;
 
 export interface ActivityDuplicateCandidate {
   id: string;
@@ -192,15 +195,7 @@ export interface ActivityDuplicateReview {
   candidates: ActivityDuplicateCandidate[];
 }
 
-export interface ActivityCategoryReview {
-  key: string;
-  familyId: Extract<CategoryFamilyId, 'purpose-tag' | 'focus-tag'>;
-  displayValue: string;
-  normalizedValue: string;
-  kind: 'unknown' | 'archived' | 'merged';
-  matchedValue?: CategoryValue;
-  replacementValue?: CategoryValue;
-}
+export type ActivityCategoryReview = ImportClassificationReview;
 
 export interface NormalizedActivityImportRow {
   sourceRow: number;
@@ -215,6 +210,7 @@ export interface NormalizedActivityImportRow {
   focusValues: string[];
   subject?: string;
   gradeLevel?: string;
+  language?: string;
   languageLevel?: string;
   durationMinutes?: number;
   grouping?: LibraryActivityGrouping;
@@ -242,6 +238,7 @@ export interface PlannedActivityImportRow {
   item?: LibraryCatalogItem;
   existingItem?: LibraryCatalogItem;
   expectedAssignments: CategoryAssignment[];
+  assignmentsToDelete: CategoryAssignment[];
   assignmentsToCreate: PlannedActivityCategoryAssignment[];
   categoryValueIds: string[];
   duplicateReview?: ActivityDuplicateReview;
@@ -265,6 +262,8 @@ export interface ActivityImportPreview extends Omit<
   restoredCategoryValues: Array<{ before: CategoryValue; after: CategoryValue }>;
   expectedCategoryValues: CategoryValue[];
   categoryReviews: ActivityCategoryReview[];
+  classificationReviews: ImportClassificationReview[];
+  classificationAudit: ImportClassificationAuditRecord[];
 }
 
 export interface BuildActivityImportPreviewInput {
@@ -430,7 +429,6 @@ function normalizeRow(
   const importedNotes = optional(valueFor(row, mapping, 'notes'));
   const notes = composeNotes(
     [
-      ['Activity type', activityType],
       ['Preparation', preparation],
       ['Teacher language', teacherLanguage],
       ['Differentiation', differentiation],
@@ -443,12 +441,10 @@ function normalizeRow(
 
   const subject = optional(valueFor(row, mapping, 'subject'));
   const gradeLevel = optional(valueFor(row, mapping, 'gradeLevel'));
+  const language = optional(valueFor(row, mapping, 'language'));
   const languageLevel = optional(valueFor(row, mapping, 'languageLevel'));
   const tagMap = new Map<string, string>();
   for (const tag of splitTags(valueFor(row, mapping, 'tags'))) addUniqueTag(tagMap, tag);
-  if (subject) addUniqueTag(tagMap, `Subject: ${subject}`);
-  if (gradeLevel) addUniqueTag(tagMap, `Grade: ${gradeLevel}`);
-  if (languageLevel) addUniqueTag(tagMap, `Language level: ${languageLevel}`);
 
   const presentFields = activityImportFieldKeys.filter((key) => mapping[key] !== null);
   if (!title) validationErrors.push('Title is required.');
@@ -496,6 +492,7 @@ function normalizeRow(
     focusValues: splitControlledValues(valueFor(row, mapping, 'skill')),
     subject,
     gradeLevel,
+    language,
     languageLevel,
     durationMinutes: duration.value,
     grouping: grouping.value,
@@ -549,13 +546,6 @@ function compareAssignment(first: CategoryAssignment, second: CategoryAssignment
   return first.id.localeCompare(second.id);
 }
 
-function categoryReviewKey(
-  familyId: Extract<CategoryFamilyId, 'purpose-tag' | 'focus-tag'>,
-  displayValue: string,
-): string {
-  return `${familyId}\u0000${normalizeCategoryName(displayValue)}`;
-}
-
 function duplicateCandidate(
   item: LibraryCatalogItem,
   match: ActivityDuplicateCandidate['match'],
@@ -607,32 +597,37 @@ export function buildActivityImportPreview(
   }
   const assignmentsByItem = new Map<string, CategoryAssignment[]>();
   for (const assignment of input.categoryAssignments) {
-    if (
-      assignment.entityType !== 'library-item' ||
-      !['purpose-tag', 'focus-tag'].includes(assignment.familyId)
-    ) {
-      continue;
-    }
+    if (assignment.entityType !== 'library-item') continue;
     const values = assignmentsByItem.get(assignment.entityId) ?? [];
     values.push(categoryAssignmentSchema.parse(assignment));
     assignmentsByItem.set(assignment.entityId, values);
   }
 
-  const values = input.categoryValues.map((value) => categoryValueSchema.parse(value));
-  const valueById = new Map(values.map((value) => [value.id, value] as const));
-  const valuesByFamily = new Map<CategoryFamilyId, CategoryValue[]>();
-  for (const value of values) {
-    const group = valuesByFamily.get(value.familyId) ?? [];
-    group.push(value);
-    valuesByFamily.set(value.familyId, group);
-  }
-  const nextSortOrder = new Map<CategoryFamilyId, number>();
-  for (const familyId of ['purpose-tag', 'focus-tag'] as const) {
-    nextSortOrder.set(
-      familyId,
-      Math.max(-1, ...(valuesByFamily.get(familyId) ?? []).map((value) => value.sortOrder)) + 1,
+  const classificationSession = createImportClassificationResolutionSession({
+    catalogType: 'activity',
+    categoryValues: input.categoryValues,
+    decisions: input.categoryDecisions,
+    createId,
+    generatedAt,
+  });
+  const applicableFamilyIds = classificationSession.applicableFamilyIds;
+  for (const [entityId, assignments] of assignmentsByItem) {
+    assignmentsByItem.set(
+      entityId,
+      assignments
+        .filter((assignment) => applicableFamilyIds.includes(assignment.familyId))
+        .sort(compareAssignment),
     );
   }
+  const presentFamilyIds = [
+    ...(input.mapping.subject !== null ? (['subject'] as const) : []),
+    ...(input.mapping.gradeLevel !== null ? (['grade-level'] as const) : []),
+    ...(input.mapping.language !== null ? (['language'] as const) : []),
+    ...(input.mapping.languageLevel !== null ? (['language-level'] as const) : []),
+    ...(input.mapping.activityType !== null ? (['activity-type'] as const) : []),
+    ...(input.mapping.purpose !== null ? (['purpose-tag'] as const) : []),
+    ...(input.mapping.skill !== null ? (['focus-tag'] as const) : []),
+  ];
 
   const normalizedRows = input.table.rows.map((row) =>
     normalizeRow(row, input.table, input.mapping, input.defaults, input.unmappedDecisions),
@@ -656,132 +651,6 @@ export function buildActivityImportPreview(
     } else {
       for (const row of group.slice(1)) repeatedIdentityRows.add(row.sourceRow);
     }
-  }
-
-  const newCategoryByKey = new Map<string, CategoryValue>();
-  const restoredCategoryById = new Map<string, { before: CategoryValue; after: CategoryValue }>();
-  const expectedCategoryById = new Map<string, CategoryValue>();
-  const categoryReviewsByKey = new Map<string, ActivityCategoryReview>();
-
-  function resolveCategories(
-    familyId: Extract<CategoryFamilyId, 'purpose-tag' | 'focus-tag'>,
-    displays: readonly string[],
-  ): {
-    ids: string[];
-    genericTags: string[];
-    reviews: ActivityCategoryReview[];
-    reasons: string[];
-  } {
-    const ids: string[] = [];
-    const genericTags: string[] = [];
-    const reviews: ActivityCategoryReview[] = [];
-    const reasons: string[] = [];
-    const familyValues = valuesByFamily.get(familyId) ?? [];
-
-    for (const displayValue of displays) {
-      const normalizedValue = normalizeCategoryName(displayValue);
-      const exact = familyValues.find((value) => value.normalizedName === normalizedValue);
-      const alias = familyValues.find((value) => value.normalizedAliases.includes(normalizedValue));
-      const matched = exact ?? alias;
-      if (matched?.lifecycleState === 'active') {
-        ids.push(matched.id);
-        expectedCategoryById.set(matched.id, matched);
-        continue;
-      }
-      const replacement =
-        matched?.lifecycleState === 'merged' && matched.mergedIntoId
-          ? valueById.get(matched.mergedIntoId)
-          : undefined;
-      const key = categoryReviewKey(familyId, displayValue);
-      const review: ActivityCategoryReview = {
-        key,
-        familyId,
-        displayValue,
-        normalizedValue,
-        kind:
-          matched?.lifecycleState === 'archived'
-            ? 'archived'
-            : matched?.lifecycleState === 'merged'
-              ? 'merged'
-              : 'unknown',
-        matchedValue: matched,
-        replacementValue: replacement,
-      };
-      categoryReviewsByKey.set(key, review);
-      const decision = input.categoryDecisions[key];
-      if (!decision) {
-        reviews.push(review);
-        reasons.push(
-          `Review ${familyId === 'purpose-tag' ? 'Purpose' : 'Focus'} value “${displayValue}”.`,
-        );
-        continue;
-      }
-      if (decision.action === 'ignore') continue;
-      if (decision.action === 'generic-tag') {
-        genericTags.push(`${familyId === 'purpose-tag' ? 'Purpose' : 'Focus'}: ${displayValue}`);
-        continue;
-      }
-      if (decision.action === 'create') {
-        let created = newCategoryByKey.get(key);
-        if (!created) {
-          const sortOrder = nextSortOrder.get(familyId) ?? 0;
-          nextSortOrder.set(familyId, sortOrder + 1);
-          created = categoryValueSchema.parse({
-            id: createId(),
-            familyId,
-            name: displayValue,
-            normalizedName: normalizedValue,
-            aliases: [],
-            normalizedAliases: [],
-            sortOrder,
-            isDefault: false,
-            lifecycleState: 'active',
-            createdAt: generatedAt,
-            updatedAt: generatedAt,
-          });
-          newCategoryByKey.set(key, created);
-        }
-        ids.push(created.id);
-        continue;
-      }
-      const selected = valueById.get(decision.categoryValueId);
-      if (!selected || selected.familyId !== familyId) {
-        reviews.push(review);
-        reasons.push(`The selected category resolution for “${displayValue}” is no longer valid.`);
-        continue;
-      }
-      if (decision.action === 'use') {
-        if (selected.lifecycleState !== 'active') {
-          reviews.push(review);
-          reasons.push(`The selected category “${selected.name}” is not active.`);
-          continue;
-        }
-        ids.push(selected.id);
-        expectedCategoryById.set(selected.id, selected);
-        continue;
-      }
-      if (selected.lifecycleState !== 'archived') {
-        reviews.push(review);
-        reasons.push(`Only an archived category can be restored for “${displayValue}”.`);
-        continue;
-      }
-      let restored = restoredCategoryById.get(selected.id);
-      if (!restored) {
-        restored = {
-          before: selected,
-          after: categoryValueSchema.parse({
-            ...selected,
-            lifecycleState: 'active',
-            archivedAt: undefined,
-            updatedAt: generatedAt,
-          }),
-        };
-        restoredCategoryById.set(selected.id, restored);
-      }
-      ids.push(selected.id);
-      expectedCategoryById.set(selected.id, selected);
-    }
-    return { ids: [...new Set(ids)], genericTags, reviews, reasons };
   }
 
   const rows: ActivityImportPreviewRow[] = [];
@@ -869,6 +738,7 @@ export function buildActivityImportPreview(
             expectedAssignments: exactIdentity
               ? [...(assignmentsByItem.get(exactIdentity.id) ?? [])].sort(compareAssignment)
               : [],
+            assignmentsToDelete: [],
             assignmentsToCreate: [],
             categoryValueIds: [],
             duplicateReview,
@@ -962,14 +832,36 @@ export function buildActivityImportPreview(
       continue;
     }
 
-    const purpose = resolveCategories('purpose-tag', normalized.purposeValues);
-    const focus = resolveCategories('focus-tag', normalized.focusValues);
-    const categoryReviews = [...purpose.reviews, ...focus.reviews];
+    const classification = classificationSession.resolveRow({
+      sourceRow: normalized.sourceRow,
+      values: {
+        subject: normalized.subject,
+        'grade-level': normalized.gradeLevel,
+        language: normalized.language,
+        'language-level': normalized.languageLevel,
+        'activity-type': normalized.activityType,
+        'purpose-tag': normalized.purposeValues.join('; '),
+        'focus-tag': normalized.focusValues.join('; '),
+      },
+      presentFamilyIds,
+    });
+    if (classification.blockingReasons.length > 0) {
+      rows.push({
+        sourceRow: normalized.sourceRow,
+        classification: 'blocked',
+        reasons: classification.blockingReasons,
+        normalized,
+        duplicateReview,
+        categoryReviews: [],
+      });
+      continue;
+    }
+    const categoryReviews = classification.reviews;
     if (categoryReviews.length > 0) {
       rows.push({
         sourceRow: normalized.sourceRow,
         classification: 'review',
-        reasons: [...purpose.reasons, ...focus.reasons],
+        reasons: classification.reviewReasons,
         normalized,
         duplicateReview,
         categoryReviews,
@@ -979,6 +871,7 @@ export function buildActivityImportPreview(
           expectedAssignments: target
             ? [...(assignmentsByItem.get(target.id) ?? [])].sort(compareAssignment)
             : [],
+          assignmentsToDelete: [],
           assignmentsToCreate: [],
           categoryValueIds: [],
           duplicateReview,
@@ -991,8 +884,7 @@ export function buildActivityImportPreview(
     const existingTags = new Map<string, string>();
     for (const tag of target?.tags ?? []) addUniqueTag(existingTags, tag);
     for (const tag of normalized.tags) addUniqueTag(existingTags, tag);
-    for (const tag of [...purpose.genericTags, ...focus.genericTags])
-      addUniqueTag(existingTags, tag);
+    for (const tag of classification.genericTags) addUniqueTag(existingTags, tag);
     const mergedTags = [...existingTags.values()];
     if (mergedTags.length > 30 || mergedTags.some((tag) => tag.length > 80)) {
       rows.push({
@@ -1055,41 +947,29 @@ export function buildActivityImportPreview(
       archivedAt: status === 'archived' ? (target?.archivedAt ?? generatedAt) : undefined,
     });
 
-    const desiredCategoryIds = [...new Set([...purpose.ids, ...focus.ids])];
-    const expectedAssignments = target
-      ? [...(assignmentsByItem.get(target.id) ?? [])].sort(compareAssignment)
-      : [];
-    const existingCategoryIds = new Set(
-      expectedAssignments.map((assignment) => assignment.categoryValueId),
-    );
-    const assignmentsToCreate = desiredCategoryIds
-      .filter((categoryValueId) => !existingCategoryIds.has(categoryValueId))
-      .map((categoryValueId) => {
-        const value =
-          valueById.get(categoryValueId) ??
-          [...newCategoryByKey.values()].find((candidate) => candidate.id === categoryValueId) ??
-          restoredCategoryById.get(categoryValueId)?.after;
-        if (!value) throw new Error('A reviewed Activity category value could not be resolved.');
-        return {
-          record: categoryAssignmentSchema.parse({
-            id: createId(),
-            familyId: value.familyId,
-            categoryValueId,
-            entityType: 'library-item',
-            entityId: itemId,
-            createdAt: generatedAt,
-          }),
-        };
-      });
+    const assignmentPlan = planImportClassificationAssignments({
+      entityId: itemId,
+      existingAssignments: target ? (assignmentsByItem.get(target.id) ?? []) : [],
+      resolution: classification,
+      applicableFamilyIds,
+      createId,
+      generatedAt,
+    });
+    const desiredCategoryIds = assignmentPlan.desiredCategoryValueIds;
+    const expectedAssignments = assignmentPlan.expectedAssignments;
+    const assignmentsToDelete = assignmentPlan.assignmentsToDelete;
+    const assignmentsToCreate = assignmentPlan.assignmentsToCreate.map((record) => ({ record }));
 
     const itemChanged = !target || !sameRecord(withoutRun, target);
+    const currentClassificationSnapshot = classificationSession.snapshot();
+    const lifecycleIds = new Set([
+      ...currentClassificationSnapshot.newCategoryValues.map((value) => value.id),
+      ...currentClassificationSnapshot.restoredCategoryValues.map((value) => value.after.id),
+    ]);
     const hasCategoryChanges =
+      assignmentsToDelete.length > 0 ||
       assignmentsToCreate.length > 0 ||
-      desiredCategoryIds.some(
-        (categoryValueId) =>
-          restoredCategoryById.has(categoryValueId) ||
-          [...newCategoryByKey.values()].some((value) => value.id === categoryValueId),
-      );
+      desiredCategoryIds.some((categoryValueId) => lifecycleIds.has(categoryValueId));
     if (target && !itemChanged && !hasCategoryChanges) {
       rows.push({
         sourceRow: normalized.sourceRow,
@@ -1102,6 +982,7 @@ export function buildActivityImportPreview(
           normalized,
           existingItem: target,
           expectedAssignments,
+          assignmentsToDelete: [],
           assignmentsToCreate: [],
           categoryValueIds: desiredCategoryIds,
           duplicateReview,
@@ -1119,8 +1000,10 @@ export function buildActivityImportPreview(
         target
           ? 'The reviewed stable identity or explicit duplicate decision updates this Activity.'
           : 'No strong existing identity was selected; create a new Activity.',
-        ...(assignmentsToCreate.length > 0
-          ? [`Add ${assignmentsToCreate.length} reviewed Purpose/Focus assignment(s).`]
+        ...(assignmentsToDelete.length + assignmentsToCreate.length > 0
+          ? [
+              `Apply ${assignmentsToDelete.length + assignmentsToCreate.length} reviewed classification assignment change(s).`,
+            ]
           : []),
       ],
       normalized,
@@ -1131,6 +1014,7 @@ export function buildActivityImportPreview(
         item,
         existingItem: target,
         expectedAssignments,
+        assignmentsToDelete,
         assignmentsToCreate,
         categoryValueIds: desiredCategoryIds,
         duplicateReview,
@@ -1157,6 +1041,7 @@ export function buildActivityImportPreview(
     generatedAt,
   );
 
+  const classificationSnapshot = classificationSession.snapshot();
   return {
     ...genericPreview,
     importRunId,
@@ -1165,9 +1050,11 @@ export function buildActivityImportPreview(
       externalSource: optional(normalizeImportText(input.defaults.externalSource ?? '')),
       sourceReference: optional(normalizeImportText(input.defaults.sourceReference ?? '')),
     },
-    newCategoryValues: [...newCategoryByKey.values()],
-    restoredCategoryValues: [...restoredCategoryById.values()],
-    expectedCategoryValues: [...expectedCategoryById.values()],
-    categoryReviews: [...categoryReviewsByKey.values()],
+    newCategoryValues: classificationSnapshot.newCategoryValues,
+    restoredCategoryValues: classificationSnapshot.restoredCategoryValues,
+    expectedCategoryValues: classificationSnapshot.expectedCategoryValues,
+    categoryReviews: classificationSnapshot.classificationReviews,
+    classificationReviews: classificationSnapshot.classificationReviews,
+    classificationAudit: classificationSnapshot.classificationAudit,
   };
 }

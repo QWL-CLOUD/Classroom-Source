@@ -130,8 +130,8 @@ test('Resources pasted-table preview is no-write, commits format atomically, and
       resourceRuns: 0,
     });
   await page
-    .getByLabel(/Resource Format: Slides/)
-    .selectOption({ label: 'Create reviewed Resource Format' });
+    .getByLabel('Resource Format resolution for Slides')
+    .selectOption({ label: 'Create “Slides”' });
   await page.getByRole('button', { name: 'Apply decisions and regenerate preview' }).click();
   await page.getByLabel(/Commit Resources, status, tags/).check();
   await page.getByRole('button', { name: 'Commit reviewed Resources' }).click();
@@ -188,8 +188,8 @@ test('Resources URL source remains local, requires reviewed format, and renders 
   await page.getByRole('button', { name: 'Generate reviewed preview' }).click();
   expect(externalRequests).toEqual([]);
   await page
-    .getByLabel(/Resource Format: URL/)
-    .selectOption({ label: 'Create reviewed Resource Format' });
+    .getByLabel('Resource Format resolution for URL')
+    .selectOption({ label: 'Create “URL”' });
   await page.getByRole('button', { name: 'Apply decisions and regenerate preview' }).click();
   await page.getByLabel(/Commit Resources, status, tags/).check();
   await page.getByRole('button', { name: 'Commit reviewed Resources' }).click();
@@ -219,8 +219,8 @@ test('Resources local-file flow stores metadata only and never file contents', a
   await page.getByRole('button', { name: 'Review file metadata rows' }).click();
   await page.getByRole('button', { name: 'Generate reviewed preview' }).click();
   await page
-    .getByLabel(/Resource Format: Slides/)
-    .selectOption({ label: 'Create reviewed Resource Format' });
+    .getByLabel('Resource Format resolution for Slides')
+    .selectOption({ label: 'Create “Slides”' });
   await page.getByRole('button', { name: 'Apply decisions and regenerate preview' }).click();
   await page.getByLabel(/Commit Resources, status, tags/).check();
   await page.getByRole('button', { name: 'Commit reviewed Resources' }).click();

@@ -8,7 +8,6 @@ import {
   categoryAssignmentSchema,
   categoryValueSchema,
   libraryCatalogItemSchema,
-  type CategoryValue,
 } from '@/domain/models/entities';
 import {
   activityImportFieldKeys,
@@ -17,7 +16,6 @@ import {
   createEmptyActivityImportMapping,
   listReviewableUnmappedColumns,
   suggestActivityImportMapping,
-  type ActivityCategoryDecision,
   type ActivityCategoryDecisions,
   type ActivityDuplicateDecision,
   type ActivityDuplicateDecisions,
@@ -30,6 +28,7 @@ import {
 import { downloadActivityImportTemplate } from '@/features/activityImport/activityImportTemplate';
 import { activityImportMutationService } from '@/features/activityImport/activityImportMutationService';
 
+import { ImportClassificationReview } from './ImportClassificationReview';
 import { ImportMappingTable, type ImportMappingField } from './ImportMappingTable';
 import { ImportPreviewTable, type ImportPreviewColumn } from './ImportPreviewTable';
 import { ImportSourcePanel, type ImportSourcePanelMode } from './ImportSourcePanel';
@@ -142,31 +141,6 @@ function decodeDuplicateDecision(value: string): ActivityDuplicateDecision | und
   if (action === 'update' || action === 'update-archived' || action === 'restore-update') {
     return { action, targetId };
   }
-  return undefined;
-}
-
-function encodeCategoryDecision(decision: ActivityCategoryDecision | undefined): string {
-  if (!decision) return '';
-  if (
-    decision.action === 'create' ||
-    decision.action === 'generic-tag' ||
-    decision.action === 'ignore'
-  ) {
-    return decision.action;
-  }
-  return `${decision.action}:${decision.categoryValueId}`;
-}
-
-function decodeCategoryDecision(value: string): ActivityCategoryDecision | undefined {
-  if (!value) return undefined;
-  if (value === 'create' || value === 'generic-tag' || value === 'ignore') {
-    return { action: value };
-  }
-  const separator = value.indexOf(':');
-  if (separator < 0) return undefined;
-  const action = value.slice(0, separator);
-  const categoryValueId = value.slice(separator + 1);
-  if (action === 'use' || action === 'restore') return { action, categoryValueId };
   return undefined;
 }
 
@@ -631,64 +605,20 @@ export function ActivitiesImportWorkspace() {
                   );
                 })}
 
-                {categoryReviews.map((review) => {
-                  const activeValues = (data?.categoryValues ?? [])
-                    .filter(
-                      (value) =>
-                        value.familyId === review.familyId && value.lifecycleState === 'active',
-                    )
-                    .sort(
-                      (first, second) =>
-                        first.sortOrder - second.sortOrder || first.name.localeCompare(second.name),
-                    );
-                  return (
-                    <label key={review.key}>
-                      <span>
-                        {review.familyId === 'purpose-tag' ? 'Purpose' : 'Focus'}:{' '}
-                        {review.displayValue}
-                        <small>
-                          {review.kind === 'unknown'
-                            ? 'Unknown controlled value'
-                            : review.kind === 'archived'
-                              ? 'Archived controlled value'
-                              : 'Merged controlled value'}
-                        </small>
-                      </span>
-                      <select
-                        value={encodeCategoryDecision(categoryDecisions[review.key])}
-                        disabled={busy}
-                        onChange={(event) => {
-                          setCategoryDecisions((current) => ({
-                            ...current,
-                            [review.key]: decodeCategoryDecision(event.target.value),
-                          }));
-                          setReviewDirty(true);
-                          setConfirmCommit(false);
-                        }}
-                      >
-                        <option value="">Decision required</option>
-                        {review.replacementValue?.lifecycleState === 'active' ? (
-                          <option value={`use:${review.replacementValue.id}`}>
-                            Use merged replacement “{review.replacementValue.name}”
-                          </option>
-                        ) : null}
-                        {review.matchedValue?.lifecycleState === 'archived' ? (
-                          <option value={`restore:${review.matchedValue.id}`}>
-                            Restore and use “{review.matchedValue.name}”
-                          </option>
-                        ) : null}
-                        {activeValues.map((value: CategoryValue) => (
-                          <option key={value.id} value={`use:${value.id}`}>
-                            Use existing “{value.name}”
-                          </option>
-                        ))}
-                        <option value="create">Create reviewed controlled value</option>
-                        <option value="generic-tag">Keep as a generic searchable tag</option>
-                        <option value="ignore">Ignore this value — confirmed</option>
-                      </select>
-                    </label>
-                  );
-                })}
+                <ImportClassificationReview
+                  reviews={categoryReviews}
+                  decisions={categoryDecisions}
+                  categoryValues={data?.categoryValues ?? []}
+                  disabled={busy}
+                  onDecision={(key, decision) => {
+                    setCategoryDecisions((current) => ({
+                      ...current,
+                      [key]: decision,
+                    }));
+                    setReviewDirty(true);
+                    setConfirmCommit(false);
+                  }}
+                />
               </div>
               <div className={styles.reviewActions}>
                 <button className="button" type="button" disabled={busy} onClick={generatePreview}>

@@ -1,5 +1,8 @@
 import {
+  categoryAssignmentSchema,
   libraryCatalogItemSchema,
+  type CategoryAssignment,
+  type CategoryValue,
   type LibraryAssessmentFields,
   type LibraryAssessmentKind,
   type LibraryCatalogItem,
@@ -11,6 +14,13 @@ import {
   type ImportPreview,
   type ImportPreviewRow,
 } from '@/features/importCenter/importPreviewModel';
+import {
+  createImportClassificationResolutionSession,
+  planImportClassificationAssignments,
+  type ImportClassificationAuditRecord,
+  type ImportClassificationDecisions,
+  type ImportClassificationReview,
+} from '@/features/importCenter/importClassificationResolution';
 import {
   createEmptyImportColumnMapping,
   mappedImportValue,
@@ -33,7 +43,10 @@ export const assessmentImportFieldKeys = [
   'evidenceToCollect',
   'subject',
   'gradeLevel',
+  'language',
   'languageLevel',
+  'purpose',
+  'skill',
   'relatedUnit',
   'tags',
   'externalSource',
@@ -54,7 +67,10 @@ export const assessmentImportFieldLabels: Record<AssessmentImportFieldKey, strin
   evidenceToCollect: 'Evidence to collect',
   subject: 'Subject',
   gradeLevel: 'Grade level',
+  language: 'Language',
   languageLevel: 'Language level',
+  purpose: 'Purpose',
+  skill: 'Skill / focus',
   relatedUnit: 'Related unit',
   tags: 'Tags',
   externalSource: 'External source namespace',
@@ -66,7 +82,7 @@ export const assessmentImportFieldLabels: Record<AssessmentImportFieldKey, strin
 const aliases: ImportHeaderAliases<AssessmentImportFieldKey> = {
   externalKey: ['assessmentid', 'externalkey', 'assessmentkey', 'catalogid', 'id'],
   title: ['title', 'assessment', 'assessmentname', 'name'],
-  description: ['description', 'purpose', 'overview'],
+  description: ['description', 'overview'],
   assessmentKind: ['assessmentkind', 'assessmenttype', 'kind', 'type'],
   studentPrompt: ['studentprompt', 'prompt', 'question', 'task', 'instructions', 'directions'],
   evidenceToCollect: [
@@ -78,7 +94,10 @@ const aliases: ImportHeaderAliases<AssessmentImportFieldKey> = {
   ],
   subject: ['subject', 'domain', 'contentarea'],
   gradeLevel: ['gradelevel', 'grade'],
+  language: ['language', 'languages', 'instructionallanguage', 'targetlanguage'],
   languageLevel: ['languagelevel', 'proficiencylevel', 'level'],
+  purpose: ['purpose', 'purposes', 'purposetag', 'purposetags'],
+  skill: ['skill', 'skills', 'focus', 'focustag', 'focustags'],
   relatedUnit: ['relatedunit', 'unit', 'module'],
   tags: ['tags', 'tag', 'keywords', 'labels'],
   externalSource: ['externalsource', 'organization', 'publisher', 'catalog'],
@@ -177,7 +196,10 @@ export interface NormalizedAssessmentImportRow {
   evidenceToCollect?: string;
   subject?: string;
   gradeLevel?: string;
+  language?: string;
   languageLevel?: string;
+  purpose?: string;
+  skill?: string;
   relatedUnit?: string;
   tags: string[];
   status?: LibraryCatalogStatus;
@@ -190,12 +212,18 @@ export interface NormalizedAssessmentImportRow {
 export interface PlannedAssessmentImportRow {
   item?: LibraryCatalogItem;
   existingItem?: LibraryCatalogItem;
+  expectedAssignments: CategoryAssignment[];
+  assignmentsToDelete: CategoryAssignment[];
+  assignmentsToCreate: CategoryAssignment[];
+  categoryValueIds: string[];
+  classificationReviews?: ImportClassificationReview[];
 }
 
 export interface AssessmentImportPreviewRow extends ImportPreviewRow<PlannedAssessmentImportRow> {
   normalized: NormalizedAssessmentImportRow;
   duplicateReview?: AssessmentDuplicateReview;
   kindReview?: AssessmentKindReview;
+  classificationReviews?: ImportClassificationReview[];
 }
 
 export interface AssessmentImportPreview extends Omit<
@@ -204,6 +232,12 @@ export interface AssessmentImportPreview extends Omit<
 > {
   importRunId: string;
   rows: AssessmentImportPreviewRow[];
+  defaults: AssessmentImportDefaults;
+  newCategoryValues: CategoryValue[];
+  restoredCategoryValues: Array<{ before: CategoryValue; after: CategoryValue }>;
+  expectedCategoryValues: CategoryValue[];
+  classificationReviews: ImportClassificationReview[];
+  classificationAudit: ImportClassificationAuditRecord[];
 }
 
 export interface BuildAssessmentImportPreviewInput {
@@ -213,7 +247,10 @@ export interface BuildAssessmentImportPreviewInput {
   unmappedDecisions: UnmappedColumnDecisions;
   duplicateDecisions: AssessmentDuplicateDecisions;
   kindDecisions: AssessmentKindDecisions;
+  classificationDecisions?: ImportClassificationDecisions;
   existingItems: LibraryCatalogItem[];
+  categoryValues?: readonly CategoryValue[];
+  categoryAssignments?: readonly CategoryAssignment[];
 }
 
 export interface AssessmentImportPreviewDependencies {
@@ -348,13 +385,7 @@ function normalizeRow(
     optional(get('notes')),
     unmappedValues,
   );
-  const tags = uniqueTags([
-    ...splitValues(get('tags')),
-    tagged('Subject', get('subject')) ?? '',
-    tagged('Grade', get('gradeLevel')) ?? '',
-    tagged('Language level', get('languageLevel')) ?? '',
-    tagged('Unit', get('relatedUnit')) ?? '',
-  ]);
+  const tags = uniqueTags([...splitValues(get('tags')), tagged('Unit', get('relatedUnit')) ?? '']);
   const validationErrors: string[] = [];
   const title = normalizeImportText(get('title'));
   if (!title) validationErrors.push('Title is required.');
@@ -397,7 +428,10 @@ function normalizeRow(
     evidenceToCollect,
     subject: optional(get('subject')),
     gradeLevel: optional(get('gradeLevel')),
+    language: optional(get('language')),
     languageLevel: optional(get('languageLevel')),
+    purpose: optional(get('purpose')),
+    skill: optional(get('skill')),
     relatedUnit: optional(get('relatedUnit')),
     tags,
     status,
@@ -540,6 +574,39 @@ export function buildAssessmentImportPreview(
       .map((item) => [item.importIdentityKey as string, item] as const),
   );
   const rubricBlocked = isRubricWorksheet(input.table);
+  const classificationSession = createImportClassificationResolutionSession({
+    catalogType: 'assessment',
+    categoryValues: input.categoryValues ?? [],
+    decisions: input.classificationDecisions ?? {},
+    createId,
+    generatedAt,
+  });
+  const applicableFamilyIds = classificationSession.applicableFamilyIds;
+  const assignmentsByItem = new Map<string, CategoryAssignment[]>();
+  for (const rawAssignment of input.categoryAssignments ?? []) {
+    const assignment = categoryAssignmentSchema.parse(rawAssignment);
+    if (
+      assignment.entityType !== 'library-item' ||
+      !applicableFamilyIds.includes(assignment.familyId)
+    ) {
+      continue;
+    }
+    assignmentsByItem.set(assignment.entityId, [
+      ...(assignmentsByItem.get(assignment.entityId) ?? []),
+      assignment,
+    ]);
+  }
+  for (const assignments of assignmentsByItem.values()) {
+    assignments.sort((first, second) => first.id.localeCompare(second.id));
+  }
+  const presentFamilyIds = [
+    ...(input.mapping.subject !== null ? (['subject'] as const) : []),
+    ...(input.mapping.gradeLevel !== null ? (['grade-level'] as const) : []),
+    ...(input.mapping.language !== null ? (['language'] as const) : []),
+    ...(input.mapping.languageLevel !== null ? (['language-level'] as const) : []),
+    ...(input.mapping.purpose !== null ? (['purpose-tag'] as const) : []),
+    ...(input.mapping.skill !== null ? (['focus-tag'] as const) : []),
+  ];
 
   const normalizedRows = input.table.rows.map((row) =>
     normalizeRow(
@@ -695,7 +762,13 @@ export function buildAssessmentImportPreview(
         duplicateReview,
         kindReview,
         planned: targetId
-          ? { existingItem: existingAssessments.find((item) => item.id === targetId) }
+          ? {
+              existingItem: existingAssessments.find((item) => item.id === targetId),
+              expectedAssignments: assignmentsByItem.get(targetId) ?? [],
+              assignmentsToDelete: [],
+              assignmentsToCreate: [],
+              categoryValueIds: [],
+            }
           : undefined,
       };
     }
@@ -735,6 +808,53 @@ export function buildAssessmentImportPreview(
       };
     }
 
+    const classification = classificationSession.resolveRow({
+      sourceRow: normalized.sourceRow,
+      values: {
+        subject: effectiveNormalized.subject,
+        'grade-level': effectiveNormalized.gradeLevel,
+        language: effectiveNormalized.language,
+        'language-level': effectiveNormalized.languageLevel,
+        'purpose-tag': effectiveNormalized.purpose,
+        'focus-tag': effectiveNormalized.skill,
+      },
+      presentFamilyIds,
+    });
+    if (classification.blockingReasons.length > 0) {
+      return {
+        sourceRow: normalized.sourceRow,
+        classification: 'blocked',
+        reasons: classification.blockingReasons,
+        normalized: effectiveNormalized,
+        duplicateReview,
+        kindReview,
+        classificationReviews: [],
+      };
+    }
+    if (classification.reviews.length > 0) {
+      return {
+        sourceRow: normalized.sourceRow,
+        classification: 'review',
+        reasons: classification.reviewReasons,
+        normalized: effectiveNormalized,
+        duplicateReview,
+        kindReview,
+        classificationReviews: classification.reviews,
+        planned: {
+          existingItem: target,
+          expectedAssignments: target ? (assignmentsByItem.get(target.id) ?? []) : [],
+          assignmentsToDelete: [],
+          assignmentsToCreate: [],
+          categoryValueIds: [],
+          classificationReviews: classification.reviews,
+        },
+      };
+    }
+    const classifiedNormalized: NormalizedAssessmentImportRow = {
+      ...effectiveNormalized,
+      tags: uniqueTags([...effectiveNormalized.tags, ...classification.genericTags]),
+    };
+
     const forcedStatus =
       decision?.action === 'restore-update'
         ? 'active'
@@ -743,13 +863,22 @@ export function buildAssessmentImportPreview(
           : undefined;
 
     if (decision?.action === 'create' || (!target && !identityMatch)) {
+      const itemId = createId();
       const withoutRun = mergeAssessment(
         undefined,
-        effectiveNormalized,
-        createId(),
+        classifiedNormalized,
+        itemId,
         generatedAt,
         forcedStatus,
       );
+      const assignmentPlan = planImportClassificationAssignments({
+        entityId: itemId,
+        existingAssignments: [],
+        resolution: classification,
+        applicableFamilyIds,
+        createId,
+        generatedAt,
+      });
       const item = libraryCatalogItemSchema.parse({
         ...withoutRun,
         lastImportRunId: importRunId,
@@ -761,11 +890,22 @@ export function buildAssessmentImportPreview(
           duplicateReview
             ? 'The reviewed decision creates a separate Assessment.'
             : 'No strong existing identity was selected; create a new Assessment.',
+          ...(assignmentPlan.assignmentsToCreate.length
+            ? ['Apply the reviewed Library classification assignments.']
+            : []),
         ],
-        normalized: effectiveNormalized,
+        normalized: classifiedNormalized,
         duplicateReview,
         kindReview,
-        planned: { item },
+        classificationReviews: [],
+        planned: {
+          item,
+          expectedAssignments: assignmentPlan.expectedAssignments,
+          assignmentsToDelete: assignmentPlan.assignmentsToDelete,
+          assignmentsToCreate: assignmentPlan.assignmentsToCreate,
+          categoryValueIds: assignmentPlan.desiredCategoryValueIds,
+          classificationReviews: [],
+        },
       };
     }
 
@@ -782,20 +922,45 @@ export function buildAssessmentImportPreview(
 
     const withoutRun = mergeAssessment(
       target,
-      effectiveNormalized,
+      classifiedNormalized,
       target.id,
       generatedAt,
       forcedStatus,
     );
-    if (sameRecord(withoutRun, target)) {
+    const assignmentPlan = planImportClassificationAssignments({
+      entityId: target.id,
+      existingAssignments: assignmentsByItem.get(target.id) ?? [],
+      resolution: classification,
+      applicableFamilyIds,
+      createId,
+      generatedAt,
+    });
+    const classificationSnapshot = classificationSession.snapshot();
+    const lifecycleIds = new Set([
+      ...classificationSnapshot.newCategoryValues.map((value) => value.id),
+      ...classificationSnapshot.restoredCategoryValues.map((value) => value.after.id),
+    ]);
+    const classificationChanged =
+      assignmentPlan.assignmentsToDelete.length > 0 ||
+      assignmentPlan.assignmentsToCreate.length > 0 ||
+      assignmentPlan.desiredCategoryValueIds.some((id) => lifecycleIds.has(id));
+    if (sameRecord(withoutRun, target) && !classificationChanged) {
       return {
         sourceRow: normalized.sourceRow,
         classification: 'skip',
         reasons: ['The stable Assessment identity already has the same reviewed values.'],
-        normalized: effectiveNormalized,
+        normalized: classifiedNormalized,
         duplicateReview,
         kindReview,
-        planned: { existingItem: target },
+        classificationReviews: [],
+        planned: {
+          existingItem: target,
+          expectedAssignments: assignmentPlan.expectedAssignments,
+          assignmentsToDelete: [],
+          assignmentsToCreate: [],
+          categoryValueIds: assignmentPlan.desiredCategoryValueIds,
+          classificationReviews: [],
+        },
       };
     }
 
@@ -808,11 +973,23 @@ export function buildAssessmentImportPreview(
       classification: 'update',
       reasons: [
         'The reviewed stable identity or explicit duplicate decision updates this Assessment.',
+        ...(classificationChanged
+          ? ['Apply the reviewed Library classification assignments.']
+          : []),
       ],
-      normalized: effectiveNormalized,
+      normalized: classifiedNormalized,
       duplicateReview,
       kindReview,
-      planned: { item, existingItem: target },
+      classificationReviews: [],
+      planned: {
+        item,
+        existingItem: target,
+        expectedAssignments: assignmentPlan.expectedAssignments,
+        assignmentsToDelete: assignmentPlan.assignmentsToDelete,
+        assignmentsToCreate: assignmentPlan.assignmentsToCreate,
+        categoryValueIds: assignmentPlan.desiredCategoryValueIds,
+        classificationReviews: [],
+      },
     };
   });
 
@@ -830,13 +1007,25 @@ export function buildAssessmentImportPreview(
       unmappedDecisions: input.unmappedDecisions,
       duplicateDecisions: input.duplicateDecisions,
       kindDecisions: input.kindDecisions,
+      classificationDecisions: input.classificationDecisions,
     },
     generatedAt,
   );
 
+  const classificationSnapshot = classificationSession.snapshot();
   return {
     ...genericPreview,
     importRunId,
     rows,
+    defaults: {
+      externalSource: optional(input.defaults.externalSource ?? ''),
+      sourceReference: optional(input.defaults.sourceReference ?? ''),
+      assessmentKind: input.defaults.assessmentKind,
+    },
+    newCategoryValues: classificationSnapshot.newCategoryValues,
+    restoredCategoryValues: classificationSnapshot.restoredCategoryValues,
+    expectedCategoryValues: classificationSnapshot.expectedCategoryValues,
+    classificationReviews: classificationSnapshot.classificationReviews,
+    classificationAudit: classificationSnapshot.classificationAudit,
   };
 }

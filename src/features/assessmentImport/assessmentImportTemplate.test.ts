@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 import { describe, expect, it } from 'vitest';
 
+import { suggestAssessmentImportMapping } from './assessmentImportModel';
 import {
   assessmentImportTemplateHeaders,
   buildAssessmentImportCsvTemplate,
@@ -13,6 +14,29 @@ describe('assessmentImportTemplate', () => {
     expect(csv.startsWith('\uFEFF')).toBe(true);
     expect(csv.trim().split(/\r?\n/)).toHaveLength(1);
     expect(csv).toContain('"Assessment Kind"');
+  });
+
+  it('maps every formal classification header to the Assessment model', () => {
+    expect(suggestAssessmentImportMapping([...assessmentImportTemplateHeaders])).toEqual({
+      externalKey: 1,
+      title: 2,
+      description: 3,
+      assessmentKind: 4,
+      studentPrompt: 5,
+      evidenceToCollect: 6,
+      subject: 7,
+      gradeLevel: 8,
+      language: 9,
+      languageLevel: 10,
+      purpose: 11,
+      skill: 12,
+      relatedUnit: 13,
+      tags: 14,
+      externalSource: 0,
+      sourceReference: 15,
+      status: 16,
+      notes: 17,
+    });
   });
 
   it('builds import, instruction, and fictional example worksheets', () => {

@@ -68,6 +68,73 @@ describe('assessmentImportModel', () => {
     expect(preview.rows[0]?.classification).toBe('review');
   });
 
+  it('resolves Assessment classification fields into canonical assignments', () => {
+    const source = table([
+      [
+        'Title',
+        'Assessment Kind',
+        'Subject',
+        'Grade Level',
+        'Language',
+        'Language Level',
+        'Purpose',
+        'Skill',
+      ],
+      [
+        'Oral retell check',
+        'Formative',
+        'Chinese Language Arts',
+        'Grade 3',
+        'Chinese',
+        'Intermediate',
+        'Formative check',
+        'Oral sequencing',
+      ],
+    ]);
+    const preview = buildAssessmentImportPreview(
+      {
+        table: source,
+        mapping: suggestAssessmentImportMapping(source.headers),
+        defaults: {},
+        unmappedDecisions: {},
+        duplicateDecisions: {},
+        kindDecisions: {},
+        classificationDecisions: {
+          'subject\u0000chinese language arts': { action: 'create' },
+          'grade-level\u0000grade 3': { action: 'create' },
+          'language\u0000chinese': { action: 'create' },
+          'language-level\u0000intermediate': { action: 'create' },
+          'purpose-tag\u0000formative check': { action: 'create' },
+          'focus-tag\u0000oral sequencing': { action: 'create' },
+        },
+        existingItems: [],
+        categoryValues: [],
+        categoryAssignments: [],
+      },
+      {
+        createId: (() => {
+          let next = 0;
+          return () => `id-${++next}`;
+        })(),
+        now: () => '2026-08-01T00:00:00.000Z',
+      },
+    );
+
+    expect(preview.rows[0]?.classification).toBe('create');
+    expect(preview.rows[0]?.planned?.assignmentsToCreate).toHaveLength(6);
+    expect(preview.rows[0]?.planned?.item?.tags).toEqual([]);
+    expect(preview.newCategoryValues.map((value) => value.familyId)).toEqual(
+      expect.arrayContaining([
+        'subject',
+        'grade-level',
+        'language',
+        'language-level',
+        'purpose-tag',
+        'focus-tag',
+      ]),
+    );
+  });
+
   it('updates only through exact external identity', () => {
     const source = table([
       ['External Source', 'Assessment ID', 'Title', 'Assessment Kind'],

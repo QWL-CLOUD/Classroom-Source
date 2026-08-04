@@ -12,6 +12,7 @@ export const activityImportTemplateHeaders = [
   'Subject',
   'Skill',
   'Grade Level',
+  'Language',
   'Language Level',
   'Duration Minutes',
   'Grouping',
@@ -38,10 +39,10 @@ const instructionRows: Array<Array<string | number>> = [
     'External Source and Activity ID together form the stable update identity. Title equality alone never overwrites an existing Activity.',
   ],
   [
-    'Purpose and Skill resolve to controlled Purpose and Focus values. Unknown, archived, or merged values require an explicit preview decision.',
+    'Subject, Grade Level, Language, Language Level, Activity Type, Purpose, and Skill resolve to controlled classifications. Unknown, archived, merged, or ambiguous values require an explicit preview decision.',
   ],
   [
-    'Purpose and Skill may contain multiple values separated by semicolons, vertical bars, or line breaks. Tags may contain comma-separated searchable labels.',
+    'Subject, Grade Level, Language, Language Level, Purpose, and Skill may contain multiple values separated by semicolons, vertical bars, or line breaks. Activity Type accepts one value. Tags may contain comma-separated searchable labels.',
   ],
   [
     'Grouping accepts Whole Class, Small Group, Partners, Individual, or Flexible. Duration Minutes accepts a whole number from 1 to 1,440.',
@@ -73,6 +74,7 @@ const exampleRows: Array<Array<string | number>> = [
     'Chinese Language Arts',
     'Sequencing',
     'Grade 3',
+    'Chinese',
     'Intermediate',
     15,
     'Partners',
@@ -98,6 +100,7 @@ const exampleRows: Array<Array<string | number>> = [
     'Interdisciplinary',
     'Evidence selection',
     'Grade 5',
+    'English',
     '',
     25,
     'Small Group',
@@ -116,7 +119,7 @@ const exampleRows: Array<Array<string | number>> = [
 ];
 
 const templateColumnWidths = [
-  26, 18, 34, 46, 22, 22, 24, 24, 18, 20, 18, 18, 38, 38, 54, 42, 42, 42, 42, 28, 34, 14, 48,
+  26, 18, 34, 46, 22, 22, 24, 24, 18, 18, 20, 18, 18, 38, 38, 54, 42, 42, 42, 42, 28, 34, 14, 48,
 ].map((wch) => ({ wch }));
 
 function importSheetRange(rowCount: number): string {

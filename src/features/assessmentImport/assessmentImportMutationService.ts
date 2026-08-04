@@ -1,8 +1,12 @@
 import { classroomDb, type ClassroomDatabase } from '@/data/db/ClassroomDatabase';
 import {
+  categoryAssignmentSchema,
+  categoryValueSchema,
   changeLogSchema,
   importRunSchema,
   libraryCatalogItemSchema,
+  type CategoryAssignment,
+  type CategoryValue,
   type ChangeLog,
   type ImportRunSourceKind,
   type LibraryCatalogItem,
@@ -10,10 +14,15 @@ import {
 import { clearSupportedRedoBranch } from '@/features/editing/editCommandRegistry';
 import { notifyEditHistoryChanged } from '@/features/editing/editHistorySignal';
 import { applyImportOperations } from '@/features/importCenter/applyImportOperations';
+import { classificationSummaryJson } from '@/features/importCenter/importClassificationResolution';
 import {
   createImportCommand,
+  deleteImportCategoryAssignmentOperation,
+  deleteImportCategoryValueOperation,
   deleteImportedLibraryItemOperation,
   deleteImportRunOperation,
+  putImportCategoryAssignmentOperation,
+  putImportCategoryValueOperation,
   putImportedLibraryItemOperation,
   putImportRunOperation,
   serializeImportCommand,
@@ -41,11 +50,26 @@ export interface AssessmentImportCommitResult {
   created: LibraryCatalogItem[];
   updated: LibraryCatalogItem[];
   skippedCount: number;
+  createdCategoryValues: CategoryValue[];
+  restoredCategoryValues: CategoryValue[];
   log: ChangeLog;
 }
 
+const ASSESSMENT_CLASSIFICATION_FAMILIES = [
+  'subject',
+  'grade-level',
+  'language',
+  'language-level',
+  'purpose-tag',
+  'focus-tag',
+] as const;
+
 function sameRecord(first: unknown, second: unknown): boolean {
   return JSON.stringify(first) === JSON.stringify(second);
+}
+
+function sortedAssignments(values: readonly CategoryAssignment[]): CategoryAssignment[] {
+  return [...values].sort((first, second) => first.id.localeCompare(second.id));
 }
 
 function commandSize(forwardJson: string, inverseJson: string): number {
@@ -83,11 +107,19 @@ export class AssessmentImportMutationService {
 
     const result = await this.db.transaction(
       'rw',
-      [this.db.libraryItems, this.db.importRuns, this.db.changeLog],
+      [
+        this.db.libraryItems,
+        this.db.categoryValues,
+        this.db.categoryAssignments,
+        this.db.importRuns,
+        this.db.changeLog,
+      ],
       async (): Promise<AssessmentImportCommitResult> => {
         if (await this.db.importRuns.get(preview.importRunId)) {
           throw new Error('This reviewed Assessment import has already been committed.');
         }
+
+        await this.validateCategoryState(preview);
 
         const currentAssessments = (
           await this.db.libraryItems.where('catalogType').equals('assessment').toArray()
@@ -99,6 +131,8 @@ export class AssessmentImportMutationService {
 
         const forwardItems: ImportOperation[] = [];
         const inverseItems: ImportOperation[] = [];
+        const forwardAssignments: ImportOperation[] = [];
+        const inverseAssignments: ImportOperation[] = [];
         const created: LibraryCatalogItem[] = [];
         const updated: LibraryCatalogItem[] = [];
 
@@ -107,6 +141,11 @@ export class AssessmentImportMutationService {
           if (row.classification === 'skip') {
             if (plan?.existingItem) {
               await this.validateExpectedItem(plan.existingItem, row.sourceRow);
+              await this.validateExpectedAssignments(
+                plan.existingItem.id,
+                plan.expectedAssignments,
+                row.sourceRow,
+              );
             }
             continue;
           }
@@ -150,6 +189,41 @@ export class AssessmentImportMutationService {
             }
           }
           if (identity) currentByIdentity.set(identity, planned);
+
+          await this.validateExpectedAssignments(
+            plan.existingItem?.id,
+            plan.expectedAssignments,
+            row.sourceRow,
+          );
+          for (const assignment of plan.assignmentsToDelete) {
+            forwardAssignments.push(deleteImportCategoryAssignmentOperation(assignment.id));
+            inverseAssignments.unshift(putImportCategoryAssignmentOperation(assignment));
+          }
+          for (const assignmentValue of plan.assignmentsToCreate) {
+            const assignment = categoryAssignmentSchema.parse(assignmentValue);
+            const existing = await this.db.categoryAssignments
+              .where('[categoryValueId+entityType+entityId]')
+              .equals([assignment.categoryValueId, assignment.entityType, assignment.entityId])
+              .first();
+            if (existing) {
+              throw new Error(
+                `Row ${row.sourceRow} Assessment classification assignments changed after preview.`,
+              );
+            }
+            forwardAssignments.push(putImportCategoryAssignmentOperation(assignment));
+            inverseAssignments.unshift(deleteImportCategoryAssignmentOperation(assignment.id));
+          }
+        }
+
+        const forwardCategoryValues: ImportOperation[] = [];
+        const inverseCategoryValues: ImportOperation[] = [];
+        for (const value of preview.newCategoryValues) {
+          forwardCategoryValues.push(putImportCategoryValueOperation(value));
+          inverseCategoryValues.unshift(deleteImportCategoryValueOperation(value.id));
+        }
+        for (const change of preview.restoredCategoryValues) {
+          forwardCategoryValues.push(putImportCategoryValueOperation(change.after));
+          inverseCategoryValues.unshift(putImportCategoryValueOperation(change.before));
         }
 
         const importRun = importRunSchema.parse({
@@ -164,15 +238,26 @@ export class AssessmentImportMutationService {
           skippedCount: preview.summary.skipCount,
           reviewCount: 0,
           blockedCount: 0,
-          summaryJson: JSON.stringify({
+          summaryJson: classificationSummaryJson({
             sourceFingerprint: preview.sourceFingerprint,
+            defaults: preview.defaults,
+            newCategoryValues: preview.newCategoryValues,
+            restoredCategoryValues: preview.restoredCategoryValues,
+            classificationAudit: preview.classificationAudit,
           }),
           committedAt: preview.generatedAt,
         });
 
-        const forward = createImportCommand([...forwardItems, putImportRunOperation(importRun)]);
+        const forward = createImportCommand([
+          ...forwardCategoryValues,
+          ...forwardItems,
+          ...forwardAssignments,
+          putImportRunOperation(importRun),
+        ]);
         const inverse = createImportCommand([
+          ...inverseAssignments,
           ...inverseItems,
+          ...inverseCategoryValues,
           deleteImportRunOperation(importRun.id),
         ]);
         const forwardJson = serializeImportCommand(forward);
@@ -200,6 +285,8 @@ export class AssessmentImportMutationService {
           created,
           updated,
           skippedCount: preview.summary.skipCount,
+          createdCategoryValues: preview.newCategoryValues,
+          restoredCategoryValues: preview.restoredCategoryValues.map((value) => value.after),
           log,
         };
       },
@@ -224,6 +311,76 @@ export class AssessmentImportMutationService {
     const current = libraryCatalogItemSchema.parse(currentValue);
     if (!sameRecord(current, expected)) {
       throw new Error(`Row ${sourceRow} Assessment changed after preview. Generate a new preview.`);
+    }
+  }
+
+  private async validateExpectedAssignments(
+    entityId: string | undefined,
+    expected: readonly CategoryAssignment[],
+    sourceRow: number,
+  ): Promise<void> {
+    if (!entityId) {
+      if (expected.length > 0) {
+        throw new Error(
+          `Row ${sourceRow} contains invalid expected Assessment classification assignments.`,
+        );
+      }
+      return;
+    }
+    const current = (
+      await this.db.categoryAssignments
+        .where('[entityType+entityId]')
+        .equals(['library-item', entityId])
+        .toArray()
+    )
+      .map((value) => categoryAssignmentSchema.parse(value))
+      .filter((value) =>
+        ASSESSMENT_CLASSIFICATION_FAMILIES.includes(
+          value.familyId as (typeof ASSESSMENT_CLASSIFICATION_FAMILIES)[number],
+        ),
+      );
+    if (!sameRecord(sortedAssignments(current), sortedAssignments(expected))) {
+      throw new Error(
+        `Row ${sourceRow} Assessment classification assignments changed after preview. Generate a new preview.`,
+      );
+    }
+  }
+
+  private async validateCategoryState(preview: AssessmentImportPreview): Promise<void> {
+    for (const expected of preview.expectedCategoryValues) {
+      const current = await this.db.categoryValues.get(expected.id);
+      if (!current || !sameRecord(categoryValueSchema.parse(current), expected)) {
+        throw new Error(
+          `Classification “${expected.name}” changed after preview. Generate a new preview.`,
+        );
+      }
+    }
+    for (const change of preview.restoredCategoryValues) {
+      const current = await this.db.categoryValues.get(change.before.id);
+      if (!current || !sameRecord(categoryValueSchema.parse(current), change.before)) {
+        throw new Error(
+          `Classification “${change.before.name}” changed after preview. Generate a new preview.`,
+        );
+      }
+    }
+    const currentValues = (await this.db.categoryValues.toArray()).map((value) =>
+      categoryValueSchema.parse(value),
+    );
+    for (const value of preview.newCategoryValues) {
+      if (await this.db.categoryValues.get(value.id)) {
+        throw new Error(`New classification “${value.name}” changed after preview.`);
+      }
+      const collision = currentValues.find(
+        (current) =>
+          current.familyId === value.familyId &&
+          (current.normalizedName === value.normalizedName ||
+            current.normalizedAliases.includes(value.normalizedName)),
+      );
+      if (collision) {
+        throw new Error(
+          `Classification “${value.name}” now conflicts with “${collision.name}”. Generate a new preview.`,
+        );
+      }
     }
   }
 }
