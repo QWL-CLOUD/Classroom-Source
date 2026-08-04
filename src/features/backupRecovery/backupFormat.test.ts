@@ -63,7 +63,7 @@ describe('Classroom backup format', () => {
     expect(preview.validRecordCount).toBe(1);
     expect(preview.quarantineCount).toBe(0);
     expect(preview.validTables.tasks).toEqual([task('task-1')]);
-    expect(preview.tableSummaries).toHaveLength(29);
+    expect(preview.tableSummaries).toHaveLength(30);
   });
 
   it('restores a schema v10 backup with the new Student and roster tables empty', () => {
@@ -77,10 +77,12 @@ describe('Classroom backup format', () => {
     delete legacyTables.rosterMemberships;
     delete legacyTables.assessmentEvidence;
     delete legacyTables.importRuns;
+    delete legacyTables.classificationMappingPresets;
     delete legacyCounts.studentRecords;
     delete legacyCounts.rosterMemberships;
     delete legacyCounts.assessmentEvidence;
     delete legacyCounts.importRuns;
+    delete legacyCounts.classificationMappingPresets;
     const legacyEnvelope = {
       ...current,
       databaseSchemaVersion: 10,
@@ -94,6 +96,7 @@ describe('Classroom backup format', () => {
     expect(preview.validTables.rosterMemberships).toEqual([]);
     expect(preview.validTables.assessmentEvidence).toEqual([]);
     expect(preview.validTables.importRuns).toEqual([]);
+    expect(preview.validTables.classificationMappingPresets).toEqual([]);
     expect(preview.warnings.join(' ')).toMatch(/predates independent Student/);
   });
 
@@ -106,8 +109,10 @@ describe('Classroom backup format', () => {
     const legacyCounts = { ...current.tableCounts } as Record<string, number>;
     delete legacyTables.assessmentEvidence;
     delete legacyTables.importRuns;
+    delete legacyTables.classificationMappingPresets;
     delete legacyCounts.assessmentEvidence;
     delete legacyCounts.importRuns;
+    delete legacyCounts.classificationMappingPresets;
     const legacyEnvelope = {
       ...current,
       databaseSchemaVersion: 11,
@@ -119,6 +124,7 @@ describe('Classroom backup format', () => {
 
     expect(preview.validTables.assessmentEvidence).toEqual([]);
     expect(preview.validTables.importRuns).toEqual([]);
+    expect(preview.validTables.classificationMappingPresets).toEqual([]);
     expect(preview.warnings.join(' ')).toMatch(/predates Assessment Evidence/);
   });
 
@@ -130,7 +136,9 @@ describe('Classroom backup format', () => {
     const legacyTables = { ...current.tables } as Record<string, unknown[]>;
     const legacyCounts = { ...current.tableCounts } as Record<string, number>;
     delete legacyTables.importRuns;
+    delete legacyTables.classificationMappingPresets;
     delete legacyCounts.importRuns;
+    delete legacyCounts.classificationMappingPresets;
     const legacyEnvelope = {
       ...current,
       databaseSchemaVersion: 12,
@@ -141,7 +149,30 @@ describe('Classroom backup format', () => {
     const preview = buildRestorePreview(resign(legacyEnvelope));
 
     expect(preview.validTables.importRuns).toEqual([]);
+    expect(preview.validTables.classificationMappingPresets).toEqual([]);
     expect(preview.warnings.join(' ')).toMatch(/predates canonical Import Center history/);
+  });
+
+  it('restores a schema v13 backup with classification mappings empty', () => {
+    const current = createBackupEnvelope(emptyBackupTables(), {
+      backupId: 'legacy-v13-backup',
+      exportedAt: now,
+    });
+    const legacyTables = { ...current.tables } as Record<string, unknown[]>;
+    const legacyCounts = { ...current.tableCounts } as Record<string, number>;
+    delete legacyTables.classificationMappingPresets;
+    delete legacyCounts.classificationMappingPresets;
+    const legacyEnvelope = {
+      ...current,
+      databaseSchemaVersion: 13,
+      tables: legacyTables,
+      tableCounts: legacyCounts,
+    } as unknown as ClassroomBackupEnvelope;
+
+    const preview = buildRestorePreview(resign(legacyEnvelope));
+
+    expect(preview.validTables.classificationMappingPresets).toEqual([]);
+    expect(preview.warnings.join(' ')).toMatch(/predates classification mapping presets/);
   });
 
   it('validates canonical Import Center history records', () => {
@@ -170,7 +201,7 @@ describe('Classroom backup format', () => {
     expect(preview.validTables.importRuns).toHaveLength(1);
   });
 
-  it('round-trips imported Activities, text-only workflow fields, controlled labels, and import metadata on DB v13', () => {
+  it('round-trips imported Activities, text-only workflow fields, controlled labels, and import metadata on DB v14', () => {
     const tables = emptyBackupTables();
     tables.libraryItems.push({
       id: 'activity-imported',
@@ -290,7 +321,7 @@ describe('Classroom backup format', () => {
     expect(preview.validTables.assessmentEvidence).toHaveLength(1);
   });
 
-  it('round-trips expanded Library classification families on DB v13', () => {
+  it('round-trips expanded Library classification families on DB v14', () => {
     const tables = emptyBackupTables();
     tables.libraryItems.push({
       id: 'assessment-classified',
@@ -352,19 +383,31 @@ describe('Classroom backup format', () => {
       },
     );
 
+    tables.classificationMappingPresets.push({
+      id: 'mapping-math',
+      familyId: 'subject',
+      sourceText: 'Math',
+      normalizedSourceText: 'math',
+      targetCategoryValueId: 'subject-mathematics',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    });
+
     const envelope = createBackupEnvelope(tables, {
       backupId: 'classification-foundation-backup',
       exportedAt: now,
     });
     const preview = buildRestorePreview(serializeBackupEnvelope(envelope));
 
-    expect(envelope.databaseSchemaVersion).toBe(13);
+    expect(envelope.databaseSchemaVersion).toBe(14);
     expect(preview.quarantineCount).toBe(0);
     expect(familyIds(preview.validTables.categoryValues)).toEqual(['language-level', 'subject']);
     expect(familyIds(preview.validTables.categoryAssignments)).toEqual([
       'language-level',
       'subject',
     ]);
+    expect(preview.validTables.classificationMappingPresets).toHaveLength(1);
   });
 
   it('rejects a backup whose content no longer matches its integrity hash', () => {

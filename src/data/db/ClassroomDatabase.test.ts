@@ -12,7 +12,7 @@ afterEach(async () => {
 });
 
 describe('ClassroomDatabase schema upgrades', () => {
-  it('upgrades legacy data to schema v13 and adds Student, roster, Assessment Evidence, and Import Center stores without losing Tasks', async () => {
+  it('upgrades legacy data to schema v14 and adds Student, roster, Assessment Evidence, and Import Center stores without losing Tasks', async () => {
     const name = `classroom-v20-upgrade-${crypto.randomUUID()}`;
     names.push(name);
     const legacy = new Dexie(name);
@@ -33,7 +33,7 @@ describe('ClassroomDatabase schema upgrades', () => {
     const upgraded = new ClassroomDatabase(name);
     await upgraded.open();
 
-    expect(upgraded.verno).toBe(13);
+    expect(upgraded.verno).toBe(14);
     expect(await upgraded.tasks.get('legacy-task')).toBeDefined();
     await upgraded.learnerContexts.put({
       id: 'class-1',
@@ -107,6 +107,17 @@ describe('ClassroomDatabase schema upgrades', () => {
     });
     expect(await upgraded.categoryValues.count()).toBe(1);
     expect(await upgraded.categoryAssignments.count()).toBe(0);
+    await upgraded.classificationMappingPresets.put({
+      id: 'mapping-literacy',
+      familyId: 'purpose-tag',
+      sourceText: 'Literacy',
+      normalizedSourceText: 'literacy',
+      targetCategoryValueId: 'purpose-reading',
+      status: 'active',
+      createdAt: '2026-08-03T12:00:00.000Z',
+      updatedAt: '2026-08-03T12:00:00.000Z',
+    });
+    expect(await upgraded.classificationMappingPresets.count()).toBe(1);
 
     await upgraded.learnerServiceOccurrences.put({
       id: 'notice-1:2026-07-21',

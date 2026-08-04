@@ -122,10 +122,23 @@ describe('CategoryReadService', () => {
       },
     ]);
 
+    await database.classificationMappingPresets.put({
+      id: 'mapping-reading',
+      familyId: 'purpose-tag',
+      sourceText: 'Literacy block',
+      normalizedSourceText: 'literacy block',
+      targetCategoryValueId: 'purpose-reading',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    });
+
     expect(await service.getUsageSummary('purpose-reading')).toEqual({
       total: 2,
       byEntityType: { 'lesson-plan': 2 },
       mergedSourceCount: 0,
+      mappingPresetCount: 1,
+      activeMappingPresetCount: 1,
     });
   });
 });

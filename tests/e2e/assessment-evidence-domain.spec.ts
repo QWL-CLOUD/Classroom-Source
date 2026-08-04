@@ -162,10 +162,11 @@ test('Assessment Evidence persists independently and remains source-traceable in
   expect(path).not.toBeNull();
   const envelope = JSON.parse(await readFile(path!, 'utf8')) as {
     databaseSchemaVersion: number;
-    tables: { assessmentEvidence: unknown[] };
+    tables: { assessmentEvidence: unknown[]; classificationMappingPresets: unknown[] };
   };
 
-  expect(envelope.databaseSchemaVersion).toBe(13);
+  expect(envelope.databaseSchemaVersion).toBe(14);
+  expect(envelope.tables.classificationMappingPresets).toEqual([]);
   expect(envelope.tables.assessmentEvidence).toEqual([
     expect.objectContaining({
       id: 'evidence-record',

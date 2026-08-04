@@ -3,8 +3,10 @@ import { z } from 'zod';
 import {
   categoryAssignmentSchema,
   categoryValueSchema,
+  classificationMappingPresetSchema,
   type CategoryAssignment,
   type CategoryValue,
+  type ClassificationMappingPreset,
   type ChangeLog,
 } from '@/domain/models/entities';
 
@@ -18,6 +20,18 @@ const putCategoryValueOperationSchema = z.object({
 
 const deleteCategoryValueOperationSchema = z.object({
   table: z.literal('categoryValues'),
+  action: z.literal('delete'),
+  id: z.string().min(1),
+});
+
+const putClassificationMappingPresetOperationSchema = z.object({
+  table: z.literal('classificationMappingPresets'),
+  action: z.literal('put'),
+  record: classificationMappingPresetSchema,
+});
+
+const deleteClassificationMappingPresetOperationSchema = z.object({
+  table: z.literal('classificationMappingPresets'),
   action: z.literal('delete'),
   id: z.string().min(1),
 });
@@ -42,6 +56,8 @@ export const categoryAssignmentOperationSchema = z.union([
 export const categoryOperationSchema = z.union([
   putCategoryValueOperationSchema,
   deleteCategoryValueOperationSchema,
+  putClassificationMappingPresetOperationSchema,
+  deleteClassificationMappingPresetOperationSchema,
   putCategoryAssignmentOperationSchema,
   deleteCategoryAssignmentOperationSchema,
 ]);
@@ -65,6 +81,24 @@ export function putCategoryValueOperation(record: CategoryValue): CategoryOperat
 
 export function deleteCategoryValueOperation(id: string): CategoryOperation {
   return categoryOperationSchema.parse({ table: 'categoryValues', action: 'delete', id });
+}
+
+export function putClassificationMappingPresetOperation(
+  record: ClassificationMappingPreset,
+): CategoryOperation {
+  return categoryOperationSchema.parse({
+    table: 'classificationMappingPresets',
+    action: 'put',
+    record,
+  });
+}
+
+export function deleteClassificationMappingPresetOperation(id: string): CategoryOperation {
+  return categoryOperationSchema.parse({
+    table: 'classificationMappingPresets',
+    action: 'delete',
+    id,
+  });
 }
 
 export function putCategoryAssignmentOperation(

@@ -52,12 +52,29 @@ export function filterCategoryWorkspaceItems(
 }
 
 export function categoryUsageLabel(usage: CategoryUsageSummary): string {
-  if (usage.total === 0) return 'Not in use';
-  return `${usage.total} ${usage.total === 1 ? 'use' : 'uses'}`;
+  const parts: string[] = [];
+  if (usage.total > 0) parts.push(`${usage.total} ${usage.total === 1 ? 'use' : 'uses'}`);
+  const mappingPresetCount = usage.mappingPresetCount ?? 0;
+  if (mappingPresetCount > 0) {
+    parts.push(`${mappingPresetCount} import ${mappingPresetCount === 1 ? 'mapping' : 'mappings'}`);
+  }
+  return parts.length > 0 ? parts.join(' · ') : 'Not in use';
 }
 
 export function canArchiveDirectly(item: CategoryWorkspaceItem): boolean {
-  return item.usage.total === 0 && item.usage.mergedSourceCount === 0;
+  return (
+    item.usage.total === 0 &&
+    item.usage.mergedSourceCount === 0 &&
+    (item.usage.activeMappingPresetCount ?? 0) === 0
+  );
+}
+
+export function canDeleteDirectly(item: CategoryWorkspaceItem): boolean {
+  return (
+    item.usage.total === 0 &&
+    item.usage.mergedSourceCount === 0 &&
+    (item.usage.mappingPresetCount ?? 0) === 0
+  );
 }
 
 export function replacementGuidance(item: CategoryWorkspaceItem): string {
@@ -66,8 +83,20 @@ export function replacementGuidance(item: CategoryWorkspaceItem): string {
       item.usage.mergedSourceCount === 1 ? 'value resolves' : 'values resolve'
     } through this value. Merge it into the replacement to preserve those aliases.`;
   }
+  const dependencies: string[] = [];
   if (item.usage.total > 0) {
-    return `${categoryUsageLabel(item.usage)} must be moved to another value before this one can be archived.`;
+    dependencies.push(`${item.usage.total} ${item.usage.total === 1 ? 'use' : 'uses'}`);
+  }
+  const activeMappingPresetCount = item.usage.activeMappingPresetCount ?? 0;
+  if (activeMappingPresetCount > 0) {
+    dependencies.push(
+      `${activeMappingPresetCount} active import ${
+        activeMappingPresetCount === 1 ? 'mapping' : 'mappings'
+      }`,
+    );
+  }
+  if (dependencies.length > 0) {
+    return `${dependencies.join(' and ')} will move to the replacement in one undoable transaction.`;
   }
   return 'This value can be archived without replacing any references.';
 }

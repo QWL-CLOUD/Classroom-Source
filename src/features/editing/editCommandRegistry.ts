@@ -256,6 +256,12 @@ export async function applySupportedEditCommand(
       if (operation.table === 'categoryValues') {
         if (operation.action === 'put') await db.categoryValues.put(operation.record);
         else await db.categoryValues.delete(operation.id);
+      } else if (operation.table === 'classificationMappingPresets') {
+        if (operation.action === 'put') {
+          await db.classificationMappingPresets.put(operation.record);
+        } else {
+          await db.classificationMappingPresets.delete(operation.id);
+        }
       } else if (operation.action === 'put') {
         await db.categoryAssignments.put(operation.record);
       } else {

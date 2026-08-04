@@ -7,6 +7,7 @@ import type { CategoryFamilyId, CategoryValue } from '@/domain/models/entities';
 import { EditHistoryService } from '@/features/editing/editHistoryService';
 
 import {
+  CategoryMappingPresetDependencyError,
   CategoryMergeHistoryDependencyError,
   CategoryMutationService,
   CategoryValueInUseError,
@@ -223,6 +224,39 @@ describe('CategoryMutationService', () => {
     expect(deleteError).toMatchObject({ usageCount: 1, attemptedOperation: 'delete' });
   });
 
+  it('blocks archive and delete for mapping targets until mappings are resolved', async () => {
+    await database.categoryValues.put(value('source', 'Reading'));
+    await database.classificationMappingPresets.put({
+      id: 'mapping-source',
+      familyId: 'purpose-tag',
+      sourceText: 'Literacy',
+      normalizedSourceText: 'literacy',
+      targetCategoryValueId: 'source',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const archiveError = await service.archive('source').catch((error: unknown) => error);
+    expect(archiveError).toBeInstanceOf(CategoryMappingPresetDependencyError);
+    expect(archiveError).toMatchObject({
+      presetCount: 1,
+      activePresetCount: 1,
+      attemptedOperation: 'archive',
+    });
+
+    await database.classificationMappingPresets.update('mapping-source', {
+      status: 'inactive',
+      deactivatedAt: now,
+    });
+    await service.archive('source');
+    await expect(service.deleteUnused('source')).rejects.toMatchObject({
+      presetCount: 1,
+      activePresetCount: 0,
+      attemptedOperation: 'delete',
+    });
+  });
+
   it('replaces assignments and archives the old value atomically', async () => {
     await seedPlan();
     await database.categoryValues.bulkPut([
@@ -237,6 +271,16 @@ describe('CategoryMutationService', () => {
       entityId: 'plan-1',
       createdAt: now,
     });
+    await database.classificationMappingPresets.put({
+      id: 'mapping-reading',
+      familyId: 'purpose-tag',
+      sourceText: 'Literacy',
+      normalizedSourceText: 'literacy',
+      targetCategoryValueId: 'source',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    });
     ids = ['log-replace'];
 
     await service.replaceAndArchive('source', 'target');
@@ -249,6 +293,9 @@ describe('CategoryMutationService', () => {
     expect(await database.categoryAssignments.get('assignment-1')).toMatchObject({
       categoryValueId: 'target',
     });
+    expect(await database.classificationMappingPresets.get('mapping-reading')).toMatchObject({
+      targetCategoryValueId: 'target',
+    });
 
     await history.undo();
     expect(await database.categoryValues.get('source')).toMatchObject({
@@ -258,9 +305,15 @@ describe('CategoryMutationService', () => {
     expect(await database.categoryAssignments.get('assignment-1')).toMatchObject({
       categoryValueId: 'source',
     });
+    expect(await database.classificationMappingPresets.get('mapping-reading')).toMatchObject({
+      targetCategoryValueId: 'source',
+    });
     await history.redo();
     expect(await database.categoryAssignments.get('assignment-1')).toMatchObject({
       categoryValueId: 'target',
+    });
+    expect(await database.classificationMappingPresets.get('mapping-reading')).toMatchObject({
+      targetCategoryValueId: 'target',
     });
   });
 
@@ -298,6 +351,16 @@ describe('CategoryMutationService', () => {
         createdAt: now,
       },
     ]);
+    await database.classificationMappingPresets.put({
+      id: 'mapping-priority',
+      familyId: 'task-label',
+      sourceText: 'Priority external',
+      normalizedSourceText: 'priority external',
+      targetCategoryValueId: 'source',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    });
     ids = ['log-merge'];
 
     await service.merge('source', 'target');
@@ -311,11 +374,17 @@ describe('CategoryMutationService', () => {
       normalizedAliases: ['urgent', 'priority'],
     });
     expect(await database.categoryAssignments.toArray()).toHaveLength(1);
+    expect(await database.classificationMappingPresets.get('mapping-priority')).toMatchObject({
+      targetCategoryValueId: 'target',
+    });
 
     await history.undo();
     expect(await database.categoryValues.get('source')).toMatchObject({ lifecycleState: 'active' });
     expect(await database.categoryValues.get('target')).toMatchObject({ aliases: [] });
     expect(await database.categoryAssignments.toArray()).toHaveLength(2);
+    expect(await database.classificationMappingPresets.get('mapping-priority')).toMatchObject({
+      targetCategoryValueId: 'source',
+    });
   });
 
   it('protects merge history and supports merging a surviving target onward', async () => {

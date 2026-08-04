@@ -23,7 +23,9 @@ import type {
   CategoryValue,
 } from '@/domain/models/entities';
 import { CATEGORY_FAMILIES, getCategoryFamily } from '@/features/categories/categoryFamilies';
+import { ClassificationMappingPresetManager } from '@/features/categories/ClassificationMappingPresetManager';
 import {
+  CategoryMappingPresetDependencyError,
   CategoryMergeHistoryDependencyError,
   CategoryValueInUseError,
   categoryMutationService,
@@ -32,6 +34,7 @@ import {
   CATEGORY_COLOR_OPTIONS,
   CATEGORY_ICON_OPTIONS,
   canArchiveDirectly,
+  canDeleteDirectly,
   categoryUsageLabel,
   filterCategoryWorkspaceItems,
   replacementGuidance,
@@ -71,6 +74,12 @@ type CombineState = {
   mode: 'replace-and-archive' | 'merge';
 };
 
+type CategoryWorkspaceMode = 'values' | 'mappings';
+
+function isWorkspaceMode(value: string | null): value is CategoryWorkspaceMode {
+  return value === 'values' || value === 'mappings';
+}
+
 function isFamilyId(value: string | null): value is CategoryFamilyId {
   return CATEGORY_FAMILIES.some((family) => family.id === value);
 }
@@ -87,6 +96,7 @@ function editorFromValue(value: CategoryValue): EditorState {
 
 function mutationErrorMessage(error: unknown): string {
   if (error instanceof CategoryValueInUseError) return error.message;
+  if (error instanceof CategoryMappingPresetDependencyError) return error.message;
   if (error instanceof CategoryMergeHistoryDependencyError) return error.message;
   if (error instanceof Error) return error.message;
   return 'The category change could not be completed.';
@@ -102,7 +112,9 @@ function valueById(
 export function CategoriesRoute() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedFamily = searchParams.get('family');
+  const requestedMode = searchParams.get('mode');
   const familyId: CategoryFamilyId = isFamilyId(requestedFamily) ? requestedFamily : 'purpose-tag';
+  const mode: CategoryWorkspaceMode = isWorkspaceMode(requestedMode) ? requestedMode : 'values';
   const family = getCategoryFamily(familyId);
   const state = useCategoryWorkspace(familyId);
   const [view, setView] = useState<CategoryWorkspaceView>('active');
@@ -133,6 +145,16 @@ export function CategoriesRoute() {
     nextParams.set('family', nextFamilyId);
     setSearchParams(nextParams, { replace: true });
     setView('active');
+    setEditor(null);
+    setCombine(null);
+    setError(null);
+    setMessage(null);
+  }
+
+  function chooseMode(nextMode: CategoryWorkspaceMode): void {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('mode', nextMode);
+    setSearchParams(nextParams, { replace: true });
     setEditor(null);
     setCombine(null);
     setError(null);
@@ -240,6 +262,7 @@ export function CategoriesRoute() {
     } catch (cause) {
       if (
         cause instanceof CategoryValueInUseError ||
+        cause instanceof CategoryMappingPresetDependencyError ||
         cause instanceof CategoryMergeHistoryDependencyError
       ) {
         openCombine(item);
@@ -325,9 +348,11 @@ export function CategoriesRoute() {
             Library records.
           </p>
         </div>
-        <button className="button button-primary" type="button" onClick={openCreate}>
-          <Plus size={17} aria-hidden="true" /> New {family.label.replace(/s$/, '')}
-        </button>
+        {mode === 'values' ? (
+          <button className="button button-primary" type="button" onClick={openCreate}>
+            <Plus size={17} aria-hidden="true" /> New {family.label.replace(/s$/, '')}
+          </button>
+        ) : null}
       </header>
 
       <div className={styles.workspaceGrid}>
@@ -370,6 +395,25 @@ export function CategoriesRoute() {
         </nav>
 
         <div className={styles.mainColumn}>
+          <div className={styles.workspaceModes} role="group" aria-label="Category workspace mode">
+            <button
+              type="button"
+              data-selected={mode === 'values'}
+              aria-pressed={mode === 'values'}
+              onClick={() => chooseMode('values')}
+            >
+              Controlled values
+            </button>
+            <button
+              type="button"
+              data-selected={mode === 'mappings'}
+              aria-pressed={mode === 'mappings'}
+              onClick={() => chooseMode('mappings')}
+            >
+              Import mappings
+            </button>
+          </div>
+
           <section
             className={`card ${styles.familySummary}`}
             aria-labelledby="category-family-title"
@@ -395,412 +439,432 @@ export function CategoriesRoute() {
             </dl>
           </section>
 
-          {editor ? (
-            <section className={`card ${styles.editorCard}`} aria-label="Category value editor">
-              <header className={styles.panelHeader}>
-                <div>
-                  <h2>
-                    {editor.mode === 'create'
-                      ? `New ${family.label.replace(/s$/, '')}`
-                      : 'Edit category value'}
-                  </h2>
-                  <p>Names keep stable IDs. Renamed values retain their former names as aliases.</p>
-                </div>
-                <button
-                  className="button button-icon"
-                  type="button"
-                  aria-label="Close category editor"
-                  onClick={() => setEditor(null)}
-                >
-                  <X size={17} aria-hidden="true" />
-                </button>
-              </header>
-              <div className={styles.editorGrid}>
-                <label>
-                  <span>Name</span>
-                  <input
-                    className="input"
-                    value={editor.name}
-                    autoFocus
-                    onChange={(event) =>
-                      setEditor((current) =>
-                        current ? { ...current, name: event.target.value } : current,
-                      )
-                    }
-                  />
-                </label>
-                <label>
-                  <span>Color</span>
-                  <select
-                    className="select"
-                    value={editor.colorKey}
-                    onChange={(event) =>
-                      setEditor((current) =>
-                        current
-                          ? { ...current, colorKey: event.target.value as CategoryColorKey | '' }
-                          : current,
-                      )
-                    }
-                  >
-                    <option value="">No color</option>
-                    {CATEGORY_COLOR_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  <span>Icon</span>
-                  <select
-                    className="select"
-                    value={editor.iconKey}
-                    onChange={(event) =>
-                      setEditor((current) =>
-                        current
-                          ? { ...current, iconKey: event.target.value as CategoryIconKey | '' }
-                          : current,
-                      )
-                    }
-                  >
-                    <option value="">No icon</option>
-                    {CATEGORY_ICON_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <div className={styles.panelActions}>
-                <button
-                  className="button button-primary"
-                  type="button"
-                  disabled={!editor.name.trim() || busy === 'editor'}
-                  onClick={() => void saveEditor()}
-                >
-                  <Save size={16} aria-hidden="true" />{' '}
-                  {busy === 'editor'
-                    ? 'Saving…'
-                    : editor.mode === 'create'
-                      ? 'Create value'
-                      : 'Save changes'}
-                </button>
-                <button className="button" type="button" onClick={() => setEditor(null)}>
-                  Cancel
-                </button>
-              </div>
-            </section>
-          ) : null}
-
-          {combine && sourceItem ? (
-            <section className={`card ${styles.resolveCard}`} aria-label="Resolve category use">
-              <header className={styles.panelHeader}>
-                <div>
-                  <h2>Resolve “{sourceItem.value.name}”</h2>
-                  <p>{replacementGuidance(sourceItem)}</p>
-                </div>
-                <button
-                  className="button button-icon"
-                  type="button"
-                  aria-label="Close resolution panel"
-                  onClick={() => setCombine(null)}
-                >
-                  <X size={17} aria-hidden="true" />
-                </button>
-              </header>
-
-              {replacementOptions.length === 0 ? (
-                <p className={styles.panelNotice}>
-                  Create another active {family.label.replace(/s$/, '').toLowerCase()} before
-                  replacing this value.
-                </p>
-              ) : (
-                <>
-                  <div className={styles.resolveGrid}>
+          {mode === 'values' ? (
+            <>
+              {editor ? (
+                <section className={`card ${styles.editorCard}`} aria-label="Category value editor">
+                  <header className={styles.panelHeader}>
+                    <div>
+                      <h2>
+                        {editor.mode === 'create'
+                          ? `New ${family.label.replace(/s$/, '')}`
+                          : 'Edit category value'}
+                      </h2>
+                      <p>
+                        Names keep stable IDs. Renamed values retain their former names as aliases.
+                      </p>
+                    </div>
+                    <button
+                      className="button button-icon"
+                      type="button"
+                      aria-label="Close category editor"
+                      onClick={() => setEditor(null)}
+                    >
+                      <X size={17} aria-hidden="true" />
+                    </button>
+                  </header>
+                  <div className={styles.editorGrid}>
                     <label>
-                      <span>Replacement value</span>
+                      <span>Name</span>
+                      <input
+                        className="input"
+                        value={editor.name}
+                        autoFocus
+                        onChange={(event) =>
+                          setEditor((current) =>
+                            current ? { ...current, name: event.target.value } : current,
+                          )
+                        }
+                      />
+                    </label>
+                    <label>
+                      <span>Color</span>
                       <select
                         className="select"
-                        value={combine.targetId}
+                        value={editor.colorKey}
                         onChange={(event) =>
-                          setCombine((current) =>
-                            current ? { ...current, targetId: event.target.value } : current,
+                          setEditor((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  colorKey: event.target.value as CategoryColorKey | '',
+                                }
+                              : current,
                           )
                         }
                       >
-                        {replacementOptions.map((item) => (
-                          <option key={item.value.id} value={item.value.id}>
-                            {item.value.name}
+                        <option value="">No color</option>
+                        {CATEGORY_COLOR_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
                           </option>
                         ))}
                       </select>
                     </label>
-                    <fieldset>
-                      <legend>Resolution method</legend>
-                      <label>
-                        <input
-                          type="radio"
-                          name="combine-mode"
-                          value="replace-and-archive"
-                          checked={combine.mode === 'replace-and-archive'}
-                          disabled={sourceItem.usage.mergedSourceCount > 0}
-                          onChange={() =>
-                            setCombine((current) =>
-                              current ? { ...current, mode: 'replace-and-archive' } : current,
-                            )
-                          }
-                        />
-                        <span>
-                          <strong>Replace and Archive</strong>
-                          <small>Move assignments and archive the old value.</small>
-                        </span>
-                      </label>
-                      <label>
-                        <input
-                          type="radio"
-                          name="combine-mode"
-                          value="merge"
-                          checked={combine.mode === 'merge'}
-                          onChange={() =>
-                            setCombine((current) =>
-                              current ? { ...current, mode: 'merge' } : current,
-                            )
-                          }
-                        />
-                        <span>
-                          <strong>Merge</strong>
-                          <small>Move assignments and retain former names as aliases.</small>
-                        </span>
-                      </label>
-                    </fieldset>
+                    <label>
+                      <span>Icon</span>
+                      <select
+                        className="select"
+                        value={editor.iconKey}
+                        onChange={(event) =>
+                          setEditor((current) =>
+                            current
+                              ? { ...current, iconKey: event.target.value as CategoryIconKey | '' }
+                              : current,
+                          )
+                        }
+                      >
+                        <option value="">No icon</option>
+                        {CATEGORY_ICON_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
                   </div>
                   <div className={styles.panelActions}>
                     <button
                       className="button button-primary"
                       type="button"
-                      disabled={!combine.targetId || busy === sourceItem.value.id}
-                      onClick={() => void combineValues()}
+                      disabled={!editor.name.trim() || busy === 'editor'}
+                      onClick={() => void saveEditor()}
                     >
-                      <Merge size={16} aria-hidden="true" />{' '}
-                      {busy === sourceItem.value.id
-                        ? 'Working…'
-                        : combine.mode === 'merge'
-                          ? 'Merge values'
-                          : 'Replace and archive'}
+                      <Save size={16} aria-hidden="true" />{' '}
+                      {busy === 'editor'
+                        ? 'Saving…'
+                        : editor.mode === 'create'
+                          ? 'Create value'
+                          : 'Save changes'}
                     </button>
-                    <button className="button" type="button" onClick={() => setCombine(null)}>
+                    <button className="button" type="button" onClick={() => setEditor(null)}>
                       Cancel
                     </button>
                   </div>
-                </>
-              )}
-            </section>
-          ) : null}
+                </section>
+              ) : null}
 
-          {message ? (
-            <p className={styles.success} role="status">
-              {message}
-            </p>
-          ) : null}
-          {error ? (
-            <p className={styles.error} role="alert">
-              {error}
-            </p>
-          ) : null}
-
-          <section className={`card ${styles.valuesCard}`} aria-labelledby="category-values-title">
-            <header className={styles.valuesHeader}>
-              <div>
-                <h2 id="category-values-title">Values</h2>
-                <p>Archived values stay visible in history but disappear from new selections.</p>
-              </div>
-              <div className={styles.viewTabs} role="group" aria-label="Category value status">
-                <button
-                  type="button"
-                  data-selected={view === 'active'}
-                  onClick={() => setView('active')}
-                >
-                  Active <span>{activeItems.length}</span>
-                </button>
-                <button
-                  type="button"
-                  data-selected={view === 'archived'}
-                  onClick={() => setView('archived')}
-                >
-                  Archived <span>{archivedCount}</span>
-                </button>
-                <button
-                  type="button"
-                  data-selected={view === 'history'}
-                  onClick={() => setView('history')}
-                >
-                  Merge history <span>{historyCount}</span>
-                </button>
-              </div>
-            </header>
-
-            {state.status === 'loading' ? (
-              <div className={styles.loadingState} role="status">
-                Reading category values…
-              </div>
-            ) : null}
-            {state.status === 'error' ? (
-              <div className={styles.error} role="alert">
-                Category values could not be loaded: {state.message}
-              </div>
-            ) : null}
-            {state.status === 'ready' && visibleItems.length === 0 ? (
-              <div className={styles.emptyState}>
-                <p>
-                  {view === 'active'
-                    ? `No active ${family.label.toLowerCase()} yet.`
-                    : view === 'archived'
-                      ? 'No archived values.'
-                      : 'No merge history.'}
-                </p>
-                {view === 'active' ? (
-                  <button className="button" type="button" onClick={openCreate}>
-                    <Plus size={16} aria-hidden="true" /> Create the first value
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-
-            {state.status === 'ready' && visibleItems.length > 0 ? (
-              <div className={styles.valueList}>
-                {visibleItems.map((item, index) => {
-                  const value = item.value;
-                  const mergedTarget = value.mergedIntoId
-                    ? valueById(items, value.mergedIntoId)
-                    : null;
-                  return (
-                    <article
-                      key={value.id}
-                      className={styles.valueRow}
-                      data-lifecycle={value.lifecycleState}
-                      aria-label={`${value.name} category value`}
+              {combine && sourceItem ? (
+                <section className={`card ${styles.resolveCard}`} aria-label="Resolve category use">
+                  <header className={styles.panelHeader}>
+                    <div>
+                      <h2>Resolve “{sourceItem.value.name}”</h2>
+                      <p>{replacementGuidance(sourceItem)}</p>
+                    </div>
+                    <button
+                      className="button button-icon"
+                      type="button"
+                      aria-label="Close resolution panel"
+                      onClick={() => setCombine(null)}
                     >
-                      <div className={styles.valueIdentity}>
-                        <span
-                          className={styles.valueMark}
-                          data-color={value.colorKey ?? 'neutral'}
-                          aria-hidden="true"
-                        >
-                          {value.iconKey ? ICON_SYMBOLS[value.iconKey] : '#'}
-                        </span>
-                        <div>
-                          <div className={styles.valueTitleRow}>
-                            <h3>{value.name}</h3>
-                            {value.isDefault ? (
-                              <span className={styles.defaultBadge}>
-                                <Check size={12} aria-hidden="true" /> Default
-                              </span>
-                            ) : null}
-                            <span className={styles.usageBadge}>
-                              {categoryUsageLabel(item.usage)}
-                            </span>
-                          </div>
-                          <p>
-                            {value.lifecycleState === 'merged'
-                              ? `Merged into ${mergedTarget?.value.name ?? 'another value'}.`
-                              : value.aliases.length > 0
-                                ? `Aliases: ${value.aliases.join(', ')}`
-                                : 'No aliases.'}
-                            {item.usage.mergedSourceCount > 0
-                              ? ` ${item.usage.mergedSourceCount} historical ${item.usage.mergedSourceCount === 1 ? 'value resolves' : 'values resolve'} here.`
-                              : ''}
-                          </p>
-                        </div>
-                      </div>
+                      <X size={17} aria-hidden="true" />
+                    </button>
+                  </header>
 
-                      {value.lifecycleState === 'active' ? (
-                        <div className={styles.rowActions}>
-                          <button
-                            className="button button-icon"
-                            type="button"
-                            aria-label={`Move ${value.name} earlier`}
-                            title="Move earlier"
-                            disabled={index === 0 || busy === value.id}
-                            onClick={() => void move(item, 'earlier')}
+                  {replacementOptions.length === 0 ? (
+                    <p className={styles.panelNotice}>
+                      Create another active {family.label.replace(/s$/, '').toLowerCase()} before
+                      replacing this value.
+                    </p>
+                  ) : (
+                    <>
+                      <div className={styles.resolveGrid}>
+                        <label>
+                          <span>Replacement value</span>
+                          <select
+                            className="select"
+                            value={combine.targetId}
+                            onChange={(event) =>
+                              setCombine((current) =>
+                                current ? { ...current, targetId: event.target.value } : current,
+                              )
+                            }
                           >
-                            <ArrowUp size={16} aria-hidden="true" />
-                          </button>
-                          <button
-                            className="button button-icon"
-                            type="button"
-                            aria-label={`Move ${value.name} later`}
-                            title="Move later"
-                            disabled={index === visibleItems.length - 1 || busy === value.id}
-                            onClick={() => void move(item, 'later')}
-                          >
-                            <ArrowDown size={16} aria-hidden="true" />
-                          </button>
-                          {!value.isDefault ? (
-                            <button
-                              className="button"
-                              type="button"
-                              disabled={busy === value.id}
-                              onClick={() => void setDefault(item)}
+                            {replacementOptions.map((item) => (
+                              <option key={item.value.id} value={item.value.id}>
+                                {item.value.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <fieldset>
+                          <legend>Resolution method</legend>
+                          <label>
+                            <input
+                              type="radio"
+                              name="combine-mode"
+                              value="replace-and-archive"
+                              checked={combine.mode === 'replace-and-archive'}
+                              disabled={sourceItem.usage.mergedSourceCount > 0}
+                              onChange={() =>
+                                setCombine((current) =>
+                                  current ? { ...current, mode: 'replace-and-archive' } : current,
+                                )
+                              }
+                            />
+                            <span>
+                              <strong>Replace and Archive</strong>
+                              <small>Move assignments and archive the old value.</small>
+                            </span>
+                          </label>
+                          <label>
+                            <input
+                              type="radio"
+                              name="combine-mode"
+                              value="merge"
+                              checked={combine.mode === 'merge'}
+                              onChange={() =>
+                                setCombine((current) =>
+                                  current ? { ...current, mode: 'merge' } : current,
+                                )
+                              }
+                            />
+                            <span>
+                              <strong>Merge</strong>
+                              <small>Move assignments and retain former names as aliases.</small>
+                            </span>
+                          </label>
+                        </fieldset>
+                      </div>
+                      <div className={styles.panelActions}>
+                        <button
+                          className="button button-primary"
+                          type="button"
+                          disabled={!combine.targetId || busy === sourceItem.value.id}
+                          onClick={() => void combineValues()}
+                        >
+                          <Merge size={16} aria-hidden="true" />{' '}
+                          {busy === sourceItem.value.id
+                            ? 'Working…'
+                            : combine.mode === 'merge'
+                              ? 'Merge values'
+                              : 'Replace and archive'}
+                        </button>
+                        <button className="button" type="button" onClick={() => setCombine(null)}>
+                          Cancel
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </section>
+              ) : null}
+
+              {message ? (
+                <p className={styles.success} role="status">
+                  {message}
+                </p>
+              ) : null}
+              {error ? (
+                <p className={styles.error} role="alert">
+                  {error}
+                </p>
+              ) : null}
+
+              <section
+                className={`card ${styles.valuesCard}`}
+                aria-labelledby="category-values-title"
+              >
+                <header className={styles.valuesHeader}>
+                  <div>
+                    <h2 id="category-values-title">Values</h2>
+                    <p>
+                      Archived values stay visible in history but disappear from new selections.
+                    </p>
+                  </div>
+                  <div className={styles.viewTabs} role="group" aria-label="Category value status">
+                    <button
+                      type="button"
+                      data-selected={view === 'active'}
+                      onClick={() => setView('active')}
+                    >
+                      Active <span>{activeItems.length}</span>
+                    </button>
+                    <button
+                      type="button"
+                      data-selected={view === 'archived'}
+                      onClick={() => setView('archived')}
+                    >
+                      Archived <span>{archivedCount}</span>
+                    </button>
+                    <button
+                      type="button"
+                      data-selected={view === 'history'}
+                      onClick={() => setView('history')}
+                    >
+                      Merge history <span>{historyCount}</span>
+                    </button>
+                  </div>
+                </header>
+
+                {state.status === 'loading' ? (
+                  <div className={styles.loadingState} role="status">
+                    Reading category values…
+                  </div>
+                ) : null}
+                {state.status === 'error' ? (
+                  <div className={styles.error} role="alert">
+                    Category values could not be loaded: {state.message}
+                  </div>
+                ) : null}
+                {state.status === 'ready' && visibleItems.length === 0 ? (
+                  <div className={styles.emptyState}>
+                    <p>
+                      {view === 'active'
+                        ? `No active ${family.label.toLowerCase()} yet.`
+                        : view === 'archived'
+                          ? 'No archived values.'
+                          : 'No merge history.'}
+                    </p>
+                    {view === 'active' ? (
+                      <button className="button" type="button" onClick={openCreate}>
+                        <Plus size={16} aria-hidden="true" /> Create the first value
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {state.status === 'ready' && visibleItems.length > 0 ? (
+                  <div className={styles.valueList}>
+                    {visibleItems.map((item, index) => {
+                      const value = item.value;
+                      const mergedTarget = value.mergedIntoId
+                        ? valueById(items, value.mergedIntoId)
+                        : null;
+                      return (
+                        <article
+                          key={value.id}
+                          className={styles.valueRow}
+                          data-lifecycle={value.lifecycleState}
+                          aria-label={`${value.name} category value`}
+                        >
+                          <div className={styles.valueIdentity}>
+                            <span
+                              className={styles.valueMark}
+                              data-color={value.colorKey ?? 'neutral'}
+                              aria-hidden="true"
                             >
-                              Set default
-                            </button>
-                          ) : null}
-                          <details className={styles.moreMenu}>
-                            <summary aria-label={`More actions for ${value.name}`}>
-                              <MoreHorizontal size={18} aria-hidden="true" />
-                              <span>More</span>
-                            </summary>
+                              {value.iconKey ? ICON_SYMBOLS[value.iconKey] : '#'}
+                            </span>
                             <div>
-                              <button type="button" onClick={() => openEdit(item)}>
-                                <Pencil size={15} aria-hidden="true" /> Edit
-                              </button>
-                              <button type="button" onClick={() => void archiveValue(item)}>
-                                {canArchiveDirectly(item) ? (
-                                  <Archive size={15} aria-hidden="true" />
-                                ) : (
-                                  <Merge size={15} aria-hidden="true" />
-                                )}
-                                {canArchiveDirectly(item) ? 'Archive' : 'Resolve use'}
+                              <div className={styles.valueTitleRow}>
+                                <h3>{value.name}</h3>
+                                {value.isDefault ? (
+                                  <span className={styles.defaultBadge}>
+                                    <Check size={12} aria-hidden="true" /> Default
+                                  </span>
+                                ) : null}
+                                <span className={styles.usageBadge}>
+                                  {categoryUsageLabel(item.usage)}
+                                </span>
+                              </div>
+                              <p>
+                                {value.lifecycleState === 'merged'
+                                  ? `Merged into ${mergedTarget?.value.name ?? 'another value'}.`
+                                  : value.aliases.length > 0
+                                    ? `Aliases: ${value.aliases.join(', ')}`
+                                    : 'No aliases.'}
+                                {item.usage.mergedSourceCount > 0
+                                  ? ` ${item.usage.mergedSourceCount} historical ${item.usage.mergedSourceCount === 1 ? 'value resolves' : 'values resolve'} here.`
+                                  : ''}
+                              </p>
+                            </div>
+                          </div>
+
+                          {value.lifecycleState === 'active' ? (
+                            <div className={styles.rowActions}>
+                              <button
+                                className="button button-icon"
+                                type="button"
+                                aria-label={`Move ${value.name} earlier`}
+                                title="Move earlier"
+                                disabled={index === 0 || busy === value.id}
+                                onClick={() => void move(item, 'earlier')}
+                              >
+                                <ArrowUp size={16} aria-hidden="true" />
                               </button>
                               <button
+                                className="button button-icon"
                                 type="button"
-                                disabled={!canArchiveDirectly(item)}
+                                aria-label={`Move ${value.name} later`}
+                                title="Move later"
+                                disabled={index === visibleItems.length - 1 || busy === value.id}
+                                onClick={() => void move(item, 'later')}
+                              >
+                                <ArrowDown size={16} aria-hidden="true" />
+                              </button>
+                              {!value.isDefault ? (
+                                <button
+                                  className="button"
+                                  type="button"
+                                  disabled={busy === value.id}
+                                  onClick={() => void setDefault(item)}
+                                >
+                                  Set default
+                                </button>
+                              ) : null}
+                              <details className={styles.moreMenu}>
+                                <summary aria-label={`More actions for ${value.name}`}>
+                                  <MoreHorizontal size={18} aria-hidden="true" />
+                                  <span>More</span>
+                                </summary>
+                                <div>
+                                  <button type="button" onClick={() => openEdit(item)}>
+                                    <Pencil size={15} aria-hidden="true" /> Edit
+                                  </button>
+                                  <button type="button" onClick={() => void archiveValue(item)}>
+                                    {canArchiveDirectly(item) ? (
+                                      <Archive size={15} aria-hidden="true" />
+                                    ) : (
+                                      <Merge size={15} aria-hidden="true" />
+                                    )}
+                                    {canArchiveDirectly(item) ? 'Archive' : 'Resolve use'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={!canDeleteDirectly(item)}
+                                    onClick={() => void deleteValue(item)}
+                                  >
+                                    <Trash2 size={15} aria-hidden="true" /> Delete unused
+                                  </button>
+                                </div>
+                              </details>
+                            </div>
+                          ) : null}
+
+                          {value.lifecycleState === 'archived' ? (
+                            <div className={styles.rowActions}>
+                              <button
+                                className="button"
+                                type="button"
+                                disabled={busy === value.id}
+                                onClick={() => void restoreValue(item)}
+                              >
+                                <RotateCcw size={16} aria-hidden="true" /> Restore
+                              </button>
+                              <button
+                                className="button"
+                                type="button"
+                                disabled={busy === value.id || !canDeleteDirectly(item)}
                                 onClick={() => void deleteValue(item)}
                               >
-                                <Trash2 size={15} aria-hidden="true" /> Delete unused
+                                <Trash2 size={16} aria-hidden="true" /> Delete unused
                               </button>
                             </div>
-                          </details>
-                        </div>
-                      ) : null}
-
-                      {value.lifecycleState === 'archived' ? (
-                        <div className={styles.rowActions}>
-                          <button
-                            className="button"
-                            type="button"
-                            disabled={busy === value.id}
-                            onClick={() => void restoreValue(item)}
-                          >
-                            <RotateCcw size={16} aria-hidden="true" /> Restore
-                          </button>
-                          <button
-                            className="button"
-                            type="button"
-                            disabled={busy === value.id || !canArchiveDirectly(item)}
-                            onClick={() => void deleteValue(item)}
-                          >
-                            <Trash2 size={16} aria-hidden="true" /> Delete unused
-                          </button>
-                        </div>
-                      ) : null}
-                    </article>
-                  );
-                })}
-              </div>
-            ) : null}
-          </section>
+                          ) : null}
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </section>
+            </>
+          ) : (
+            <ClassificationMappingPresetManager
+              familyId={familyId}
+              familyLabel={family.label}
+              values={items.map((item) => item.value)}
+            />
+          )}
         </div>
       </div>
     </section>

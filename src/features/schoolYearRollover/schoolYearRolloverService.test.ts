@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ClassroomDatabase } from '@/data/db/ClassroomDatabase';
 import { EditHistoryService } from '@/features/editing/editHistoryService';
+import { buildRestorePreview } from '@/features/backupRecovery/backupFormat';
 
 import { SchoolYearRolloverService } from './schoolYearRolloverService';
 
@@ -99,6 +100,29 @@ beforeEach(async () => {
     scopeKey: 'lesson-plan:source-plan:step:source-step',
     createdAt: '2026-07-01T12:00:00.000Z',
   });
+  await database.categoryValues.put({
+    id: 'subject-ela',
+    familyId: 'subject',
+    name: 'English Language Arts',
+    normalizedName: 'english language arts',
+    aliases: [],
+    normalizedAliases: [],
+    sortOrder: 0,
+    isDefault: false,
+    lifecycleState: 'active',
+    createdAt: '2026-07-01T12:00:00.000Z',
+    updatedAt: '2026-07-01T12:00:00.000Z',
+  });
+  await database.classificationMappingPresets.put({
+    id: 'mapping-ela',
+    familyId: 'subject',
+    sourceText: 'ELA',
+    normalizedSourceText: 'ela',
+    targetCategoryValueId: 'subject-ela',
+    status: 'active',
+    createdAt: '2026-07-01T12:00:00.000Z',
+    updatedAt: '2026-07-01T12:00:00.000Z',
+  });
 });
 
 afterEach(async () => {
@@ -148,6 +172,13 @@ describe('SchoolYearRolloverService instructional repair', () => {
     expect(await database.sessionOccurrences.count()).toBe(1);
     expect(await database.schoolYears.toArray()).toEqual(beforeYears);
 
+    expect(await database.classificationMappingPresets.get('mapping-ela')).toMatchObject({
+      targetCategoryValueId: 'subject-ela',
+      status: 'active',
+    });
+    const safetyPreview = buildRestorePreview(result.safetySnapshot.payloadJson);
+    expect(safetyPreview.validTables.classificationMappingPresets).toHaveLength(1);
+
     await history.undo();
     expect(await database.lessonPlans.get('target-plan')).toBeUndefined();
     expect(await database.lessonSeries.get('target-series')).toBeUndefined();
@@ -159,6 +190,7 @@ describe('SchoolYearRolloverService instructional repair', () => {
     await history.redo();
     expect(await database.lessonPlans.get('target-plan')).toBeDefined();
     expect(await database.schoolYears.toArray()).toEqual(beforeYears);
+    expect(await database.classificationMappingPresets.get('mapping-ela')).toBeDefined();
   });
 
   it('rejects a stale preview before creating a safety snapshot', async () => {
