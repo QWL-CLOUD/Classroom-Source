@@ -675,3 +675,19 @@
     grid-template-columns: 1fr;
   }
 }
+
+.classificationReview {
+  display: grid;
+  gap: 0.65rem;
+  align-content: start;
+  min-width: 0;
+}
+
+.classificationReview > label {
+  min-width: 0;
+}
+
+.mappingManageLink {
+  display: block;
+  overflow-wrap: anywhere;
+}

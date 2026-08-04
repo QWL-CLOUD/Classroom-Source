@@ -7,6 +7,7 @@ import { classroomDb } from '@/data/db/ClassroomDatabase';
 import {
   categoryAssignmentSchema,
   categoryValueSchema,
+  classificationMappingPresetSchema,
   libraryCatalogItemSchema,
 } from '@/domain/models/entities';
 import {
@@ -29,6 +30,7 @@ import { downloadActivityImportTemplate } from '@/features/activityImport/activi
 import { activityImportMutationService } from '@/features/activityImport/activityImportMutationService';
 
 import { ImportClassificationReview } from './ImportClassificationReview';
+import type { ImportClassificationMappingPersistenceDecisions } from './importClassificationMappingPresetPlan';
 import { ImportMappingTable, type ImportMappingField } from './ImportMappingTable';
 import { ImportPreviewTable, type ImportPreviewColumn } from './ImportPreviewTable';
 import { ImportSourcePanel, type ImportSourcePanelMode } from './ImportSourcePanel';
@@ -146,15 +148,17 @@ function decodeDuplicateDecision(value: string): ActivityDuplicateDecision | und
 
 export function ActivitiesImportWorkspace() {
   const data = useLiveQuery(async () => {
-    const [items, values, assignments] = await Promise.all([
+    const [items, values, assignments, mappingPresets] = await Promise.all([
       classroomDb.libraryItems.toArray(),
       classroomDb.categoryValues.toArray(),
       classroomDb.categoryAssignments.where('entityType').equals('library-item').toArray(),
+      classroomDb.classificationMappingPresets.toArray(),
     ]);
     return {
       items: items.map((value) => libraryCatalogItemSchema.parse(value)),
       categoryValues: values.map((value) => categoryValueSchema.parse(value)),
       categoryAssignments: assignments.map((value) => categoryAssignmentSchema.parse(value)),
+      mappingPresets: mappingPresets.map((value) => classificationMappingPresetSchema.parse(value)),
     };
   }, []);
 
@@ -171,6 +175,8 @@ export function ActivitiesImportWorkspace() {
   const [unmappedDecisions, setUnmappedDecisions] = useState<UnmappedColumnDecisions>({});
   const [duplicateDecisions, setDuplicateDecisions] = useState<ActivityDuplicateDecisions>({});
   const [categoryDecisions, setCategoryDecisions] = useState<ActivityCategoryDecisions>({});
+  const [mappingPersistenceDecisions, setMappingPersistenceDecisions] =
+    useState<ImportClassificationMappingPersistenceDecisions>({});
   const [preview, setPreview] = useState<ActivityImportPreview | null>(null);
   const [reviewDirty, setReviewDirty] = useState(false);
   const [confirmUpdates, setConfirmUpdates] = useState(false);
@@ -211,6 +217,7 @@ export function ActivitiesImportWorkspace() {
     setUnmappedDecisions({});
     setDuplicateDecisions({});
     setCategoryDecisions({});
+    setMappingPersistenceDecisions({});
     invalidatePreview();
   }
 
@@ -224,6 +231,7 @@ export function ActivitiesImportWorkspace() {
     setUnmappedDecisions({});
     setDuplicateDecisions({});
     setCategoryDecisions({});
+    setMappingPersistenceDecisions({});
     invalidatePreview();
   }
 
@@ -287,6 +295,8 @@ export function ActivitiesImportWorkspace() {
           unmappedDecisions,
           duplicateDecisions,
           categoryDecisions,
+          mappingPersistenceDecisions,
+          mappingPresets: data.mappingPresets,
           existingItems: data.items,
           categoryValues: data.categoryValues,
           categoryAssignments: data.categoryAssignments,
@@ -315,8 +325,12 @@ export function ActivitiesImportWorkspace() {
         confirmUpdates,
         confirmCommit,
       });
+      const mappingSummary =
+        result.createdMappingPresets.length > 0 || result.updatedMappingPresets.length > 0
+          ? ` Saved ${result.createdMappingPresets.length} and updated ${result.updatedMappingPresets.length} import mappings.`
+          : '';
       setSuccess(
-        `Committed ${result.created.length} new and ${result.updated.length} updated Activities. ${result.skippedCount} rows were skipped.`,
+        `Committed ${result.created.length} new and ${result.updated.length} updated Activities. ${result.skippedCount} rows were skipped.${mappingSummary}`,
       );
       setPreview(null);
       setReviewDirty(false);
@@ -608,12 +622,21 @@ export function ActivitiesImportWorkspace() {
                 <ImportClassificationReview
                   reviews={categoryReviews}
                   decisions={categoryDecisions}
+                  mappingPersistenceDecisions={mappingPersistenceDecisions}
                   categoryValues={data?.categoryValues ?? []}
                   disabled={busy}
                   onDecision={(key, decision) => {
                     setCategoryDecisions((current) => ({
                       ...current,
                       [key]: decision,
+                    }));
+                    setReviewDirty(true);
+                    setConfirmCommit(false);
+                  }}
+                  onMappingPersistenceDecision={(key, mappingDecision) => {
+                    setMappingPersistenceDecisions((current) => ({
+                      ...current,
+                      [key]: mappingDecision,
                     }));
                     setReviewDirty(true);
                     setConfirmCommit(false);

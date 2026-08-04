@@ -16,6 +16,7 @@ import { classroomDb } from '@/data/db/ClassroomDatabase';
 import {
   categoryAssignmentSchema,
   categoryValueSchema,
+  classificationMappingPresetSchema,
   libraryCatalogItemSchema,
 } from '@/domain/models/entities';
 import {
@@ -45,6 +46,7 @@ import {
 import { downloadResourceImportTemplate } from '@/features/resourceImport/resourceImportTemplate';
 
 import { ImportClassificationReview } from './ImportClassificationReview';
+import type { ImportClassificationMappingPersistenceDecisions } from './importClassificationMappingPresetPlan';
 import { ImportMappingTable, type ImportMappingField } from './ImportMappingTable';
 import { ImportPreviewTable, type ImportPreviewColumn } from './ImportPreviewTable';
 import { ImportSourcePanel } from './ImportSourcePanel';
@@ -173,15 +175,17 @@ function sourceKind(workbook: ImportWorkbook): ImportSourceKind {
 
 export function ResourcesImportWorkspace() {
   const data = useLiveQuery(async () => {
-    const [items, values, assignments] = await Promise.all([
+    const [items, values, assignments, mappingPresets] = await Promise.all([
       classroomDb.libraryItems.toArray(),
       classroomDb.categoryValues.toArray(),
       classroomDb.categoryAssignments.where('entityType').equals('library-item').toArray(),
+      classroomDb.classificationMappingPresets.toArray(),
     ]);
     return {
       items: items.map((value) => libraryCatalogItemSchema.parse(value)),
       categoryValues: values.map((value) => categoryValueSchema.parse(value)),
       categoryAssignments: assignments.map((value) => categoryAssignmentSchema.parse(value)),
+      mappingPresets: mappingPresets.map((value) => classificationMappingPresetSchema.parse(value)),
     };
   }, []);
 
@@ -202,6 +206,8 @@ export function ResourcesImportWorkspace() {
   const [duplicateDecisions, setDuplicateDecisions] = useState<ResourceDuplicateDecisions>({});
   const [classificationDecisions, setClassificationDecisions] =
     useState<ResourceClassificationDecisions>({});
+  const [mappingPersistenceDecisions, setMappingPersistenceDecisions] =
+    useState<ImportClassificationMappingPersistenceDecisions>({});
   const [sourceDecisions, setSourceDecisions] = useState<ResourceSourceDecisions>({});
   const [preview, setPreview] = useState<ResourceImportPreview | null>(null);
   const [reviewDirty, setReviewDirty] = useState(false);
@@ -241,6 +247,7 @@ export function ResourcesImportWorkspace() {
     setUnmappedDecisions({});
     setDuplicateDecisions({});
     setClassificationDecisions({});
+    setMappingPersistenceDecisions({});
     setSourceDecisions({});
     invalidatePreview();
   }
@@ -261,6 +268,7 @@ export function ResourcesImportWorkspace() {
     setUnmappedDecisions({});
     setDuplicateDecisions({});
     setClassificationDecisions({});
+    setMappingPersistenceDecisions({});
     setSourceDecisions({});
     invalidatePreview();
   }
@@ -341,6 +349,8 @@ export function ResourcesImportWorkspace() {
           duplicateDecisions,
           formatDecisions: {},
           classificationDecisions,
+          mappingPersistenceDecisions,
+          mappingPresets: data.mappingPresets,
           sourceDecisions,
           existingItems: data.items,
           categoryValues: data.categoryValues,
@@ -368,8 +378,12 @@ export function ResourcesImportWorkspace() {
         confirmUpdates,
         confirmCommit,
       });
+      const mappingSummary =
+        result.createdMappingPresets.length > 0 || result.updatedMappingPresets.length > 0
+          ? ` Saved ${result.createdMappingPresets.length} and updated ${result.updatedMappingPresets.length} import mappings.`
+          : '';
       setSuccess(
-        `Committed ${result.created.length} new and ${result.updated.length} updated Resources. One global Undo reverses the complete import.`,
+        `Committed ${result.created.length} new and ${result.updated.length} updated Resources.${mappingSummary} One global Undo reverses the complete import.`,
       );
       setConfirmCommit(false);
       setConfirmUpdates(false);
@@ -889,12 +903,21 @@ export function ResourcesImportWorkspace() {
                 <ImportClassificationReview
                   reviews={classificationReviews}
                   decisions={classificationDecisions}
+                  mappingPersistenceDecisions={mappingPersistenceDecisions}
                   categoryValues={data?.categoryValues ?? []}
                   disabled={busy}
                   onDecision={(key, decision) => {
                     setClassificationDecisions((current) => ({
                       ...current,
                       [key]: decision,
+                    }));
+                    setReviewDirty(true);
+                    setConfirmCommit(false);
+                  }}
+                  onMappingPersistenceDecision={(key, mappingDecision) => {
+                    setMappingPersistenceDecisions((current) => ({
+                      ...current,
+                      [key]: mappingDecision,
                     }));
                     setReviewDirty(true);
                     setConfirmCommit(false);

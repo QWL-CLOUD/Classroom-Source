@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   categoryValueSchema,
+  classificationMappingPresetSchema,
   libraryCatalogItemSchema,
   type CategoryAssignment,
   type CategoryValue,
+  type ClassificationMappingPreset,
   type LibraryCatalogItem,
 } from '@/domain/models/entities';
 import { buildImportTable } from '@/features/importCenter/importTableModel';
@@ -65,6 +67,10 @@ function preview(
     defaults?: { externalSource?: string; sourceReference?: string };
     duplicateDecisions?: ActivityDuplicateDecisions;
     categoryDecisions?: ActivityCategoryDecisions;
+    mappingPersistenceDecisions?: Parameters<
+      typeof buildActivityImportPreview
+    >[0]['mappingPersistenceDecisions'];
+    mappingPresets?: ClassificationMappingPreset[];
     unmappedDecisions?: UnmappedColumnDecisions;
   } = {},
 ) {
@@ -78,9 +84,11 @@ function preview(
       unmappedDecisions: options.unmappedDecisions ?? {},
       duplicateDecisions: options.duplicateDecisions ?? {},
       categoryDecisions: options.categoryDecisions ?? {},
+      mappingPersistenceDecisions: options.mappingPersistenceDecisions ?? {},
       existingItems: options.existingItems ?? [],
       categoryValues: options.categoryValues ?? [],
       categoryAssignments: options.categoryAssignments ?? [],
+      mappingPresets: options.mappingPresets ?? [],
     },
     { createId: ids(), now: () => timestamp },
   );
@@ -340,5 +348,40 @@ describe('Activity import model', () => {
     );
     expect(resolved.rows[0]?.classification).toBe('create');
     expect(resolved.restoredCategoryValues[0]?.after.lifecycleState).toBe('active');
+  });
+
+  it('shows and plans saved mapping behavior without writing during preview', () => {
+    const subject = category({
+      id: 'subject-ela',
+      familyId: 'subject',
+      name: 'English Language Arts',
+      normalizedName: 'english language arts',
+    });
+    const mappingPreset = classificationMappingPresetSchema.parse({
+      id: 'mapping-ela',
+      familyId: 'subject',
+      sourceText: 'ELA',
+      normalizedSourceText: 'ela',
+      targetCategoryValueId: subject.id,
+      status: 'active',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+    const result = preview(
+      [
+        ['title', 'subject'],
+        ['Partner retell', 'ELA'],
+      ],
+      { categoryValues: [subject], mappingPresets: [mappingPreset] },
+    );
+
+    expect(result.rows[0]?.classification).toBe('create');
+    expect(result.rows[0]?.reasons).toContain(
+      'Saved import mapping: “ELA” → “English Language Arts”.',
+    );
+    expect(result.expectedMappingPresets).toEqual([expect.objectContaining({ id: 'mapping-ela' })]);
+    expect(result.classificationAudit).toEqual([
+      expect.objectContaining({ resolution: 'saved-preset', mappingPresetId: 'mapping-ela' }),
+    ]);
   });
 });

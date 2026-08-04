@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import type { LibraryCatalogItem } from '@/domain/models/entities';
+import {
+  categoryValueSchema,
+  classificationMappingPresetSchema,
+  type LibraryCatalogItem,
+} from '@/domain/models/entities';
 import { buildImportTable } from '@/features/importCenter/importTableModel';
 
 import {
@@ -247,5 +251,58 @@ describe('assessmentImportModel', () => {
     });
     expect(preview.rows[0]?.classification).toBe('blocked');
     expect(preview.rows[0]?.reasons.join(' ')).toContain('Rubric');
+  });
+
+  it('automatically reuses a safe family-scoped mapping and identifies it visibly', () => {
+    const now = '2026-08-01T00:00:00.000Z';
+    const subject = categoryValueSchema.parse({
+      id: 'subject-ela',
+      familyId: 'subject',
+      name: 'English Language Arts',
+      normalizedName: 'english language arts',
+      aliases: [],
+      normalizedAliases: [],
+      sortOrder: 0,
+      isDefault: false,
+      lifecycleState: 'active',
+      createdAt: now,
+      updatedAt: now,
+    });
+    const mappingPreset = classificationMappingPresetSchema.parse({
+      id: 'mapping-ela',
+      familyId: 'subject',
+      sourceText: 'ELA',
+      normalizedSourceText: 'ela',
+      targetCategoryValueId: subject.id,
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    });
+    const source = table([
+      ['Title', 'Assessment Kind', 'Subject'],
+      ['Quick check', 'Formative', 'ELA'],
+    ]);
+    const preview = buildAssessmentImportPreview(
+      {
+        table: source,
+        mapping: suggestAssessmentImportMapping(source.headers),
+        defaults: {},
+        unmappedDecisions: {},
+        duplicateDecisions: {},
+        kindDecisions: {},
+        existingItems: [],
+        categoryValues: [subject],
+        categoryAssignments: [],
+        mappingPresets: [mappingPreset],
+      },
+      { createId: () => 'id-1', now: () => now },
+    );
+
+    expect(preview.rows[0]?.reasons).toContain(
+      'Saved import mapping: “ELA” → “English Language Arts”.',
+    );
+    expect(preview.classificationAudit).toEqual([
+      expect.objectContaining({ resolution: 'saved-preset', mappingPresetId: 'mapping-ela' }),
+    ]);
   });
 });

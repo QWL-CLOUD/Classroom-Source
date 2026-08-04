@@ -3,6 +3,7 @@ import {
   libraryCatalogItemSchema,
   type CategoryAssignment,
   type CategoryValue,
+  type ClassificationMappingPreset,
   type LibraryCatalogItem,
   type LibraryCatalogStatus,
   type LibraryResourceFields,
@@ -21,6 +22,10 @@ import {
   type ImportClassificationDecisions,
   type ImportClassificationReview,
 } from '@/features/importCenter/importClassificationResolution';
+import type {
+  ImportClassificationMappingAuditRecord,
+  ImportClassificationMappingPersistenceDecisions,
+} from '@/features/importCenter/importClassificationMappingPresetPlan';
 import {
   createEmptyImportColumnMapping,
   mappedImportValue,
@@ -289,6 +294,13 @@ export interface ResourceImportPreview extends Omit<
   formatReviews: ResourceFormatReview[];
   classificationReviews: ImportClassificationReview[];
   classificationAudit: ImportClassificationAuditRecord[];
+  newMappingPresets: ClassificationMappingPreset[];
+  updatedMappingPresets: Array<{
+    before: ClassificationMappingPreset;
+    after: ClassificationMappingPreset;
+  }>;
+  expectedMappingPresets: ClassificationMappingPreset[];
+  classificationMappingAudit: ImportClassificationMappingAuditRecord[];
 }
 
 export interface BuildResourceImportPreviewInput {
@@ -299,9 +311,11 @@ export interface BuildResourceImportPreviewInput {
   duplicateDecisions: ResourceDuplicateDecisions;
   formatDecisions: ResourceFormatDecisions;
   classificationDecisions?: ResourceClassificationDecisions;
+  mappingPersistenceDecisions?: ImportClassificationMappingPersistenceDecisions;
   sourceDecisions: ResourceSourceDecisions;
   existingItems: readonly LibraryCatalogItem[];
   categoryValues: readonly CategoryValue[];
+  mappingPresets?: readonly ClassificationMappingPreset[];
   categoryAssignments: readonly CategoryAssignment[];
 }
 
@@ -607,7 +621,9 @@ export function buildResourceImportPreview(
   const classificationSession = createImportClassificationResolutionSession({
     catalogType: 'resource',
     categoryValues: input.categoryValues,
+    mappingPresets: input.mappingPresets ?? [],
     decisions: { ...legacyFormatDecisions, ...(input.classificationDecisions ?? {}) },
+    mappingPersistenceDecisions: input.mappingPersistenceDecisions ?? {},
     createId,
     generatedAt,
   });
@@ -979,17 +995,27 @@ export function buildResourceImportPreview(
       ...currentClassificationSnapshot.newCategoryValues.map((value) => value.id),
       ...currentClassificationSnapshot.restoredCategoryValues.map((value) => value.after.id),
     ]);
+    const mappingChanged = classification.mappingPersistencePlanned;
     const categoryLifecycleChange = assignmentPlan.desiredCategoryValueIds.some((id) =>
       lifecycleIds.has(id),
     );
 
     const itemChanged = !target || !sameRecord(withoutRun, target);
     const assignmentChanged = assignmentsToDelete.length > 0 || assignmentsToCreate.length > 0;
-    if (target && !itemChanged && !assignmentChanged && !categoryLifecycleChange) {
+    if (
+      target &&
+      !itemChanged &&
+      !assignmentChanged &&
+      !categoryLifecycleChange &&
+      !mappingChanged
+    ) {
       rows.push({
         sourceRow: normalized.sourceRow,
         classification: 'skip',
-        reasons: ['The stable Resource identity already has the same reviewed values.'],
+        reasons: [
+          'The stable Resource identity already has the same reviewed values.',
+          ...classification.mappingNotes,
+        ],
         normalized,
         duplicateReview,
         planned: {
@@ -1012,6 +1038,7 @@ export function buildResourceImportPreview(
       sourceRow: normalized.sourceRow,
       classification: target ? 'update' : 'create',
       reasons: [
+        ...classification.mappingNotes,
         target
           ? 'The reviewed stable identity or explicit duplicate decision updates this Resource.'
           : 'No strong existing identity was selected; create a new Resource.',
@@ -1051,6 +1078,7 @@ export function buildResourceImportPreview(
       duplicateDecisions: input.duplicateDecisions,
       formatDecisions: input.formatDecisions,
       classificationDecisions: input.classificationDecisions,
+      mappingPersistenceDecisions: input.mappingPersistenceDecisions ?? {},
       sourceDecisions: input.sourceDecisions,
     },
     generatedAt,
@@ -1073,5 +1101,9 @@ export function buildResourceImportPreview(
     ),
     classificationReviews: classificationSnapshot.classificationReviews,
     classificationAudit: classificationSnapshot.classificationAudit,
+    newMappingPresets: classificationSnapshot.newMappingPresets,
+    updatedMappingPresets: classificationSnapshot.updatedMappingPresets,
+    expectedMappingPresets: classificationSnapshot.expectedMappingPresets,
+    classificationMappingAudit: classificationSnapshot.classificationMappingAudit,
   };
 }

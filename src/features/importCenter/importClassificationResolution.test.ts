@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import type { CategoryAssignment, CategoryFamilyId, CategoryValue } from '@/domain/models/entities';
+import {
+  classificationMappingPresetSchema,
+  type CategoryAssignment,
+  type CategoryFamilyId,
+  type CategoryValue,
+} from '@/domain/models/entities';
 
 import {
   classificationSummaryJson,
@@ -59,6 +64,8 @@ describe('importClassificationResolution', () => {
         }),
         value('purpose-math', 'purpose-tag', 'Math'),
       ],
+      mappingPresets: [],
+      mappingPersistenceDecisions: {},
       decisions: {},
       createId: () => 'unused',
       generatedAt: now,
@@ -107,6 +114,8 @@ describe('importClassificationResolution', () => {
     const session = createImportClassificationResolutionSession({
       catalogType: 'activity',
       categoryValues,
+      mappingPresets: [],
+      mappingPersistenceDecisions: {},
       decisions: {},
       createId: () => 'new-value',
       generatedAt: now,
@@ -161,6 +170,8 @@ describe('importClassificationResolution', () => {
         }),
         value('language-current', 'language', 'Mandarin'),
       ],
+      mappingPresets: [],
+      mappingPersistenceDecisions: {},
       decisions,
       createId: () => 'subject-science',
       generatedAt: now,
@@ -198,6 +209,8 @@ describe('importClassificationResolution', () => {
     const session = createImportClassificationResolutionSession({
       catalogType: 'resource',
       categoryValues: [],
+      mappingPresets: [],
+      mappingPersistenceDecisions: {},
       decisions: {},
       createId: () => 'unused',
       generatedAt: now,
@@ -227,6 +240,8 @@ describe('importClassificationResolution', () => {
         reviewReasons: [],
         blockingReasons: [],
         genericTags: ['Focus: Imported text'],
+        mappingNotes: [],
+        mappingPersistencePlanned: false,
         families: [
           {
             familyId: 'subject',
@@ -287,12 +302,152 @@ describe('importClassificationResolution', () => {
           resultingName: 'Science',
         },
       ],
+      classificationMappingAudit: [
+        {
+          action: 'created',
+          presetId: 'mapping-science',
+          familyId: 'subject',
+          importedText: 'SCI',
+          normalizedText: 'sci',
+          targetCategoryValueId: 'subject-new',
+          targetName: 'Science',
+        },
+      ],
     });
     expect(JSON.parse(summary)).toMatchObject({
       sourceFingerprint: 'source-fingerprint',
       createdCategoryValues: 1,
       restoredCategoryValues: 0,
       classificationAudit: [expect.objectContaining({ occurrenceCount: 2 })],
+      classificationMappingAudit: [
+        expect.objectContaining({ action: 'created', presetId: 'mapping-science' }),
+      ],
     });
+  });
+
+  it('uses one safe active saved mapping only after canonical matching finds nothing', () => {
+    const session = createImportClassificationResolutionSession({
+      catalogType: 'activity',
+      categoryValues: [value('subject-ela', 'subject', 'English Language Arts')],
+      mappingPresets: [
+        classificationMappingPresetSchema.parse({
+          id: 'mapping-ela',
+          familyId: 'subject',
+          sourceText: 'ELA',
+          normalizedSourceText: 'ela',
+          targetCategoryValueId: 'subject-ela',
+          status: 'active',
+          createdAt: now,
+          updatedAt: now,
+        }),
+      ],
+      mappingPersistenceDecisions: {},
+      decisions: {},
+      createId: () => 'unused',
+      generatedAt: now,
+    });
+
+    const resolved = session.resolveRow({
+      sourceRow: 5,
+      presentFamilyIds: ['subject'],
+      values: { subject: 'ELA' },
+    });
+    const snapshot = session.snapshot();
+
+    expect(resolved.reviews).toEqual([]);
+    expect(resolved.mappingNotes).toEqual([
+      'Saved import mapping: “ELA” → “English Language Arts”.',
+    ]);
+    expect(resolved.families[0]?.categoryValueIds).toEqual(['subject-ela']);
+    expect(snapshot.expectedMappingPresets).toEqual([
+      expect.objectContaining({ id: 'mapping-ela' }),
+    ]);
+    expect(snapshot.classificationAudit).toEqual([
+      expect.objectContaining({
+        resolution: 'saved-preset',
+        mappingPresetId: 'mapping-ela',
+      }),
+    ]);
+  });
+
+  it('keeps canonical history ahead of a saved mapping', () => {
+    const session = createImportClassificationResolutionSession({
+      catalogType: 'activity',
+      categoryValues: [
+        value('subject-old', 'subject', 'ELA', {
+          lifecycleState: 'archived',
+          archivedAt: now,
+        }),
+        value('subject-current', 'subject', 'English Language Arts'),
+      ],
+      mappingPresets: [
+        classificationMappingPresetSchema.parse({
+          id: 'mapping-ela',
+          familyId: 'subject',
+          sourceText: 'ELA',
+          normalizedSourceText: 'ela',
+          targetCategoryValueId: 'subject-current',
+          status: 'active',
+          createdAt: now,
+          updatedAt: now,
+        }),
+      ],
+      mappingPersistenceDecisions: {},
+      decisions: {},
+      createId: () => 'unused',
+      generatedAt: now,
+    });
+
+    const resolved = session.resolveRow({
+      sourceRow: 6,
+      presentFamilyIds: ['subject'],
+      values: { subject: 'ELA' },
+    });
+
+    expect(resolved.reviews).toEqual([
+      expect.objectContaining({
+        kind: 'archived',
+        matchedValue: expect.objectContaining({ id: 'subject-old' }),
+      }),
+    ]);
+    expect(resolved.mappingNotes).toEqual([]);
+  });
+
+  it('requires review for an inactive saved mapping', () => {
+    const session = createImportClassificationResolutionSession({
+      catalogType: 'assessment',
+      categoryValues: [value('language-en', 'language', 'English')],
+      mappingPresets: [
+        classificationMappingPresetSchema.parse({
+          id: 'mapping-en',
+          familyId: 'language',
+          sourceText: 'EN',
+          normalizedSourceText: 'en',
+          targetCategoryValueId: 'language-en',
+          status: 'inactive',
+          createdAt: now,
+          updatedAt: now,
+          deactivatedAt: now,
+        }),
+      ],
+      mappingPersistenceDecisions: {},
+      decisions: {},
+      createId: () => 'unused',
+      generatedAt: now,
+    });
+
+    const resolved = session.resolveRow({
+      sourceRow: 7,
+      presentFamilyIds: ['language'],
+      values: { language: 'EN' },
+    });
+
+    expect(resolved.reviews).toEqual([
+      expect.objectContaining({
+        kind: 'mapping',
+        mappingIssue: 'inactive',
+        mappingPresets: [expect.objectContaining({ id: 'mapping-en' })],
+      }),
+    ]);
   });
 });

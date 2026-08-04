@@ -1,9 +1,11 @@
 import {
   categoryAssignmentSchema,
   categoryValueSchema,
+  classificationMappingPresetSchema,
   type CategoryAssignment,
   type CategoryFamilyId,
   type CategoryValue,
+  type ClassificationMappingPreset,
 } from '@/domain/models/entities';
 import {
   getCategoryFamily,
@@ -11,6 +13,14 @@ import {
 } from '@/features/categories/categoryFamilies';
 import { normalizeCategoryName } from '@/features/categories/categoryNormalization';
 import { normalizeImportText } from '@/features/importCenter/importTableModel';
+
+import {
+  importClassificationMappingPresetKey,
+  planImportClassificationMappingPresets,
+  type ImportClassificationMappingAuditRecord,
+  type ImportClassificationMappingPersistenceDecisions,
+  type ImportClassificationMappingPresetPlanSnapshot,
+} from './importClassificationMappingPresetPlan';
 
 export type ImportClassificationCatalogType = 'activity' | 'resource' | 'assessment';
 
@@ -79,7 +89,16 @@ export type ImportClassificationDecisions = Record<
   ImportClassificationDecision | undefined
 >;
 
-export type ImportClassificationReviewKind = 'unknown' | 'archived' | 'merged' | 'ambiguous';
+export type ImportClassificationReviewKind =
+  'unknown' | 'archived' | 'merged' | 'ambiguous' | 'mapping';
+
+export type ImportClassificationMappingIssue =
+  | 'inactive'
+  | 'target-archived'
+  | 'target-merged'
+  | 'target-missing'
+  | 'wrong-family'
+  | 'ambiguous';
 
 export interface ImportClassificationReview {
   key: string;
@@ -93,6 +112,9 @@ export interface ImportClassificationReview {
   matches: CategoryValue[];
   matchedValue?: CategoryValue;
   replacementValue?: CategoryValue;
+  mappingIssue?: ImportClassificationMappingIssue;
+  mappingPresets?: ClassificationMappingPreset[];
+  mappingTarget?: CategoryValue;
 }
 
 export type ImportClassificationAuditResolution =
@@ -103,7 +125,8 @@ export type ImportClassificationAuditResolution =
   | 'restored'
   | 'created'
   | 'generic-tag'
-  | 'ignored';
+  | 'ignored'
+  | 'saved-preset';
 
 export interface ImportClassificationAuditRecord {
   familyId: CategoryFamilyId;
@@ -113,6 +136,7 @@ export interface ImportClassificationAuditRecord {
   resolution: ImportClassificationAuditResolution;
   categoryValueId?: string;
   resultingName?: string;
+  mappingPresetId?: string;
 }
 
 export interface ImportClassificationResolvedFamily {
@@ -131,6 +155,8 @@ export interface ImportClassificationRowResolution {
   reviewReasons: string[];
   blockingReasons: string[];
   genericTags: string[];
+  mappingNotes: string[];
+  mappingPersistencePlanned: boolean;
 }
 
 export interface ResolveImportClassificationRowInput {
@@ -145,12 +171,21 @@ export interface ImportClassificationResolutionSnapshot {
   expectedCategoryValues: CategoryValue[];
   classificationReviews: ImportClassificationReview[];
   classificationAudit: ImportClassificationAuditRecord[];
+  newMappingPresets: ClassificationMappingPreset[];
+  updatedMappingPresets: Array<{
+    before: ClassificationMappingPreset;
+    after: ClassificationMappingPreset;
+  }>;
+  expectedMappingPresets: ClassificationMappingPreset[];
+  classificationMappingAudit: ImportClassificationMappingAuditRecord[];
 }
 
 export interface CreateImportClassificationResolutionSessionInput {
   catalogType: ImportClassificationCatalogType;
   categoryValues: readonly CategoryValue[];
+  mappingPresets: readonly ClassificationMappingPreset[];
   decisions: ImportClassificationDecisions;
+  mappingPersistenceDecisions: ImportClassificationMappingPersistenceDecisions;
   createId: () => string;
   generatedAt: string;
 }
@@ -167,6 +202,17 @@ function compareCategoryValue(first: CategoryValue, second: CategoryValue): numb
   return (
     first.sortOrder - second.sortOrder ||
     first.name.localeCompare(second.name) ||
+    first.id.localeCompare(second.id)
+  );
+}
+
+function comparePreset(
+  first: ClassificationMappingPreset,
+  second: ClassificationMappingPreset,
+): number {
+  return (
+    first.familyId.localeCompare(second.familyId) ||
+    first.normalizedSourceText.localeCompare(second.normalizedSourceText) ||
     first.id.localeCompare(second.id)
   );
 }
@@ -211,6 +257,24 @@ function uniqueMatches(values: readonly CategoryValue[]): CategoryValue[] {
 }
 
 function reviewMessage(review: ImportClassificationReview): string {
+  if (review.kind === 'mapping') {
+    if (review.mappingIssue === 'inactive') {
+      return `${review.fieldLabel} value “${review.displayValue}” matches an inactive saved import mapping.`;
+    }
+    if (review.mappingIssue === 'target-archived') {
+      return `${review.fieldLabel} value “${review.displayValue}” maps to an archived controlled value.`;
+    }
+    if (review.mappingIssue === 'target-merged') {
+      return `${review.fieldLabel} value “${review.displayValue}” maps to merged classification history.`;
+    }
+    if (review.mappingIssue === 'target-missing') {
+      return `${review.fieldLabel} value “${review.displayValue}” has a saved mapping whose target is missing.`;
+    }
+    if (review.mappingIssue === 'wrong-family') {
+      return `${review.fieldLabel} value “${review.displayValue}” has a saved mapping to another classification family.`;
+    }
+    return `${review.fieldLabel} value “${review.displayValue}” matches multiple saved import mappings.`;
+  }
   if (review.kind === 'unknown') {
     return `Review ${review.fieldLabel} value “${review.displayValue}”.`;
   }
@@ -230,6 +294,7 @@ function auditKey(record: Omit<ImportClassificationAuditRecord, 'occurrenceCount
     record.resolution,
     record.categoryValueId ?? '',
     record.resultingName ?? '',
+    record.mappingPresetId ?? '',
   ].join('\u0000');
 }
 
@@ -240,6 +305,16 @@ export function createImportClassificationResolutionSession(
   const applicableFamilyIds = new Set(definitions.map((definition) => definition.familyId));
   const values = input.categoryValues.map((value) => categoryValueSchema.parse(value));
   const valueById = new Map(values.map((value) => [value.id, value] as const));
+  const mappingPresets = input.mappingPresets.map((preset) =>
+    classificationMappingPresetSchema.parse(preset),
+  );
+  const mappingPresetsByKey = new Map<string, ClassificationMappingPreset[]>();
+  for (const preset of mappingPresets) {
+    const key = importClassificationMappingPresetKey(preset.familyId, preset.normalizedSourceText);
+    const presets = mappingPresetsByKey.get(key) ?? [];
+    presets.push(preset);
+    mappingPresetsByKey.set(key, presets);
+  }
   const valuesByFamily = new Map<CategoryFamilyId, CategoryValue[]>();
   for (const value of values) {
     const familyValues = valuesByFamily.get(value.familyId) ?? [];
@@ -259,12 +334,18 @@ export function createImportClassificationResolutionSession(
   const newCategoryByKey = new Map<string, CategoryValue>();
   const restoredCategoryById = new Map<string, { before: CategoryValue; after: CategoryValue }>();
   const expectedCategoryById = new Map<string, CategoryValue>();
+  const expectedMappingById = new Map<string, ClassificationMappingPreset>();
   const reviewsByKey = new Map<string, ImportClassificationReview>();
   const auditByKey = new Map<string, ImportClassificationAuditRecord>();
   const resolvedRows = new Set<number>();
+  let mappingPlanCache: ImportClassificationMappingPresetPlanSnapshot | undefined;
 
   function addExpected(value: CategoryValue | undefined): void {
     if (value) expectedCategoryById.set(value.id, value);
+  }
+
+  function addExpectedMapping(preset: ClassificationMappingPreset | undefined): void {
+    if (preset) expectedMappingById.set(preset.id, preset);
   }
 
   function addAudit(record: Omit<ImportClassificationAuditRecord, 'occurrenceCount'>): void {
@@ -321,6 +402,49 @@ export function createImportClassificationResolutionSession(
     };
   }
 
+  function buildMappingReview(
+    definition: ImportClassificationFieldDefinition,
+    displayValue: string,
+    presets: ClassificationMappingPreset[],
+  ): ImportClassificationReview {
+    const normalizedValue = normalizeCategoryName(displayValue);
+    const single = presets.length === 1 ? presets[0] : undefined;
+    const target = single ? valueById.get(single.targetCategoryValueId) : undefined;
+    const issue: ImportClassificationMappingIssue =
+      presets.length > 1
+        ? 'ambiguous'
+        : single?.status === 'inactive'
+          ? 'inactive'
+          : !target
+            ? 'target-missing'
+            : target.familyId !== definition.familyId
+              ? 'wrong-family'
+              : target.lifecycleState === 'archived'
+                ? 'target-archived'
+                : target.lifecycleState === 'merged'
+                  ? 'target-merged'
+                  : 'ambiguous';
+    return {
+      key: reviewKey(definition.familyId, displayValue),
+      familyId: definition.familyId,
+      familyLabel: getCategoryFamily(definition.familyId).label,
+      fieldLabel: definition.fieldLabel,
+      genericTagPrefix: definition.genericTagPrefix,
+      displayValue,
+      normalizedValue,
+      kind: 'mapping',
+      matches: target ? [target] : [],
+      matchedValue: target,
+      replacementValue:
+        target?.lifecycleState === 'merged' && target.mergedIntoId
+          ? valueById.get(target.mergedIntoId)
+          : undefined,
+      mappingIssue: issue,
+      mappingPresets: presets,
+      mappingTarget: target,
+    };
+  }
+
   function resolveReviewDecision(
     review: ImportClassificationReview,
     decision: ImportClassificationDecision | undefined,
@@ -332,6 +456,7 @@ export function createImportClassificationResolutionSession(
   } {
     for (const match of review.matches) addExpected(match);
     addExpected(review.replacementValue);
+    for (const preset of review.mappingPresets ?? []) addExpectedMapping(preset);
 
     if (!decision) return { unresolved: review, reason: reviewMessage(review) };
 
@@ -454,6 +579,7 @@ export function createImportClassificationResolutionSession(
   }
 
   function resolveRow(row: ResolveImportClassificationRowInput): ImportClassificationRowResolution {
+    mappingPlanCache = undefined;
     if (resolvedRows.has(row.sourceRow)) {
       throw new Error(`Classification resolution for row ${row.sourceRow} was requested twice.`);
     }
@@ -465,6 +591,8 @@ export function createImportClassificationResolutionSession(
     const reviewReasons: string[] = [];
     const blockingReasons: string[] = [];
     const genericTags: string[] = [];
+    const mappingNotes: string[] = [];
+    let mappingPersistencePlanned = false;
 
     for (const definition of definitions) {
       const familyId = definition.familyId;
@@ -499,8 +627,63 @@ export function createImportClassificationResolutionSession(
             continue;
           }
 
+          if (matches.length === 0) {
+            const mappingKey = importClassificationMappingPresetKey(familyId, normalizedValue);
+            const matchingPresets = mappingPresetsByKey.get(mappingKey) ?? [];
+            if (matchingPresets.length === 1) {
+              const preset = matchingPresets[0];
+              const target = preset ? valueById.get(preset.targetCategoryValueId) : undefined;
+              const safe =
+                preset?.status === 'active' &&
+                target?.familyId === familyId &&
+                target.lifecycleState === 'active';
+              if (preset && target && safe) {
+                addExpected(target);
+                addExpectedMapping(preset);
+                addAudit({
+                  familyId,
+                  importedText: displayValue,
+                  normalizedText: normalizedValue,
+                  resolution: 'saved-preset',
+                  categoryValueId: target.id,
+                  resultingName: target.name,
+                  mappingPresetId: preset.id,
+                });
+                familyCategoryValueIds.push(target.id);
+                mappingNotes.push(`Saved import mapping: “${displayValue}” → “${target.name}”.`);
+                continue;
+              }
+            }
+            if (matchingPresets.length > 0) {
+              const mappingReview = buildMappingReview(definition, displayValue, matchingPresets);
+              reviewsByKey.set(mappingReview.key, mappingReview);
+              if (input.mappingPersistenceDecisions[mappingReview.key]) {
+                mappingPersistencePlanned = true;
+              }
+              const resolved = resolveReviewDecision(
+                mappingReview,
+                input.decisions[mappingReview.key],
+              );
+              if (resolved.unresolved) {
+                reviews.push(resolved.unresolved);
+                reviewReasons.push(resolved.reason ?? reviewMessage(resolved.unresolved));
+              }
+              if (resolved.categoryValueId) {
+                familyCategoryValueIds.push(resolved.categoryValueId);
+              }
+              if (resolved.genericTag) {
+                familyGenericTags.push(resolved.genericTag);
+                genericTags.push(resolved.genericTag);
+              }
+              continue;
+            }
+          }
+
           const review = buildReview(definition, displayValue, matches);
           reviewsByKey.set(review.key, review);
+          if (input.mappingPersistenceDecisions[review.key]) {
+            mappingPersistencePlanned = true;
+          }
           const resolved = resolveReviewDecision(review, input.decisions[review.key]);
           if (resolved.unresolved) {
             reviews.push(resolved.unresolved);
@@ -531,27 +714,50 @@ export function createImportClassificationResolutionSession(
       reviewReasons,
       blockingReasons,
       genericTags: [...new Set(genericTags)],
+      mappingNotes: [...new Set(mappingNotes)],
+      mappingPersistencePlanned,
     };
   }
 
   function snapshot(): ImportClassificationResolutionSnapshot {
+    const classificationReviews = [...reviewsByKey.values()].sort(
+      (first, second) =>
+        first.familyLabel.localeCompare(second.familyLabel) ||
+        first.displayValue.localeCompare(second.displayValue),
+    );
+    const mappingPlan =
+      mappingPlanCache ??
+      planImportClassificationMappingPresets({
+        reviews: classificationReviews,
+        decisions: input.decisions,
+        persistenceDecisions: input.mappingPersistenceDecisions,
+        categoryValues: values,
+        mappingPresets,
+        createId: input.createId,
+        generatedAt: input.generatedAt,
+      });
+    mappingPlanCache = mappingPlan;
+    const expectedMappingPresets = new Map(expectedMappingById);
+    for (const preset of mappingPlan.expectedMappingPresets) {
+      expectedMappingPresets.set(preset.id, preset);
+    }
     return {
       newCategoryValues: [...newCategoryByKey.values()].sort(compareCategoryValue),
       restoredCategoryValues: [...restoredCategoryById.values()].sort((first, second) =>
         compareCategoryValue(first.before, second.before),
       ),
       expectedCategoryValues: [...expectedCategoryById.values()].sort(compareCategoryValue),
-      classificationReviews: [...reviewsByKey.values()].sort(
-        (first, second) =>
-          first.familyLabel.localeCompare(second.familyLabel) ||
-          first.displayValue.localeCompare(second.displayValue),
-      ),
+      classificationReviews,
       classificationAudit: [...auditByKey.values()].sort(
         (first, second) =>
           first.familyId.localeCompare(second.familyId) ||
           first.normalizedText.localeCompare(second.normalizedText) ||
           first.resolution.localeCompare(second.resolution),
       ),
+      newMappingPresets: mappingPlan.newMappingPresets,
+      updatedMappingPresets: mappingPlan.updatedMappingPresets,
+      expectedMappingPresets: [...expectedMappingPresets.values()].sort(comparePreset),
+      classificationMappingAudit: mappingPlan.classificationMappingAudit,
     };
   }
 
@@ -645,6 +851,7 @@ export function classificationSummaryJson(input: {
   newCategoryValues: readonly CategoryValue[];
   restoredCategoryValues: readonly { before: CategoryValue; after: CategoryValue }[];
   classificationAudit: readonly ImportClassificationAuditRecord[];
+  classificationMappingAudit?: readonly ImportClassificationMappingAuditRecord[];
   additionalSummary?: Readonly<Record<string, unknown>>;
 }): string {
   const summary = JSON.stringify({
@@ -653,6 +860,7 @@ export function classificationSummaryJson(input: {
     createdCategoryValues: input.newCategoryValues.length,
     restoredCategoryValues: input.restoredCategoryValues.length,
     classificationAudit: input.classificationAudit,
+    classificationMappingAudit: input.classificationMappingAudit ?? [],
     ...input.additionalSummary,
   });
   if (summary.length > 100_000) {

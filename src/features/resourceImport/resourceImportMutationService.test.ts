@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ClassroomDatabase } from '@/data/db/ClassroomDatabase';
 import {
   categoryValueSchema,
+  classificationMappingPresetSchema,
   libraryCatalogItemSchema,
   type LibraryCatalogItem,
 } from '@/domain/models/entities';
@@ -55,13 +56,17 @@ async function buildPreview(
       typeof buildResourceImportPreview
     >[0]['classificationDecisions'];
     duplicateDecisions?: Parameters<typeof buildResourceImportPreview>[0]['duplicateDecisions'];
+    mappingPersistenceDecisions?: Parameters<
+      typeof buildResourceImportPreview
+    >[0]['mappingPersistenceDecisions'];
   } = {},
 ) {
   const table = buildImportTable(rows);
-  const [existingItems, categoryValues, categoryAssignments] = await Promise.all([
+  const [existingItems, categoryValues, categoryAssignments, mappingPresets] = await Promise.all([
     database.libraryItems.toArray(),
     database.categoryValues.toArray(),
     database.categoryAssignments.toArray(),
+    database.classificationMappingPresets.toArray(),
   ]);
   return buildResourceImportPreview(
     {
@@ -72,10 +77,12 @@ async function buildPreview(
       duplicateDecisions: options.duplicateDecisions ?? {},
       formatDecisions: options.formatDecisions ?? {},
       classificationDecisions: options.classificationDecisions ?? {},
+      mappingPersistenceDecisions: options.mappingPersistenceDecisions ?? {},
       sourceDecisions: {},
       existingItems,
       categoryValues,
       categoryAssignments,
+      mappingPresets,
     },
     { createId: ids('preview'), now: () => timestamp },
   );
@@ -311,5 +318,65 @@ describe('ResourceImportMutationService', () => {
     expect(await database.categoryAssignments.count()).toBe(0);
     expect(await database.importRuns.count()).toBe(0);
     expect(await database.changeLog.count()).toBe(0);
+  });
+
+  it('updates an inactive mapping atomically with the Resource import', async () => {
+    await database.categoryValues.put(
+      categoryValueSchema.parse({
+        id: 'subject-ela',
+        familyId: 'subject',
+        name: 'English Language Arts',
+        normalizedName: 'english language arts',
+        aliases: [],
+        normalizedAliases: [],
+        sortOrder: 0,
+        isDefault: false,
+        lifecycleState: 'active',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }),
+    );
+    await database.classificationMappingPresets.put(
+      classificationMappingPresetSchema.parse({
+        id: 'mapping-ela',
+        familyId: 'subject',
+        sourceText: 'ELA',
+        normalizedSourceText: 'ela',
+        targetCategoryValueId: 'subject-ela',
+        status: 'inactive',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        deactivatedAt: timestamp,
+      }),
+    );
+    const reviewKey = 'subject\u0000ela';
+    const preview = await buildPreview(
+      [
+        ['title', 'subject'],
+        ['Weather deck', 'ELA'],
+      ],
+      {
+        classificationDecisions: {
+          [reviewKey]: { action: 'use', categoryValueId: 'subject-ela' },
+        },
+        mappingPersistenceDecisions: { [reviewKey]: 'update' },
+      },
+    );
+
+    const result = await new ResourceImportMutationService(database, {
+      createId: ids('commit'),
+    }).commit(preview, {
+      sourceKind: 'csv',
+      confirmUpdates: false,
+      confirmCommit: true,
+    });
+
+    expect(result.updatedMappingPresets).toEqual([
+      expect.objectContaining({ id: 'mapping-ela', status: 'active' }),
+    ]);
+    expect(await database.classificationMappingPresets.get('mapping-ela')).toMatchObject({
+      status: 'active',
+      deactivatedAt: undefined,
+    });
   });
 });

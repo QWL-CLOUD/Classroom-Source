@@ -6,7 +6,7 @@ async function waitForSchema(page: Page): Promise<void> {
     .poll(async () => {
       const databases = await page.evaluate(() => indexedDB.databases());
       return databases.some(
-        (database) => database.name === 'classroom-v20' && (database.version ?? 0) >= 13,
+        (database) => database.name === 'classroom-v20' && (database.version ?? 0) >= 14,
       );
     })
     .toBe(true);
@@ -21,7 +21,13 @@ async function readImportedActivityState(page: Page, title: string) {
     });
     try {
       const transaction = database.transaction(
-        ['libraryItems', 'categoryValues', 'categoryAssignments', 'importRuns'],
+        [
+          'libraryItems',
+          'categoryValues',
+          'categoryAssignments',
+          'classificationMappingPresets',
+          'importRuns',
+        ],
         'readonly',
       );
       const all = <T>(store: string) =>
@@ -30,10 +36,11 @@ async function readImportedActivityState(page: Page, title: string) {
           request.onerror = () => reject(request.error);
           request.onsuccess = () => resolve(request.result as T[]);
         });
-      const [items, values, assignments, runs] = await Promise.all([
+      const [items, values, assignments, mappings, runs] = await Promise.all([
         all<Record<string, unknown>>('libraryItems'),
         all<Record<string, unknown>>('categoryValues'),
         all<Record<string, unknown>>('categoryAssignments'),
+        all<Record<string, unknown>>('classificationMappingPresets'),
         all<Record<string, unknown>>('importRuns'),
       ]);
       const item = items.find(
@@ -50,6 +57,7 @@ async function readImportedActivityState(page: Page, title: string) {
           (candidate) =>
             candidate.entityId === item?.id && candidate.categoryValueId === purpose?.id,
         ),
+        mappingCount: mappings.length,
         activityRuns: runs.filter((run) => run.importType === 'activities').length,
       };
     } finally {
@@ -131,6 +139,7 @@ test('Activities paste-table preview is no-write, creates controlled values atom
     .poll(() => readImportedActivityState(page, title))
     .toMatchObject({
       item: undefined,
+      mappingCount: 0,
       activityRuns: 0,
     });
 
@@ -165,6 +174,7 @@ test('Activities paste-table preview is no-write, creates controlled values atom
       },
       purpose: { name: 'Oral rehearsal', lifecycleState: 'active' },
       assignment: { familyId: 'purpose-tag' },
+      mappingCount: 0,
       activityRuns: 1,
     });
 

@@ -3,7 +3,12 @@ import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ClassroomDatabase } from '@/data/db/ClassroomDatabase';
-import { libraryCatalogItemSchema, type LibraryCatalogItem } from '@/domain/models/entities';
+import {
+  categoryValueSchema,
+  classificationMappingPresetSchema,
+  libraryCatalogItemSchema,
+  type LibraryCatalogItem,
+} from '@/domain/models/entities';
 import { EditHistoryService } from '@/features/editing/editHistoryService';
 import { applyImportOperations } from '@/features/importCenter/applyImportOperations';
 import { buildImportTable } from '@/features/importCenter/importTableModel';
@@ -48,13 +53,17 @@ async function buildPreview(
     defaults?: { externalSource?: string; sourceReference?: string };
     categoryDecisions?: Parameters<typeof buildActivityImportPreview>[0]['categoryDecisions'];
     duplicateDecisions?: Parameters<typeof buildActivityImportPreview>[0]['duplicateDecisions'];
+    mappingPersistenceDecisions?: Parameters<
+      typeof buildActivityImportPreview
+    >[0]['mappingPersistenceDecisions'];
   } = {},
 ) {
   const table = buildImportTable(rows);
-  const [existingItems, categoryValues, categoryAssignments] = await Promise.all([
+  const [existingItems, categoryValues, categoryAssignments, mappingPresets] = await Promise.all([
     database.libraryItems.toArray(),
     database.categoryValues.toArray(),
     database.categoryAssignments.toArray(),
+    database.classificationMappingPresets.toArray(),
   ]);
   return buildActivityImportPreview(
     {
@@ -64,9 +73,11 @@ async function buildPreview(
       unmappedDecisions: {},
       duplicateDecisions: options.duplicateDecisions ?? {},
       categoryDecisions: options.categoryDecisions ?? {},
+      mappingPersistenceDecisions: options.mappingPersistenceDecisions ?? {},
       existingItems,
       categoryValues,
       categoryAssignments,
+      mappingPresets,
     },
     { createId: ids('preview'), now: () => timestamp },
   );
@@ -260,5 +271,118 @@ describe('ActivityImportMutationService', () => {
     expect(await database.categoryAssignments.count()).toBe(0);
     expect(await database.importRuns.count()).toBe(0);
     expect(await database.changeLog.count()).toBe(0);
+  });
+
+  it('blocks commit when a mapping used by preview changes', async () => {
+    await database.categoryValues.put(
+      categoryValueSchema.parse({
+        id: 'subject-ela-stale',
+        familyId: 'subject',
+        name: 'English Language Arts',
+        normalizedName: 'english language arts',
+        aliases: [],
+        normalizedAliases: [],
+        sortOrder: 0,
+        isDefault: false,
+        lifecycleState: 'active',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }),
+    );
+    const mapping = classificationMappingPresetSchema.parse({
+      id: 'mapping-ela-stale',
+      familyId: 'subject',
+      sourceText: 'ELA',
+      normalizedSourceText: 'ela',
+      targetCategoryValueId: 'subject-ela-stale',
+      status: 'active',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+    await database.classificationMappingPresets.put(mapping);
+    const preview = await buildPreview([
+      ['title', 'subject'],
+      ['Stale mapping activity', 'ELA'],
+    ]);
+    await database.classificationMappingPresets.put(
+      classificationMappingPresetSchema.parse({
+        ...mapping,
+        status: 'inactive',
+        deactivatedAt: '2026-07-31T12:01:00.000Z',
+        updatedAt: '2026-07-31T12:01:00.000Z',
+      }),
+    );
+
+    await expect(
+      new ActivityImportMutationService(database, { createId: ids('commit') }).commit(preview, {
+        sourceKind: 'csv',
+        confirmUpdates: false,
+        confirmCommit: true,
+      }),
+    ).rejects.toThrow(/changed after preview/i);
+    expect(await database.libraryItems.count()).toBe(0);
+    expect(await database.importRuns.count()).toBe(0);
+  });
+
+  it('saves one mapping with the import and globally undoes and redoes both', async () => {
+    await database.categoryValues.put(
+      categoryValueSchema.parse({
+        id: 'subject-ela',
+        familyId: 'subject',
+        name: 'English Language Arts',
+        normalizedName: 'english language arts',
+        aliases: [],
+        normalizedAliases: [],
+        sortOrder: 0,
+        isDefault: false,
+        lifecycleState: 'active',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }),
+    );
+    const reviewKey = 'subject\u0000ela';
+    const preview = await buildPreview(
+      [
+        ['title', 'subject'],
+        ['Partner retell', 'ELA'],
+      ],
+      {
+        categoryDecisions: {
+          [reviewKey]: { action: 'use', categoryValueId: 'subject-ela' },
+        },
+        mappingPersistenceDecisions: { [reviewKey]: 'save' },
+      },
+    );
+
+    const result = await new ActivityImportMutationService(database, {
+      createId: ids('commit'),
+    }).commit(preview, {
+      sourceKind: 'csv',
+      confirmUpdates: false,
+      confirmCommit: true,
+    });
+
+    expect(result.createdMappingPresets).toEqual([
+      expect.objectContaining({ sourceText: 'ELA', targetCategoryValueId: 'subject-ela' }),
+    ]);
+    expect(await database.classificationMappingPresets.count()).toBe(1);
+    const summary = JSON.parse(
+      (await database.importRuns.get(preview.importRunId))?.summaryJson ?? '{}',
+    );
+    expect(summary.classificationMappingAudit).toEqual([
+      expect.objectContaining({ action: 'created', targetCategoryValueId: 'subject-ela' }),
+    ]);
+
+    const history = new EditHistoryService(database, {
+      now: () => '2026-07-31T12:06:00.000Z',
+    });
+    await history.undo();
+    expect(await database.classificationMappingPresets.count()).toBe(0);
+    await history.redo();
+    expect(
+      classificationMappingPresetSchema.parse(
+        (await database.classificationMappingPresets.toArray())[0],
+      ),
+    ).toMatchObject({ sourceText: 'ELA', status: 'active' });
   });
 });

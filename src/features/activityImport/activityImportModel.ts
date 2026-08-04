@@ -3,6 +3,7 @@ import {
   libraryCatalogItemSchema,
   type CategoryAssignment,
   type CategoryValue,
+  type ClassificationMappingPreset,
   type LibraryActivityFields,
   type LibraryActivityGrouping,
   type LibraryCatalogItem,
@@ -23,6 +24,10 @@ import {
   type ImportClassificationDecisions,
   type ImportClassificationReview,
 } from '@/features/importCenter/importClassificationResolution';
+import type {
+  ImportClassificationMappingAuditRecord,
+  ImportClassificationMappingPersistenceDecisions,
+} from '@/features/importCenter/importClassificationMappingPresetPlan';
 import {
   createEmptyImportColumnMapping,
   mappedImportValue,
@@ -264,6 +269,13 @@ export interface ActivityImportPreview extends Omit<
   categoryReviews: ActivityCategoryReview[];
   classificationReviews: ImportClassificationReview[];
   classificationAudit: ImportClassificationAuditRecord[];
+  newMappingPresets: ClassificationMappingPreset[];
+  updatedMappingPresets: Array<{
+    before: ClassificationMappingPreset;
+    after: ClassificationMappingPreset;
+  }>;
+  expectedMappingPresets: ClassificationMappingPreset[];
+  classificationMappingAudit: ImportClassificationMappingAuditRecord[];
 }
 
 export interface BuildActivityImportPreviewInput {
@@ -273,8 +285,10 @@ export interface BuildActivityImportPreviewInput {
   unmappedDecisions: UnmappedColumnDecisions;
   duplicateDecisions: ActivityDuplicateDecisions;
   categoryDecisions: ActivityCategoryDecisions;
+  mappingPersistenceDecisions?: ImportClassificationMappingPersistenceDecisions;
   existingItems: readonly LibraryCatalogItem[];
   categoryValues: readonly CategoryValue[];
+  mappingPresets?: readonly ClassificationMappingPreset[];
   categoryAssignments: readonly CategoryAssignment[];
 }
 
@@ -606,7 +620,9 @@ export function buildActivityImportPreview(
   const classificationSession = createImportClassificationResolutionSession({
     catalogType: 'activity',
     categoryValues: input.categoryValues,
+    mappingPresets: input.mappingPresets ?? [],
     decisions: input.categoryDecisions,
+    mappingPersistenceDecisions: input.mappingPersistenceDecisions ?? {},
     createId,
     generatedAt,
   });
@@ -970,11 +986,19 @@ export function buildActivityImportPreview(
       assignmentsToDelete.length > 0 ||
       assignmentsToCreate.length > 0 ||
       desiredCategoryIds.some((categoryValueId) => lifecycleIds.has(categoryValueId));
-    if (target && !itemChanged && !hasCategoryChanges) {
+    if (
+      target &&
+      !itemChanged &&
+      !hasCategoryChanges &&
+      !classification.mappingPersistencePlanned
+    ) {
       rows.push({
         sourceRow: normalized.sourceRow,
         classification: 'skip',
-        reasons: ['The stable Activity identity already has the same reviewed values.'],
+        reasons: [
+          'The stable Activity identity already has the same reviewed values.',
+          ...classification.mappingNotes,
+        ],
         normalized,
         duplicateReview,
         categoryReviews: [],
@@ -997,6 +1021,7 @@ export function buildActivityImportPreview(
       sourceRow: normalized.sourceRow,
       classification: target ? 'update' : 'create',
       reasons: [
+        ...classification.mappingNotes,
         target
           ? 'The reviewed stable identity or explicit duplicate decision updates this Activity.'
           : 'No strong existing identity was selected; create a new Activity.',
@@ -1037,6 +1062,7 @@ export function buildActivityImportPreview(
       unmappedDecisions: input.unmappedDecisions,
       duplicateDecisions: input.duplicateDecisions,
       categoryDecisions: input.categoryDecisions,
+      mappingPersistenceDecisions: input.mappingPersistenceDecisions ?? {},
     },
     generatedAt,
   );
@@ -1056,5 +1082,9 @@ export function buildActivityImportPreview(
     categoryReviews: classificationSnapshot.classificationReviews,
     classificationReviews: classificationSnapshot.classificationReviews,
     classificationAudit: classificationSnapshot.classificationAudit,
+    newMappingPresets: classificationSnapshot.newMappingPresets,
+    updatedMappingPresets: classificationSnapshot.updatedMappingPresets,
+    expectedMappingPresets: classificationSnapshot.expectedMappingPresets,
+    classificationMappingAudit: classificationSnapshot.classificationMappingAudit,
   };
 }
