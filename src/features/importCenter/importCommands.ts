@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import {
+  calendarEventSchema,
   categoryAssignmentSchema,
   categoryValueSchema,
   classificationMappingPresetSchema,
@@ -10,6 +11,7 @@ import {
   standardAlignmentSchema,
   standardSchema,
   studentRecordSchema,
+  type CalendarEvent,
   type CategoryAssignment,
   type CategoryValue,
   type ClassificationMappingPreset,
@@ -31,6 +33,16 @@ const putImportRunOperationSchema = z.object({
 const deleteImportRunOperationSchema = z.object({
   action: z.literal('delete'),
   table: z.literal('importRuns'),
+  id: z.string().min(1),
+});
+const putCalendarEventOperationSchema = z.object({
+  action: z.literal('put'),
+  table: z.literal('calendarEvents'),
+  record: calendarEventSchema,
+});
+const deleteCalendarEventOperationSchema = z.object({
+  action: z.literal('delete'),
+  table: z.literal('calendarEvents'),
   id: z.string().min(1),
 });
 const putLibraryItemOperationSchema = z.object({
@@ -119,6 +131,8 @@ const deleteStandardAlignmentOperationSchema = z.object({
 export const importOperationSchema = z.union([
   putImportRunOperationSchema,
   deleteImportRunOperationSchema,
+  putCalendarEventOperationSchema,
+  deleteCalendarEventOperationSchema,
   putLibraryItemOperationSchema,
   deleteLibraryItemOperationSchema,
   putCategoryValueOperationSchema,
@@ -168,6 +182,14 @@ export function putImportRunOperation(record: ImportRun): ImportOperation {
 
 export function deleteImportRunOperation(id: string): ImportOperation {
   return { action: 'delete', table: 'importRuns', id };
+}
+
+export function putImportedCalendarEventOperation(record: CalendarEvent): ImportOperation {
+  return { action: 'put', table: 'calendarEvents', record: calendarEventSchema.parse(record) };
+}
+
+export function deleteImportedCalendarEventOperation(id: string): ImportOperation {
+  return { action: 'delete', table: 'calendarEvents', id };
 }
 
 export function putImportedLibraryItemOperation(record: LibraryCatalogItem): ImportOperation {

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ClassroomDatabase } from '@/data/db/ClassroomDatabase';
 import {
+  calendarEventSchema,
   changeLogSchema,
   classificationMappingPresetSchema,
   importRunSchema,
@@ -18,12 +19,14 @@ import {
   deleteImportCategoryAssignmentOperation,
   deleteImportCategoryValueOperation,
   deleteImportClassificationMappingPresetOperation,
+  deleteImportedCalendarEventOperation,
   deleteImportedLibraryItemOperation,
   deleteImportRunOperation,
   parseImportCommand,
   putImportCategoryAssignmentOperation,
   putImportCategoryValueOperation,
   putImportClassificationMappingPresetOperation,
+  putImportedCalendarEventOperation,
   putImportedLibraryItemOperation,
   putImportRunOperation,
   serializeImportCommand,
@@ -311,5 +314,56 @@ describe('Import Center history and commands', () => {
     const history = await new ImportHistoryReadService(database).list();
     expect(history).toHaveLength(1);
     expect(history[0]?.importType).toBe('assessments');
+  });
+
+  it('reads Calendar Event destination history and applies Calendar Event import commands', async () => {
+    const run = importRunSchema.parse({
+      id: 'calendar-event-import-run',
+      importType: 'calendar-events',
+      sourceKind: 'ics',
+      sourceLabel: 'district-calendar.ics',
+      schoolYearId: 'school-year-2026',
+      totalRows: 1,
+      createdCount: 1,
+      updatedCount: 0,
+      skippedCount: 0,
+      reviewCount: 0,
+      blockedCount: 0,
+      committedAt: '2026-08-05T12:00:00.000Z',
+    });
+    const event = calendarEventSchema.parse({
+      id: 'calendar-event-imported',
+      title: 'Professional learning day',
+      startDate: '2026-10-12',
+      category: 'Calendar',
+      schoolYearId: run.schoolYearId,
+      externalSource: 'ics',
+      externalKey: 'district-pd-1',
+      importIdentityKey: 'calendar-event\u0000ics\u0000district-pd-1',
+      lastImportRunId: run.id,
+    });
+    const command = parseImportCommand(
+      serializeImportCommand(
+        createImportCommand([putImportedCalendarEventOperation(event), putImportRunOperation(run)]),
+      ),
+    );
+
+    await database.transaction('rw', [database.calendarEvents, database.importRuns], () =>
+      applyImportOperations(database, command.operations),
+    );
+    expect(await database.calendarEvents.get(event.id)).toEqual(event);
+
+    const history = await new ImportHistoryReadService(database).list();
+    expect(history).toEqual([
+      expect.objectContaining({
+        id: run.id,
+        importType: 'calendar-events',
+        sourceKind: 'ics',
+        schoolYearId: 'school-year-2026',
+      }),
+    ]);
+
+    await applyImportOperations(database, [deleteImportedCalendarEventOperation(event.id)]);
+    expect(await database.calendarEvents.get(event.id)).toBeUndefined();
   });
 });

@@ -611,6 +611,9 @@ export function CalendarRoute() {
           <a className="button" href={`#/schedule/edit?date=${date}`}>
             Manage schedule
           </a>
+          <a className="button" href="#/import?type=calendar-events">
+            Import events
+          </a>
           <a
             className="button button-primary"
             href={`#/calendar/edit?date=${date}`}

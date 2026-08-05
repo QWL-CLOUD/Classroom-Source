@@ -24,6 +24,11 @@ describe('Import Center route state', () => {
       contextId: undefined,
     });
     expect(buildImportCenterHref('resources')).toBe('/import?type=resources');
+    expect(parseImportRouteState(new URLSearchParams('type=calendar-events'))).toEqual({
+      importType: 'calendar-events',
+      contextId: undefined,
+    });
+    expect(buildImportCenterHref('calendar-events')).toBe('/import?type=calendar-events');
   });
 
   it('rejects ambiguous, unknown, and cross-domain query state', () => {

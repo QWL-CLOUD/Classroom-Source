@@ -1,4 +1,5 @@
 import {
+  CalendarDays,
   ClipboardCheck,
   FileText,
   Library,
@@ -19,6 +20,13 @@ const options: Array<{
   icon: LucideIcon;
   available: boolean;
 }> = [
+  {
+    type: 'calendar-events',
+    label: 'Calendar Events',
+    description: 'Import reviewed school-wide Events into one active School Year.',
+    icon: CalendarDays,
+    available: true,
+  },
   {
     type: 'roster',
     label: 'Rosters',

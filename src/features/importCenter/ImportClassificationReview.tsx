@@ -175,7 +175,9 @@ export function ImportClassificationReview({
                 {review.kind === 'unknown' ? (
                   <option value="create">Create “{review.displayValue}”</option>
                 ) : null}
-                <option value="generic-tag">Keep as a generic searchable tag</option>
+                {review.genericTagPrefix ? (
+                  <option value="generic-tag">Keep as a generic searchable tag</option>
+                ) : null}
                 <option value="ignore">Ignore this value — confirmed</option>
               </select>
             </label>
@@ -186,7 +188,7 @@ export function ImportClassificationReview({
                   Mapping behavior
                   <small>
                     Apply once keeps this decision local to the current import. Saved mappings are
-                    shared by Activities, Resources, and Assessments.
+                    shared by Activities, Resources, Assessments, and Calendar Events.
                   </small>
                 </span>
                 <select

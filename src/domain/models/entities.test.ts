@@ -303,6 +303,41 @@ describe('domain schemas', () => {
         committedAt: '2026-07-29T12:00:00.000Z',
       }),
     ).toThrow('counts must equal');
+    expect(
+      importRunSchema.parse({
+        id: 'calendar-event-import-run',
+        importType: 'calendar-events',
+        sourceKind: 'ics',
+        sourceLabel: 'district-calendar.ics',
+        schoolYearId: 'school-year-2026',
+        totalRows: 1,
+        createdCount: 1,
+        updatedCount: 0,
+        skippedCount: 0,
+        reviewCount: 0,
+        blockedCount: 0,
+        committedAt: '2026-08-05T12:00:00.000Z',
+      }),
+    ).toMatchObject({
+      importType: 'calendar-events',
+      sourceKind: 'ics',
+      schoolYearId: 'school-year-2026',
+    });
+    expect(() =>
+      importRunSchema.parse({
+        id: 'calendar-event-import-without-school-year',
+        importType: 'calendar-events',
+        sourceKind: 'ics',
+        totalRows: 1,
+        createdCount: 1,
+        updatedCount: 0,
+        skippedCount: 0,
+        reviewCount: 0,
+        blockedCount: 0,
+        committedAt: '2026-08-05T12:00:00.000Z',
+      }),
+    ).toThrow('School Year');
+
     expect(() =>
       importRunSchema.parse({
         id: 'roster-import-without-context',

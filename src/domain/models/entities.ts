@@ -291,6 +291,7 @@ export const importRunTypeSchema = z.enum([
   'activities',
   'resources',
   'assessments',
+  'calendar-events',
 ]);
 
 export const importRunSourceKindSchema = z.enum([
@@ -300,6 +301,7 @@ export const importRunSourceKindSchema = z.enum([
   'paste-table',
   'paste-url',
   'file-metadata',
+  'ics',
 ]);
 
 export const importRunSchema = z
@@ -310,6 +312,7 @@ export const importRunSchema = z
     sourceLabel: z.string().trim().min(1).max(500).optional(),
     worksheetName: z.string().trim().min(1).max(240).optional(),
     contextId: idSchema.optional(),
+    schoolYearId: idSchema.optional(),
     totalRows: z.number().int().nonnegative().max(50_000),
     createdCount: z.number().int().nonnegative().max(50_000),
     updatedCount: z.number().int().nonnegative().max(50_000),
@@ -352,6 +355,13 @@ export const importRunSchema = z
         code: 'custom',
         message: 'Roster import runs require a target context.',
         path: ['contextId'],
+      });
+    }
+    if (value.importType === 'calendar-events' && !value.schoolYearId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Calendar Event import runs require a destination School Year.',
+        path: ['schoolYearId'],
       });
     }
   });

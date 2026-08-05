@@ -10,6 +10,9 @@ export async function applyImportOperations(
     if (operation.table === 'importRuns') {
       if (operation.action === 'put') await db.importRuns.put(operation.record);
       else await db.importRuns.delete(operation.id);
+    } else if (operation.table === 'calendarEvents') {
+      if (operation.action === 'put') await db.calendarEvents.put(operation.record);
+      else await db.calendarEvents.delete(operation.id);
     } else if (operation.table === 'libraryItems') {
       if (operation.action === 'put') await db.libraryItems.put(operation.record);
       else await db.libraryItems.delete(operation.id);
