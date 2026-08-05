@@ -6,6 +6,7 @@ export const importTypes = [
   'activities',
   'resources',
   'assessments',
+  'calendar-events',
 ] as const;
 
 export type ImportType = (typeof importTypes)[number];
@@ -53,10 +54,11 @@ export interface ImportSourceAdapter<TSource> {
 export interface ImportHistoryEntry {
   id: string;
   importType: ImportType;
-  sourceKind: ImportSourceKind;
+  sourceKind: ImportRun['sourceKind'];
   sourceLabel?: string;
   worksheetName?: string;
   contextId?: string;
+  schoolYearId?: string;
   totalRows: number;
   createdCount: number;
   updatedCount: number;

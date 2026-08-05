@@ -147,11 +147,11 @@ describe('BackupRecoveryService', () => {
       lastImportRunId: 'calendar-import-run',
     });
     await database.importRuns.put({
-      id: 'current-import-run',
-      importType: 'assessments',
-      sourceKind: 'xlsx',
-      sourceLabel: 'assessments.xlsx',
-      worksheetName: 'Assessments',
+      id: 'calendar-import-run',
+      importType: 'calendar-events',
+      sourceKind: 'ics',
+      sourceLabel: 'district-calendar.ics',
+      schoolYearId: 'year-1',
       totalRows: 1,
       createdCount: 1,
       updatedCount: 0,
@@ -178,7 +178,14 @@ describe('BackupRecoveryService', () => {
 
     expect(envelope.tables.tasks).toEqual([task('current-task', 'Current task')]);
     expect(envelope.tables.assessmentEvidence).toHaveLength(1);
-    expect(envelope.tables.importRuns).toHaveLength(1);
+    expect(envelope.tables.importRuns).toEqual([
+      expect.objectContaining({
+        id: 'calendar-import-run',
+        importType: 'calendar-events',
+        sourceKind: 'ics',
+        schoolYearId: 'year-1',
+      }),
+    ]);
     expect(envelope.tables.libraryItems[0]).toMatchObject({
       id: 'current-activity',
       typedFields: { materials: 'Picture cards', notes: 'Preparation\nSort cards.' },

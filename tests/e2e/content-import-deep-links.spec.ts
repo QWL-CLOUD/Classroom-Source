@@ -195,3 +195,23 @@ test('Class and Group rosters deep-link with context while Individual stays rost
     0,
   );
 });
+
+test('Calendar and School Years expose the canonical Calendar Events import deep link', async ({
+  page,
+}) => {
+  await seedContexts(page);
+
+  await page.goto('./#/calendar?date=2026-08-24');
+  const calendarImport = page.getByRole('link', { name: 'Import events' });
+  await expect(calendarImport).toBeVisible();
+  await calendarImport.click();
+  await expect(page).toHaveURL(/#\/import\?type=calendar-events$/);
+  await expect(page.getByRole('heading', { name: 'Import Calendar Events' })).toBeVisible();
+
+  await page.goto('./#/settings#school-years');
+  const schoolYearImport = page.getByRole('link', { name: 'Import school calendar' });
+  await expect(schoolYearImport).toBeVisible();
+  await schoolYearImport.click();
+  await expect(page).toHaveURL(/#\/import\?type=calendar-events$/);
+  await expect(page.getByRole('heading', { name: 'Import Calendar Events' })).toBeVisible();
+});

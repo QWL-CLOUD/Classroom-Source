@@ -10,6 +10,7 @@ import {
 import {
   classificationSummaryJson,
   createImportClassificationResolutionSession,
+  importClassificationFieldsForCatalogType,
   importClassificationReviewKey,
   planImportClassificationAssignments,
 } from './importClassificationResolution';
@@ -447,6 +448,80 @@ describe('importClassificationResolution', () => {
         kind: 'mapping',
         mappingIssue: 'inactive',
         mappingPresets: [expect.objectContaining({ id: 'mapping-en' })],
+      }),
+    ]);
+  });
+
+  it('limits Calendar Events to Calendar Event Type and never offers generic-tag fallback', () => {
+    expect(importClassificationFieldsForCatalogType('calendar-event')).toEqual([
+      {
+        familyId: 'calendar-event-type',
+        fieldLabel: 'Calendar Event Type',
+      },
+    ]);
+    const reviewKey = importClassificationReviewKey('calendar-event-type', 'Special Closure');
+    const session = createImportClassificationResolutionSession({
+      catalogType: 'calendar-event',
+      categoryValues: [],
+      mappingPresets: [],
+      mappingPersistenceDecisions: {},
+      decisions: { [reviewKey]: { action: 'generic-tag' } },
+      createId: () => 'unused',
+      generatedAt: now,
+    });
+
+    const resolved = session.resolveRow({
+      sourceRow: 8,
+      presentFamilyIds: ['calendar-event-type'],
+      values: { 'calendar-event-type': 'Special Closure' },
+    });
+
+    expect(resolved.reviews).toEqual([
+      expect.objectContaining({
+        key: reviewKey,
+        familyId: 'calendar-event-type',
+        genericTagPrefix: undefined,
+      }),
+    ]);
+    expect(resolved.genericTags).toEqual([]);
+  });
+
+  it('plans Calendar Event category assignments with the requested entity type', () => {
+    const plan = planImportClassificationAssignments({
+      entityId: 'event-1',
+      entityType: 'calendar-event',
+      existingAssignments: [],
+      resolution: {
+        sourceRow: 9,
+        reviews: [],
+        reviewReasons: [],
+        blockingReasons: [],
+        genericTags: [],
+        mappingNotes: [],
+        mappingPersistencePlanned: false,
+        families: [
+          {
+            familyId: 'calendar-event-type',
+            fieldLabel: 'Calendar Event Type',
+            inputPresent: true,
+            hadInput: true,
+            categoryValueIds: ['event-type-pd'],
+            genericTags: [],
+          },
+        ],
+      },
+      applicableFamilyIds: ['calendar-event-type'],
+      createId: () => 'event-assignment',
+      generatedAt: now,
+    });
+
+    expect(plan.assignmentsToCreate).toEqual([
+      expect.objectContaining({
+        id: 'event-assignment',
+        familyId: 'calendar-event-type',
+        categoryValueId: 'event-type-pd',
+        entityType: 'calendar-event',
+        entityId: 'event-1',
       }),
     ]);
   });

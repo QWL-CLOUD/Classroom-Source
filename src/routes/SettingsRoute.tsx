@@ -201,6 +201,9 @@ export function SettingsRoute() {
           </p>
         </div>
         <div className={styles.actions}>
+          <Link className="button" to="/import?type=calendar-events">
+            Import school calendar
+          </Link>
           {state.status === 'ready' && state.data.activeSchoolYear ? (
             <button className="button" type="button" onClick={openRollover}>
               <CalendarClock size={17} aria-hidden="true" /> Prepare next school year

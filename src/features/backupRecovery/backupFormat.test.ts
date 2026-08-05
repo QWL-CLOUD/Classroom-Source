@@ -247,6 +247,20 @@ describe('Classroom backup format', () => {
       entityId: 'calendar-event-1',
       createdAt: now,
     });
+    tables.importRuns.push({
+      id: 'calendar-import-1',
+      importType: 'calendar-events',
+      sourceKind: 'ics',
+      sourceLabel: 'district-calendar.ics',
+      schoolYearId: 'year-1',
+      totalRows: 1,
+      createdCount: 1,
+      updatedCount: 0,
+      skippedCount: 0,
+      reviewCount: 0,
+      blockedCount: 0,
+      committedAt: now,
+    });
 
     const envelope = createBackupEnvelope(tables, {
       backupId: 'calendar-foundation-backup',
@@ -265,6 +279,11 @@ describe('Classroom backup format', () => {
     expect(preview.validTables.categoryAssignments[0]).toMatchObject({
       familyId: 'calendar-event-type',
       entityType: 'calendar-event',
+    });
+    expect(preview.validTables.importRuns[0]).toMatchObject({
+      importType: 'calendar-events',
+      sourceKind: 'ics',
+      schoolYearId: 'year-1',
     });
   });
 

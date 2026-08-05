@@ -6,8 +6,10 @@ export interface ImportRouteState {
   issue?: string;
 }
 
+const importTypeSet = new Set<string>(importTypes);
+
 function isImportType(value: string): value is ImportType {
-  return importTypes.includes(value as ImportType);
+  return importTypeSet.has(value);
 }
 
 export function parseImportRouteState(search: URLSearchParams): ImportRouteState {

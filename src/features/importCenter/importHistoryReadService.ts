@@ -15,6 +15,7 @@ function canonicalEntry(record: ImportRun): ImportHistoryEntry {
     sourceLabel: record.sourceLabel,
     worksheetName: record.worksheetName,
     contextId: record.contextId,
+    schoolYearId: record.schoolYearId,
     totalRows: record.totalRows,
     createdCount: record.createdCount,
     updatedCount: record.updatedCount,

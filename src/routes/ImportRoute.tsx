@@ -2,6 +2,7 @@ import { ShieldCheck } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { ActivitiesImportWorkspace } from '@/features/importCenter/ActivitiesImportWorkspace';
+import { CalendarEventsImportWorkspace } from '@/features/importCenter/CalendarEventsImportWorkspace';
 import { AssessmentsImportWorkspace } from '@/features/importCenter/AssessmentsImportWorkspace';
 import sharedStyles from '@/features/importCenter/ImportCenterShared.module.css';
 import { ImportTypeSelector } from '@/features/importCenter/ImportTypeSelector';
@@ -47,6 +48,9 @@ export function ImportRoute() {
         </div>
       ) : null}
 
+      {!routeState.issue && routeState.importType === 'calendar-events' ? (
+        <CalendarEventsImportWorkspace key="calendar-events" />
+      ) : null}
       {!routeState.issue && routeState.importType === 'activities' ? (
         <ActivitiesImportWorkspace key="activities" />
       ) : null}
@@ -72,9 +76,14 @@ export function ImportRoute() {
       ) : null}
       {!routeState.issue &&
       routeState.importType &&
-      !['activities', 'assessments', 'resources', 'standards', 'roster'].includes(
-        routeState.importType,
-      ) ? (
+      ![
+        'activities',
+        'assessments',
+        'calendar-events',
+        'resources',
+        'standards',
+        'roster',
+      ].includes(routeState.importType) ? (
         <section className={`card ${sharedStyles.plannedPanel}`} aria-label="Planned import type">
           <p className="page-eyebrow">Planned catalog import</p>
           <h2>Assessment import is not enabled yet</h2>
@@ -89,8 +98,9 @@ export function ImportRoute() {
           <p className="page-eyebrow">Start here</p>
           <h2>Choose what you are importing</h2>
           <p>
-            Activities, Resources, Assessments, Standards, and Rosters are available in this one
-            Import Center without creating additional routes or duplicated state.
+            Calendar Events, Activities, Resources, Assessments, Standards, and Rosters are
+            available in this one Import Center without creating additional routes or duplicated
+            state.
           </p>
         </section>
       ) : null}

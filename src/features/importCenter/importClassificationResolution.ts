@@ -2,6 +2,7 @@ import {
   categoryAssignmentSchema,
   categoryValueSchema,
   classificationMappingPresetSchema,
+  type CategoryAssignableEntityType,
   type CategoryAssignment,
   type CategoryFamilyId,
   type CategoryValue,
@@ -22,12 +23,13 @@ import {
   type ImportClassificationMappingPresetPlanSnapshot,
 } from './importClassificationMappingPresetPlan';
 
-export type ImportClassificationCatalogType = 'activity' | 'resource' | 'assessment';
+export type ImportClassificationCatalogType =
+  'activity' | 'resource' | 'assessment' | 'calendar-event';
 
 export interface ImportClassificationFieldDefinition {
   familyId: CategoryFamilyId;
   fieldLabel: string;
-  genericTagPrefix: string;
+  genericTagPrefix?: string;
 }
 
 const COMMON_FIELDS = [
@@ -66,6 +68,7 @@ export const IMPORT_CLASSIFICATION_FIELDS = {
     ...PURPOSE_AND_FOCUS_FIELDS,
   ],
   assessment: [...COMMON_FIELDS, ...PURPOSE_AND_FOCUS_FIELDS],
+  'calendar-event': [{ familyId: 'calendar-event-type', fieldLabel: 'Calendar Event Type' }],
 } as const satisfies Record<
   ImportClassificationCatalogType,
   readonly ImportClassificationFieldDefinition[]
@@ -105,7 +108,7 @@ export interface ImportClassificationReview {
   familyId: CategoryFamilyId;
   familyLabel: string;
   fieldLabel: string;
-  genericTagPrefix: string;
+  genericTagPrefix?: string;
   displayValue: string;
   normalizedValue: string;
   kind: ImportClassificationReviewKind;
@@ -471,6 +474,12 @@ export function createImportClassificationResolutionSession(
     }
 
     if (decision.action === 'generic-tag') {
+      if (!review.genericTagPrefix) {
+        return {
+          unresolved: review,
+          reason: `${review.fieldLabel} cannot be kept as a generic tag for this import type.`,
+        };
+      }
       const genericTag = `${review.genericTagPrefix}: ${review.displayValue}`;
       addAudit({
         familyId: review.familyId,
@@ -775,13 +784,15 @@ export function planImportClassificationAssignments(input: {
   applicableFamilyIds: readonly CategoryFamilyId[];
   createId: () => string;
   generatedAt: string;
+  entityType?: CategoryAssignableEntityType;
 }): ImportClassificationAssignmentPlan {
+  const entityType = input.entityType ?? 'library-item';
   const applicable = new Set(input.applicableFamilyIds);
   const expectedAssignments = input.existingAssignments
     .map((assignment) => categoryAssignmentSchema.parse(assignment))
     .filter(
       (assignment) =>
-        assignment.entityType === 'library-item' &&
+        assignment.entityType === entityType &&
         assignment.entityId === input.entityId &&
         applicable.has(assignment.familyId),
     )
@@ -822,7 +833,7 @@ export function planImportClassificationAssignments(input: {
           id: input.createId(),
           familyId,
           categoryValueId,
-          entityType: 'library-item',
+          entityType,
           entityId: input.entityId,
           createdAt: input.generatedAt,
         }),
