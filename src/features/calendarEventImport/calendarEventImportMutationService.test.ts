@@ -44,10 +44,10 @@ const defaultEventType: CategoryValue = categoryValueSchema.parse({
   updatedAt: now,
 });
 
-function source() {
+async function source() {
   return {
     kind: 'ics' as const,
-    parsed: parseCalendarEventIcs(
+    parsed: await parseCalendarEventIcs(
       [
         'BEGIN:VCALENDAR',
         'VERSION:2.0',
@@ -69,10 +69,10 @@ function createIds(prefix: string): () => string {
   return () => `${prefix}-${++index}`;
 }
 
-function buildPreview(): CalendarEventImportPreview {
+async function buildPreview(): Promise<CalendarEventImportPreview> {
   return buildCalendarEventImportPreview(
     {
-      source: source(),
+      source: await source(),
       schoolYear,
       duplicateDecisions: {},
       tentativeAcknowledgements: {},
@@ -104,7 +104,7 @@ afterEach(async () => {
 describe('CalendarEventImportMutationService', () => {
   it('commits one atomic Calendar import and globally undoes/redoes without changing adjacent domains', async () => {
     const db = await createDatabase('calendar-event-import');
-    const preview = buildPreview();
+    const preview = await buildPreview();
     const service = new CalendarEventImportMutationService(db, {
       createId: () => 'calendar-import-log',
     });
@@ -114,6 +114,7 @@ describe('CalendarEventImportMutationService', () => {
       sourceLabel: 'district-calendar.ics',
       sourceContentFingerprint: preview.sourceContentFingerprint,
       confirmUpdates: false,
+      confirmRemovals: false,
       confirmCommit: true,
     });
 
@@ -165,7 +166,7 @@ describe('CalendarEventImportMutationService', () => {
 
   it('rejects stale source and School Year state before writing any import records', async () => {
     const db = await createDatabase('calendar-event-stale');
-    const preview = buildPreview();
+    const preview = await buildPreview();
     const service = new CalendarEventImportMutationService(db);
 
     await expect(
@@ -173,6 +174,7 @@ describe('CalendarEventImportMutationService', () => {
         sourceKind: 'ics',
         sourceContentFingerprint: 'changed-source',
         confirmUpdates: false,
+        confirmRemovals: false,
         confirmCommit: true,
       }),
     ).rejects.toThrow('source changed after preview');
@@ -183,6 +185,7 @@ describe('CalendarEventImportMutationService', () => {
         sourceKind: 'ics',
         sourceContentFingerprint: preview.sourceContentFingerprint,
         confirmUpdates: false,
+        confirmRemovals: false,
         confirmCommit: true,
       }),
     ).rejects.toThrow('School Year changed after preview');
@@ -195,7 +198,7 @@ describe('CalendarEventImportMutationService', () => {
 
   it('rolls back the full transaction when command application fails', async () => {
     const db = await createDatabase('calendar-event-failure');
-    const preview = buildPreview();
+    const preview = await buildPreview();
     const service = new CalendarEventImportMutationService(db, {
       applyOperations: async () => {
         throw new Error('forced failure');
@@ -207,6 +210,7 @@ describe('CalendarEventImportMutationService', () => {
         sourceKind: 'ics',
         sourceContentFingerprint: preview.sourceContentFingerprint,
         confirmUpdates: false,
+        confirmRemovals: false,
         confirmCommit: true,
       }),
     ).rejects.toThrow('forced failure');
@@ -220,13 +224,14 @@ describe('CalendarEventImportMutationService', () => {
 
   it('requires explicit update confirmation for reviewed updates', async () => {
     const db = await createDatabase('calendar-event-update-confirmation');
-    const initialPreview = buildPreview();
+    const initialPreview = await buildPreview();
     await new CalendarEventImportMutationService(db, { createId: () => 'initial-log' }).commit(
       initialPreview,
       {
         sourceKind: 'ics',
         sourceContentFingerprint: initialPreview.sourceContentFingerprint,
         confirmUpdates: false,
+        confirmRemovals: false,
         confirmCommit: true,
       },
     );
@@ -234,7 +239,7 @@ describe('CalendarEventImportMutationService', () => {
     const existingEvents = await db.calendarEvents.toArray();
     const updateSource = {
       kind: 'ics' as const,
-      parsed: parseCalendarEventIcs(
+      parsed: await parseCalendarEventIcs(
         [
           'BEGIN:VCALENDAR',
           'VERSION:2.0',
@@ -268,8 +273,147 @@ describe('CalendarEventImportMutationService', () => {
         sourceKind: 'ics',
         sourceContentFingerprint: updatePreview.sourceContentFingerprint,
         confirmUpdates: false,
+        confirmRemovals: false,
         confirmCommit: true,
       }),
     ).rejects.toThrow('Confirm the reviewed Calendar Event updates');
+  });
+
+  it('commits recurrence ownership atomically, requires removal confirmation, and undoes/redoes metadata with Events', async () => {
+    const db = await createDatabase('calendar-event-recurrence');
+    const recurringSource = {
+      kind: 'ics' as const,
+      parsed: await parseCalendarEventIcs(
+        [
+          'BEGIN:VCALENDAR',
+          'VERSION:2.0',
+          'PRODID:-//Classroom Recurrence Test//EN',
+          'BEGIN:VEVENT',
+          'UID:managed-weekly',
+          'SUMMARY:Managed weekly event',
+          'DTSTART;VALUE=DATE:20260903',
+          'RRULE:FREQ=WEEKLY;COUNT=2;BYDAY=TH',
+          'END:VEVENT',
+          'END:VCALENDAR',
+        ].join('\r\n'),
+      ),
+    };
+    const firstPreview = buildCalendarEventImportPreview(
+      {
+        source: recurringSource,
+        schoolYear,
+        duplicateDecisions: {},
+        tentativeAcknowledgements: {},
+        classificationDecisions: {},
+        mappingPersistenceDecisions: {},
+        existingEvents: [],
+        existingSeries: [],
+        existingOccurrences: [],
+        recurrenceDecisions: {},
+        categoryValues: [defaultEventType],
+        mappingPresets: [],
+        categoryAssignments: [],
+      },
+      { createId: createIds('recurrence'), now: () => now },
+    );
+    expect(firstPreview.summary).toMatchObject({ createCount: 2, removeCount: 0 });
+
+    const service = new CalendarEventImportMutationService(db, {
+      createId: () => 'recurrence-log-1',
+    });
+    const firstResult = await service.commit(firstPreview, {
+      sourceKind: 'ics',
+      sourceLabel: 'recurrence.ics',
+      sourceContentFingerprint: firstPreview.sourceContentFingerprint,
+      confirmUpdates: false,
+      confirmRemovals: false,
+      confirmCommit: true,
+    });
+    expect(firstResult.created).toHaveLength(2);
+    expect(await db.calendarEvents.count()).toBe(2);
+    expect(await db.calendarEventImportSeries.count()).toBe(1);
+    expect(await db.calendarEventImportOccurrences.count()).toBe(2);
+
+    const history = new EditHistoryService(db, {
+      now: () => '2026-08-05T12:01:00.000Z',
+    });
+    await history.undo();
+    expect(await db.calendarEvents.count()).toBe(0);
+    expect(await db.calendarEventImportSeries.count()).toBe(0);
+    expect(await db.calendarEventImportOccurrences.count()).toBe(0);
+    expect(await db.importRuns.count()).toBe(0);
+
+    await history.redo();
+    expect(await db.calendarEvents.count()).toBe(2);
+    expect(await db.calendarEventImportSeries.count()).toBe(1);
+    expect(await db.calendarEventImportOccurrences.count()).toBe(2);
+    expect(await db.importRuns.count()).toBe(1);
+
+    const shortenedSource = {
+      kind: 'ics' as const,
+      parsed: await parseCalendarEventIcs(
+        [
+          'BEGIN:VCALENDAR',
+          'VERSION:2.0',
+          'PRODID:-//Classroom Recurrence Test//EN',
+          'BEGIN:VEVENT',
+          'UID:managed-weekly',
+          'SUMMARY:Managed weekly event',
+          'DTSTART;VALUE=DATE:20260903',
+          'RRULE:FREQ=WEEKLY;COUNT=1;BYDAY=TH',
+          'END:VEVENT',
+          'END:VCALENDAR',
+        ].join('\r\n'),
+      ),
+    };
+    const removalPreview = buildCalendarEventImportPreview(
+      {
+        source: shortenedSource,
+        schoolYear,
+        duplicateDecisions: {},
+        tentativeAcknowledgements: {},
+        classificationDecisions: {},
+        mappingPersistenceDecisions: {},
+        existingEvents: await db.calendarEvents.toArray(),
+        existingSeries: await db.calendarEventImportSeries.toArray(),
+        existingOccurrences: await db.calendarEventImportOccurrences.toArray(),
+        recurrenceDecisions: {},
+        categoryValues: await db.categoryValues.toArray(),
+        mappingPresets: await db.classificationMappingPresets.toArray(),
+        categoryAssignments: await db.categoryAssignments.toArray(),
+      },
+      { createId: createIds('remove'), now: () => '2026-08-05T13:00:00.000Z' },
+    );
+    expect(removalPreview.summary.removeCount).toBe(1);
+
+    await expect(
+      new CalendarEventImportMutationService(db).commit(removalPreview, {
+        sourceKind: 'ics',
+        sourceLabel: 'recurrence-shortened.ics',
+        sourceContentFingerprint: removalPreview.sourceContentFingerprint,
+        confirmUpdates: true,
+        confirmRemovals: false,
+        confirmCommit: true,
+      }),
+    ).rejects.toThrow('Confirm the reviewed Calendar Event removals');
+
+    const removed = await new CalendarEventImportMutationService(db, {
+      createId: () => 'recurrence-log-2',
+    }).commit(removalPreview, {
+      sourceKind: 'ics',
+      sourceLabel: 'recurrence-shortened.ics',
+      sourceContentFingerprint: removalPreview.sourceContentFingerprint,
+      confirmUpdates: true,
+      confirmRemovals: true,
+      confirmCommit: true,
+    });
+    expect(removed.removed).toHaveLength(1);
+    expect(await db.calendarEvents.count()).toBe(1);
+    expect(await db.calendarEventImportOccurrences.count()).toBe(2);
+    expect((await db.importRuns.get(removalPreview.importRunId))?.removedCount).toBe(1);
+
+    await new EditHistoryService(db, { now: () => '2026-08-05T13:01:00.000Z' }).undo();
+    expect(await db.calendarEvents.count()).toBe(2);
+    expect(await db.calendarEventImportOccurrences.count()).toBe(2);
   });
 });

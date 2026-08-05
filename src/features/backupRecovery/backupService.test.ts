@@ -155,10 +155,41 @@ describe('BackupRecoveryService', () => {
       totalRows: 1,
       createdCount: 1,
       updatedCount: 0,
+      removedCount: 0,
       skippedCount: 0,
       reviewCount: 0,
       blockedCount: 0,
       committedAt: firstTime,
+    });
+    await database.calendarEventImportSeries.put({
+      id: 'current-series',
+      schoolYearId: 'year-1',
+      externalSource: 'ics',
+      externalKey: 'district-series@example.test',
+      seriesIdentityKey:
+        'calendar-event-series\u0000ics\u0000year-1\u0000district-series@example.test',
+      masterFingerprint: 'fnv1a32:11111111',
+      calendarTimeZoneFingerprint: 'fnv1a32:22222222',
+      recurrenceEngineVersion: 'classroom-rfc5545-v1+ical.js-2.2.1',
+      lastImportRunId: 'calendar-import-run',
+      createdAt: firstTime,
+      updatedAt: firstTime,
+    });
+    await database.calendarEventImportOccurrences.put({
+      id: 'current-occurrence',
+      seriesId: 'current-series',
+      schoolYearId: 'year-1',
+      occurrenceKey: 'date\u00002026-08-28\u0000',
+      occurrenceIdentityKey:
+        'calendar-event-series\u0000ics\u0000year-1\u0000district-series@example.test\u0000date\u00002026-08-28\u0000',
+      sourceStatus: 'active',
+      managementStatus: 'materialized',
+      eventId: 'current-calendar-event',
+      sourceOccurrenceFingerprint: 'fnv1a32:33333333',
+      lastImportedEventFingerprint: 'fnv1a32:44444444',
+      lastImportRunId: 'calendar-import-run',
+      createdAt: firstTime,
+      updatedAt: firstTime,
     });
     await database.backupSnapshots.put({
       id: 'internal-snapshot',
@@ -200,6 +231,12 @@ describe('BackupRecoveryService', () => {
       timeZone: 'America/New_York',
       lastImportRunId: 'calendar-import-run',
     });
+    expect(envelope.tables.calendarEventImportSeries).toEqual([
+      expect.objectContaining({ id: 'current-series' }),
+    ]);
+    expect(envelope.tables.calendarEventImportOccurrences).toEqual([
+      expect.objectContaining({ id: 'current-occurrence', eventId: 'current-calendar-event' }),
+    ]);
     expect(envelope.tables).not.toHaveProperty('backupSnapshots');
     expect(envelope.tableCounts.tasks).toBe(1);
   });
@@ -264,6 +301,36 @@ describe('BackupRecoveryService', () => {
       location: 'District',
       timeZone: 'America/New_York',
     });
+    incoming.calendarEventImportSeries.push({
+      id: 'restored-series',
+      schoolYearId: 'restored-year',
+      externalSource: 'ics',
+      externalKey: 'restored-series@example.test',
+      seriesIdentityKey:
+        'calendar-event-series\u0000ics\u0000restored-year\u0000restored-series@example.test',
+      masterFingerprint: 'fnv1a32:55555555',
+      calendarTimeZoneFingerprint: 'fnv1a32:66666666',
+      recurrenceEngineVersion: 'classroom-rfc5545-v1+ical.js-2.2.1',
+      lastImportRunId: 'restored-import-run',
+      createdAt: firstTime,
+      updatedAt: firstTime,
+    });
+    incoming.calendarEventImportOccurrences.push({
+      id: 'restored-occurrence',
+      seriesId: 'restored-series',
+      schoolYearId: 'restored-year',
+      occurrenceKey: 'date\u00002026-12-24\u0000',
+      occurrenceIdentityKey:
+        'calendar-event-series\u0000ics\u0000restored-year\u0000restored-series@example.test\u0000date\u00002026-12-24\u0000',
+      sourceStatus: 'active',
+      managementStatus: 'materialized',
+      eventId: 'restored-calendar-event',
+      sourceOccurrenceFingerprint: 'fnv1a32:77777777',
+      lastImportedEventFingerprint: 'fnv1a32:88888888',
+      lastImportRunId: 'restored-import-run',
+      createdAt: firstTime,
+      updatedAt: firstTime,
+    });
     incoming.classificationMappingPresets.push({
       id: 'restored-mapping',
       familyId: 'subject',
@@ -303,6 +370,10 @@ describe('BackupRecoveryService', () => {
       schoolYearId: 'restored-year',
       category: 'School Holiday',
     });
+    expect(await database.calendarEventImportSeries.get('restored-series')).toBeDefined();
+    expect(await database.calendarEventImportOccurrences.get('restored-occurrence')).toMatchObject({
+      eventId: 'restored-calendar-event',
+    });
     expect(await database.backupSnapshots.count()).toBe(1);
     expect(await database.restoreRuns.count()).toBe(1);
     expect(await database.restoreQuarantineRecords.count()).toBe(1);
@@ -323,6 +394,7 @@ describe('BackupRecoveryService', () => {
       totalRows: 1,
       createdCount: 1,
       updatedCount: 0,
+      removedCount: 0,
       skippedCount: 0,
       reviewCount: 0,
       blockedCount: 0,
@@ -401,6 +473,7 @@ describe('BackupRecoveryService', () => {
       totalRows: 1,
       createdCount: 1,
       updatedCount: 0,
+      removedCount: 0,
       skippedCount: 0,
       reviewCount: 0,
       blockedCount: 0,
@@ -503,7 +576,7 @@ describe('BackupRecoveryService', () => {
     }).createBackup();
     const preview = buildRestorePreview(serializeBackupEnvelope(envelope));
 
-    expect(envelope.databaseSchemaVersion).toBe(15);
+    expect(envelope.databaseSchemaVersion).toBe(16);
     expect(preview.quarantineCount).toBe(0);
     expect(familyIds(preview.validTables.categoryValues)).toEqual(['language', 'subject']);
     expect(familyIds(preview.validTables.categoryAssignments)).toEqual(['language', 'subject']);

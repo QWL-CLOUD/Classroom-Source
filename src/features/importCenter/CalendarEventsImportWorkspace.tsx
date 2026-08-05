@@ -5,6 +5,8 @@ import { Link } from 'react-router-dom';
 
 import { classroomDb } from '@/data/db/ClassroomDatabase';
 import {
+  calendarEventImportOccurrenceSchema,
+  calendarEventImportSeriesSchema,
   calendarEventSchema,
   categoryAssignmentSchema,
   categoryValueSchema,
@@ -28,6 +30,10 @@ import {
   type CalendarEventTentativeAcknowledgements,
 } from '@/features/calendarEventImport/calendarEventImportModel';
 import { parseCalendarEventIcs } from '@/features/calendarEventImport/calendarEventImportIcsParser';
+import type {
+  CalendarEventRecurrenceDecision,
+  CalendarEventRecurrenceDecisions,
+} from '@/features/calendarEventImport/calendarEventRecurrenceReconciliation';
 import { calendarEventImportMutationService } from '@/features/calendarEventImport/calendarEventImportMutationService';
 import { downloadCalendarEventImportTemplate } from '@/features/calendarEventImport/calendarEventImportTemplate';
 
@@ -52,6 +58,7 @@ const mappingFields: Array<ImportMappingField<(typeof calendarEventImportFieldKe
 const classificationLabels: Record<CalendarEventImportPreviewRow['classification'], string> = {
   create: 'Create',
   update: 'Update',
+  remove: 'Remove',
   skip: 'Skip',
   review: 'Review',
   blocked: 'Blocked',
@@ -60,6 +67,7 @@ const classificationLabels: Record<CalendarEventImportPreviewRow['classification
 function previewTone(classification: CalendarEventImportPreviewRow['classification']) {
   if (classification === 'create') return 'new';
   if (classification === 'update') return 'update';
+  if (classification === 'remove') return 'blocked';
   if (classification === 'skip') return 'skip';
   return 'blocked';
 }
@@ -141,16 +149,21 @@ function decodeDuplicateDecision(value: string): CalendarEventDuplicateDecision 
 
 export function CalendarEventsImportWorkspace() {
   const data = useLiveQuery(async () => {
-    const [schoolYears, events, values, assignments, mappingPresets] = await Promise.all([
-      classroomDb.schoolYears.toArray(),
-      classroomDb.calendarEvents.toArray(),
-      classroomDb.categoryValues.toArray(),
-      classroomDb.categoryAssignments.where('entityType').equals('calendar-event').toArray(),
-      classroomDb.classificationMappingPresets.toArray(),
-    ]);
+    const [schoolYears, events, series, occurrences, values, assignments, mappingPresets] =
+      await Promise.all([
+        classroomDb.schoolYears.toArray(),
+        classroomDb.calendarEvents.toArray(),
+        classroomDb.calendarEventImportSeries.toArray(),
+        classroomDb.calendarEventImportOccurrences.toArray(),
+        classroomDb.categoryValues.toArray(),
+        classroomDb.categoryAssignments.where('entityType').equals('calendar-event').toArray(),
+        classroomDb.classificationMappingPresets.toArray(),
+      ]);
     return {
       schoolYears: schoolYears.map((value) => schoolYearSchema.parse(value)),
       events: events.map((value) => calendarEventSchema.parse(value)),
+      series: series.map((value) => calendarEventImportSeriesSchema.parse(value)),
+      occurrences: occurrences.map((value) => calendarEventImportOccurrenceSchema.parse(value)),
       categoryValues: values.map((value) => categoryValueSchema.parse(value)),
       categoryAssignments: assignments.map((value) => categoryAssignmentSchema.parse(value)),
       mappingPresets: mappingPresets.map((value) => classificationMappingPresetSchema.parse(value)),
@@ -162,7 +175,9 @@ export function CalendarEventsImportWorkspace() {
   const [selectedSheetIndex, setSelectedSheetIndex] = useState(0);
   const [fileLabel, setFileLabel] = useState('');
   const [sourceKind, setSourceKind] = useState<'ics' | 'csv' | 'xlsx' | null>(null);
-  const [parsedIcs, setParsedIcs] = useState<ReturnType<typeof parseCalendarEventIcs> | null>(null);
+  const [parsedIcs, setParsedIcs] = useState<Awaited<
+    ReturnType<typeof parseCalendarEventIcs>
+  > | null>(null);
   const [table, setTable] = useState<ImportTable | null>(null);
   const [mapping, setMapping] = useState<CalendarEventImportColumnMapping>(
     createEmptyCalendarEventImportMapping,
@@ -171,6 +186,9 @@ export function CalendarEventsImportWorkspace() {
   const [duplicateDecisions, setDuplicateDecisions] = useState<CalendarEventDuplicateDecisions>({});
   const [tentativeAcknowledgements, setTentativeAcknowledgements] =
     useState<CalendarEventTentativeAcknowledgements>({});
+  const [recurrenceDecisions, setRecurrenceDecisions] = useState<CalendarEventRecurrenceDecisions>(
+    {},
+  );
   const [classificationDecisions, setClassificationDecisions] =
     useState<ImportClassificationDecisions>({});
   const [mappingPersistenceDecisions, setMappingPersistenceDecisions] =
@@ -178,6 +196,7 @@ export function CalendarEventsImportWorkspace() {
   const [preview, setPreview] = useState<CalendarEventImportPreview | null>(null);
   const [reviewDirty, setReviewDirty] = useState(false);
   const [confirmUpdates, setConfirmUpdates] = useState(false);
+  const [confirmRemovals, setConfirmRemovals] = useState(false);
   const [confirmCommit, setConfirmCommit] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -220,11 +239,13 @@ export function CalendarEventsImportWorkspace() {
   function resetReview(): void {
     setDuplicateDecisions({});
     setTentativeAcknowledgements({});
+    setRecurrenceDecisions({});
     setClassificationDecisions({});
     setMappingPersistenceDecisions({});
     setPreview(null);
     setReviewDirty(false);
     setConfirmUpdates(false);
+    setConfirmRemovals(false);
     setConfirmCommit(false);
     setSuccess(null);
     setSuccessDate(null);
@@ -239,7 +260,7 @@ export function CalendarEventsImportWorkspace() {
         throw new Error('Choose a Calendar file no larger than 20 MB.');
       const extension = file.name.split('.').at(-1)?.toLocaleLowerCase('en-US');
       if (extension === 'ics') {
-        const parsed = parseCalendarEventIcs(await file.text());
+        const parsed = await parseCalendarEventIcs(await file.text());
         setParsedIcs(parsed);
         setWorkbook(null);
         setTable(null);
@@ -304,6 +325,9 @@ export function CalendarEventsImportWorkspace() {
           classificationDecisions,
           mappingPersistenceDecisions,
           existingEvents: data.events,
+          existingSeries: data.series,
+          existingOccurrences: data.occurrences,
+          recurrenceDecisions,
           categoryValues: data.categoryValues,
           mappingPresets: data.mappingPresets,
           categoryAssignments: data.categoryAssignments,
@@ -311,6 +335,7 @@ export function CalendarEventsImportWorkspace() {
       );
       setReviewDirty(false);
       setConfirmUpdates(false);
+      setConfirmRemovals(false);
       setConfirmCommit(false);
     } catch (cause) {
       setPreview(null);
@@ -329,6 +354,7 @@ export function CalendarEventsImportWorkspace() {
         worksheetName: preview.sourceKind === 'xlsx' ? selectedSheet?.name : undefined,
         sourceContentFingerprint: calendarEventImportSourceContentFingerprint(source),
         confirmUpdates,
+        confirmRemovals,
         confirmCommit,
       });
       const mappingSummary =
@@ -336,11 +362,12 @@ export function CalendarEventsImportWorkspace() {
           ? ` Saved ${result.createdMappingPresets.length} and updated ${result.updatedMappingPresets.length} import mappings.`
           : '';
       setSuccess(
-        `Committed ${result.created.length} new and ${result.updated.length} updated Calendar Events as one global Undo action.${mappingSummary}`,
+        `Committed ${result.created.length} new and ${result.updated.length} updated Calendar Events, with ${result.removed.length} removed, as one global Undo action.${mappingSummary}`,
       );
       setSuccessDate(result.earliestStartDate ?? null);
       setPreview(null);
       setConfirmUpdates(false);
+      setConfirmRemovals(false);
       setConfirmCommit(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Calendar Event import failed.');
@@ -350,6 +377,7 @@ export function CalendarEventsImportWorkspace() {
   }
 
   const duplicateReviewRows = preview?.rows.filter((row) => row.duplicateReview) ?? [];
+  const recurrenceReviewRows = preview?.rows.filter((row) => row.recurrenceReview) ?? [];
   const tentativeReviewRows =
     preview?.rows.filter(
       (row) => row.normalized.status === 'TENTATIVE' && row.classification === 'review',
@@ -360,11 +388,11 @@ export function CalendarEventsImportWorkspace() {
     <section className={styles.workspace} aria-labelledby="calendar-events-import-heading">
       <div className={styles.workspaceHeader} data-testid="calendar-events-import-header">
         <div>
-          <p className="page-eyebrow">Phase 3I-0.5J.2</p>
+          <p className="page-eyebrow">Phase 3I-0.5J.3</p>
           <h2 id="calendar-events-import-heading">Import Calendar Events</h2>
           <p>
-            Import reviewed non-recurring school-wide Events into one active School Year. Schedule
-            Blocks, Schedule Exceptions, Sessions, and reminders are never changed.
+            Import reviewed one-time and recurring school-wide Events into one active School Year.
+            Schedule Blocks, Schedule Exceptions, Sessions, and reminders are never changed.
           </p>
         </div>
         <div className={styles.templateActions}>
@@ -465,10 +493,11 @@ export function CalendarEventsImportWorkspace() {
               <p className="page-eyebrow">Step 3</p>
               <h3 id="calendar-ics-preview-heading">Review parsed ICS Events</h3>
             </div>
-            <span className={styles.meta}>{parsedIcs.rows.length} VEVENT components</span>
+            <span className={styles.meta}>{parsedIcs.componentCount} VEVENT components</span>
           </div>
           <p className={styles.helpText}>
-            Recurrence, cancellation, incompatible date-time forms, and lossy seconds are blocked.
+            Supported recurrence and one-off exceptions expand into reviewed discrete Events.
+            Unsupported recurrence, incompatible date-time forms, and lossy seconds are blocked.
             VALARM data is ignored and never creates reminders.
           </p>
           <button
@@ -549,8 +578,8 @@ export function CalendarEventsImportWorkspace() {
               </div>
               <span className={styles.meta}>
                 {preview.summary.createCount} create · {preview.summary.updateCount} update ·{' '}
-                {preview.summary.skipCount} skip · {preview.summary.reviewCount} review ·{' '}
-                {preview.summary.blockedCount} blocked
+                {preview.summary.removeCount} remove · {preview.summary.skipCount} skip ·{' '}
+                {preview.summary.reviewCount} review · {preview.summary.blockedCount} blocked
               </span>
             </div>
             {reviewDirty ? (
@@ -562,11 +591,12 @@ export function CalendarEventsImportWorkspace() {
               label="Calendar Event import preview"
               rows={preview.rows}
               columns={previewColumns}
-              rowKey={(row) => `${row.sourceRow}-${row.normalized.eventOrdinal ?? 0}`}
+              rowKey={(row) => row.rowKey}
             />
           </section>
 
           {duplicateReviewRows.length ||
+          recurrenceReviewRows.length ||
           tentativeReviewRows.length ||
           classificationReviews.length ? (
             <section
@@ -581,7 +611,7 @@ export function CalendarEventsImportWorkspace() {
               </div>
               <div className={styles.reviewGrid}>
                 {duplicateReviewRows.map((row) => (
-                  <label key={`duplicate-${row.sourceRow}`}>
+                  <label key={`duplicate-${row.rowKey}`}>
                     <span>
                       {row.normalized.eventOrdinal
                         ? `Event ${row.normalized.eventOrdinal}`
@@ -590,12 +620,12 @@ export function CalendarEventsImportWorkspace() {
                       <small>{row.duplicateReview?.message}</small>
                     </span>
                     <select
-                      value={encodeDuplicateDecision(duplicateDecisions[row.sourceRow])}
+                      value={encodeDuplicateDecision(duplicateDecisions[row.rowKey])}
                       disabled={busy}
                       onChange={(event) => {
                         setDuplicateDecisions((current) => ({
                           ...current,
-                          [row.sourceRow]: decodeDuplicateDecision(event.target.value),
+                          [row.rowKey]: decodeDuplicateDecision(event.target.value),
                         }));
                         markReviewDirty();
                       }}
@@ -610,6 +640,39 @@ export function CalendarEventsImportWorkspace() {
                             Update and adopt manual Event: {candidate.title}
                           </option>
                         ))}
+                    </select>
+                  </label>
+                ))}
+                {recurrenceReviewRows.map((row) => (
+                  <label key={`recurrence-${row.rowKey}`}>
+                    <span>
+                      Event {row.normalized.eventOrdinal ?? row.sourceRow}: {row.normalized.title}
+                      <small>{row.reasons[0]}</small>
+                    </span>
+                    <select
+                      value={
+                        recurrenceDecisions[row.recurrenceReview!.occurrenceIdentityKey]?.action ??
+                        ''
+                      }
+                      disabled={busy}
+                      onChange={(event) => {
+                        const action = event.target.value as
+                          CalendarEventRecurrenceDecision['action'] | '';
+                        setRecurrenceDecisions((current) => ({
+                          ...current,
+                          [row.recurrenceReview!.occurrenceIdentityKey]: action
+                            ? { action }
+                            : undefined,
+                        }));
+                        markReviewDirty();
+                      }}
+                    >
+                      <option value="">Choose recurrence decision</option>
+                      {row.recurrenceReview?.options.map((option) => (
+                        <option key={option.action} value={option.action}>
+                          {option.label}
+                        </option>
+                      ))}
                     </select>
                   </label>
                 ))}
@@ -676,6 +739,16 @@ export function CalendarEventsImportWorkspace() {
                 <span>Confirm the reviewed Calendar Event updates.</span>
               </label>
             ) : null}
+            {preview.summary.removeCount > 0 ? (
+              <label className={styles.confirmation}>
+                <input
+                  type="checkbox"
+                  checked={confirmRemovals}
+                  onChange={(event) => setConfirmRemovals(event.target.checked)}
+                />
+                <span>Confirm the reviewed Calendar Event removals.</span>
+              </label>
+            ) : null}
             <label className={styles.confirmation}>
               <input
                 type="checkbox"
@@ -691,9 +764,13 @@ export function CalendarEventsImportWorkspace() {
                 busy ||
                 reviewDirty ||
                 !preview.canCommit ||
-                preview.summary.createCount + preview.summary.updateCount === 0 ||
+                preview.summary.createCount +
+                  preview.summary.updateCount +
+                  preview.summary.removeCount ===
+                  0 ||
                 !confirmCommit ||
-                (preview.summary.updateCount > 0 && !confirmUpdates)
+                (preview.summary.updateCount > 0 && !confirmUpdates) ||
+                (preview.summary.removeCount > 0 && !confirmRemovals)
               }
               onClick={() => void commit()}
             >

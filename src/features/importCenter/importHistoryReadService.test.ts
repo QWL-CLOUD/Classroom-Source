@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ClassroomDatabase } from '@/data/db/ClassroomDatabase';
 import {
+  calendarEventImportOccurrenceSchema,
+  calendarEventImportSeriesSchema,
   calendarEventSchema,
   changeLogSchema,
   classificationMappingPresetSchema,
@@ -19,6 +21,8 @@ import {
   deleteImportCategoryAssignmentOperation,
   deleteImportCategoryValueOperation,
   deleteImportClassificationMappingPresetOperation,
+  deleteCalendarEventImportOccurrenceOperation,
+  deleteCalendarEventImportSeriesOperation,
   deleteImportedCalendarEventOperation,
   deleteImportedLibraryItemOperation,
   deleteImportRunOperation,
@@ -26,6 +30,8 @@ import {
   putImportCategoryAssignmentOperation,
   putImportCategoryValueOperation,
   putImportClassificationMappingPresetOperation,
+  putCalendarEventImportOccurrenceOperation,
+  putCalendarEventImportSeriesOperation,
   putImportedCalendarEventOperation,
   putImportedLibraryItemOperation,
   putImportRunOperation,
@@ -323,9 +329,10 @@ describe('Import Center history and commands', () => {
       sourceKind: 'ics',
       sourceLabel: 'district-calendar.ics',
       schoolYearId: 'school-year-2026',
-      totalRows: 1,
+      totalRows: 2,
       createdCount: 1,
       updatedCount: 0,
+      removedCount: 1,
       skippedCount: 0,
       reviewCount: 0,
       blockedCount: 0,
@@ -342,16 +349,59 @@ describe('Import Center history and commands', () => {
       importIdentityKey: 'calendar-event\u0000ics\u0000district-pd-1',
       lastImportRunId: run.id,
     });
+    const series = calendarEventImportSeriesSchema.parse({
+      id: 'calendar-event-series',
+      schoolYearId: run.schoolYearId,
+      externalSource: 'ics',
+      externalKey: 'district-series@example.test',
+      seriesIdentityKey:
+        'calendar-event-series\u0000ics\u0000school-year-2026\u0000district-series@example.test',
+      masterFingerprint: 'fnv1a32:11111111',
+      calendarTimeZoneFingerprint: 'fnv1a32:22222222',
+      recurrenceEngineVersion: 'classroom-rfc5545-v1+ical.js-2.2.1',
+      lastImportRunId: run.id,
+      createdAt: run.committedAt,
+      updatedAt: run.committedAt,
+    });
+    const occurrence = calendarEventImportOccurrenceSchema.parse({
+      id: 'calendar-event-occurrence',
+      seriesId: series.id,
+      schoolYearId: run.schoolYearId,
+      occurrenceKey: 'date\u00002026-10-12\u0000',
+      occurrenceIdentityKey: `${series.seriesIdentityKey}\u0000date\u00002026-10-12\u0000`,
+      sourceStatus: 'active',
+      managementStatus: 'materialized',
+      eventId: event.id,
+      sourceOccurrenceFingerprint: 'fnv1a32:33333333',
+      lastImportedEventFingerprint: 'fnv1a32:44444444',
+      lastImportRunId: run.id,
+      createdAt: run.committedAt,
+      updatedAt: run.committedAt,
+    });
     const command = parseImportCommand(
       serializeImportCommand(
-        createImportCommand([putImportedCalendarEventOperation(event), putImportRunOperation(run)]),
+        createImportCommand([
+          putImportedCalendarEventOperation(event),
+          putCalendarEventImportSeriesOperation(series),
+          putCalendarEventImportOccurrenceOperation(occurrence),
+          putImportRunOperation(run),
+        ]),
       ),
     );
 
-    await database.transaction('rw', [database.calendarEvents, database.importRuns], () =>
-      applyImportOperations(database, command.operations),
+    await database.transaction(
+      'rw',
+      [
+        database.calendarEvents,
+        database.calendarEventImportSeries,
+        database.calendarEventImportOccurrences,
+        database.importRuns,
+      ],
+      () => applyImportOperations(database, command.operations),
     );
     expect(await database.calendarEvents.get(event.id)).toEqual(event);
+    expect(await database.calendarEventImportSeries.get(series.id)).toEqual(series);
+    expect(await database.calendarEventImportOccurrences.get(occurrence.id)).toEqual(occurrence);
 
     const history = await new ImportHistoryReadService(database).list();
     expect(history).toEqual([
@@ -360,10 +410,17 @@ describe('Import Center history and commands', () => {
         importType: 'calendar-events',
         sourceKind: 'ics',
         schoolYearId: 'school-year-2026',
+        removedCount: 1,
       }),
     ]);
 
-    await applyImportOperations(database, [deleteImportedCalendarEventOperation(event.id)]);
+    await applyImportOperations(database, [
+      deleteCalendarEventImportOccurrenceOperation(occurrence.id),
+      deleteCalendarEventImportSeriesOperation(series.id),
+      deleteImportedCalendarEventOperation(event.id),
+    ]);
     expect(await database.calendarEvents.get(event.id)).toBeUndefined();
+    expect(await database.calendarEventImportSeries.get(series.id)).toBeUndefined();
+    expect(await database.calendarEventImportOccurrences.get(occurrence.id)).toBeUndefined();
   });
 });

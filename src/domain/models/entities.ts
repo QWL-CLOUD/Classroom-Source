@@ -197,6 +197,75 @@ export const calendarEventSchema = z
     }
   });
 
+export const calendarEventImportSeriesSchema = z.object({
+  id: idSchema,
+  schoolYearId: idSchema,
+  externalSource: z.literal('ics'),
+  externalKey: z.string().trim().min(1).max(500),
+  seriesIdentityKey: z.string().trim().min(1).max(1_500),
+  masterFingerprint: z.string().trim().min(1).max(500),
+  calendarTimeZoneFingerprint: z.string().trim().min(1).max(500),
+  recurrenceEngineVersion: z.string().trim().min(1).max(120),
+  lastImportRunId: idSchema,
+  createdAt: timestampSchema,
+  updatedAt: timestampSchema,
+});
+
+export const calendarEventImportOccurrenceSourceStatusSchema = z.enum([
+  'active',
+  'excluded',
+  'cancelled',
+  'absent',
+]);
+
+export const calendarEventImportOccurrenceManagementStatusSchema = z.enum([
+  'materialized',
+  'suppressed',
+  'detached',
+]);
+
+export const calendarEventImportOccurrenceSchema = z
+  .object({
+    id: idSchema,
+    seriesId: idSchema,
+    schoolYearId: idSchema,
+    occurrenceKey: z.string().trim().min(1).max(500),
+    occurrenceIdentityKey: z.string().trim().min(1).max(2_000),
+    sourceStatus: calendarEventImportOccurrenceSourceStatusSchema,
+    managementStatus: calendarEventImportOccurrenceManagementStatusSchema,
+    eventId: idSchema.optional(),
+    relatedManualEventId: idSchema.optional(),
+    sourceOccurrenceFingerprint: z.string().trim().min(1).max(500).optional(),
+    lastImportedEventFingerprint: z.string().trim().min(1).max(500).optional(),
+    lastImportedCategoryValueId: idSchema.optional(),
+    lastImportRunId: idSchema,
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+  })
+  .superRefine((value, context) => {
+    if (value.managementStatus === 'materialized' && !value.eventId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A materialized occurrence requires an Event.',
+        path: ['eventId'],
+      });
+    }
+    if (value.managementStatus !== 'materialized' && value.eventId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Only a materialized occurrence can own an Event.',
+        path: ['eventId'],
+      });
+    }
+    if (value.managementStatus === 'detached' && !value.relatedManualEventId) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A detached occurrence requires the preserved manual Event ID.',
+        path: ['relatedManualEventId'],
+      });
+    }
+  });
+
 export const lessonSeriesSchema = z.object({
   id: idSchema,
   contextId: idSchema,
@@ -316,6 +385,7 @@ export const importRunSchema = z
     totalRows: z.number().int().nonnegative().max(50_000),
     createdCount: z.number().int().nonnegative().max(50_000),
     updatedCount: z.number().int().nonnegative().max(50_000),
+    removedCount: z.number().int().nonnegative().max(50_000).default(0),
     skippedCount: z.number().int().nonnegative().max(50_000),
     reviewCount: z.number().int().nonnegative().max(50_000),
     blockedCount: z.number().int().nonnegative().max(50_000),
@@ -326,6 +396,7 @@ export const importRunSchema = z
     const classifiedRows =
       value.createdCount +
       value.updatedCount +
+      value.removedCount +
       value.skippedCount +
       value.reviewCount +
       value.blockedCount;
@@ -336,10 +407,14 @@ export const importRunSchema = z
         path: ['totalRows'],
       });
     }
-    if (value.totalRows === 0 || value.createdCount + value.updatedCount === 0) {
+    if (
+      value.totalRows === 0 ||
+      value.createdCount + value.updatedCount + value.removedCount === 0
+    ) {
       context.addIssue({
         code: 'custom',
-        message: 'A committed import run must contain at least one created or updated record.',
+        message:
+          'A committed import run must contain at least one created, updated, or removed record.',
         path: ['totalRows'],
       });
     }
@@ -1303,6 +1378,14 @@ export type RosterMembership = z.infer<typeof rosterMembershipSchema>;
 export type ScheduleBlock = z.infer<typeof scheduleBlockSchema>;
 export type ScheduleException = z.infer<typeof scheduleExceptionSchema>;
 export type CalendarEvent = z.infer<typeof calendarEventSchema>;
+export type CalendarEventImportSeries = z.infer<typeof calendarEventImportSeriesSchema>;
+export type CalendarEventImportOccurrenceSourceStatus = z.infer<
+  typeof calendarEventImportOccurrenceSourceStatusSchema
+>;
+export type CalendarEventImportOccurrenceManagementStatus = z.infer<
+  typeof calendarEventImportOccurrenceManagementStatusSchema
+>;
+export type CalendarEventImportOccurrence = z.infer<typeof calendarEventImportOccurrenceSchema>;
 export type LessonSeries = z.infer<typeof lessonSeriesSchema>;
 export type LessonFlowPhase = z.infer<typeof lessonFlowPhaseSchema>;
 export type LessonFlowStep = z.infer<typeof lessonFlowStepSchema>;

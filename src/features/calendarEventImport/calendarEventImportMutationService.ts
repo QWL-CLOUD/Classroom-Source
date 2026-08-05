@@ -1,5 +1,7 @@
 import { classroomDb, type ClassroomDatabase } from '@/data/db/ClassroomDatabase';
 import {
+  calendarEventImportOccurrenceSchema,
+  calendarEventImportSeriesSchema,
   calendarEventSchema,
   categoryAssignmentSchema,
   categoryValueSchema,
@@ -7,6 +9,8 @@ import {
   importRunSchema,
   schoolYearSchema,
   type CalendarEvent,
+  type CalendarEventImportOccurrence,
+  type CalendarEventImportSeries,
   type CategoryAssignment,
   type CategoryValue,
   type ChangeLog,
@@ -24,10 +28,14 @@ import {
   createImportCommand,
   deleteImportCategoryAssignmentOperation,
   deleteImportCategoryValueOperation,
+  deleteCalendarEventImportOccurrenceOperation,
+  deleteCalendarEventImportSeriesOperation,
   deleteImportedCalendarEventOperation,
   deleteImportRunOperation,
   putImportCategoryAssignmentOperation,
   putImportCategoryValueOperation,
+  putCalendarEventImportOccurrenceOperation,
+  putCalendarEventImportSeriesOperation,
   putImportedCalendarEventOperation,
   putImportRunOperation,
   serializeImportCommand,
@@ -44,6 +52,7 @@ export interface CommitCalendarEventImportOptions {
   worksheetName?: string;
   sourceContentFingerprint: string;
   confirmUpdates: boolean;
+  confirmRemovals: boolean;
   confirmCommit: boolean;
 }
 
@@ -55,6 +64,7 @@ export interface CalendarEventImportMutationDependencies {
 export interface CalendarEventImportCommitResult {
   created: CalendarEvent[];
   updated: CalendarEvent[];
+  removed: CalendarEvent[];
   skippedCount: number;
   createdCategoryValues: CategoryValue[];
   restoredCategoryValues: CategoryValue[];
@@ -103,11 +113,17 @@ export class CalendarEventImportMutationService {
         'Confirm that the complete reviewed Calendar Event preview should be committed.',
       );
     }
-    if (preview.summary.createCount + preview.summary.updateCount === 0) {
+    if (
+      preview.summary.createCount + preview.summary.updateCount + preview.summary.removeCount ===
+      0
+    ) {
       throw new Error('The reviewed Calendar Event preview contains no changes to commit.');
     }
     if (preview.summary.updateCount > 0 && !options.confirmUpdates) {
       throw new Error('Confirm the reviewed Calendar Event updates before committing.');
+    }
+    if (preview.summary.removeCount > 0 && !options.confirmRemovals) {
+      throw new Error('Confirm the reviewed Calendar Event removals before committing.');
     }
     if (options.sourceKind !== preview.sourceKind) {
       throw new Error('The Calendar source kind changed after preview. Generate a new preview.');
@@ -121,6 +137,8 @@ export class CalendarEventImportMutationService {
       [
         this.db.schoolYears,
         this.db.calendarEvents,
+        this.db.calendarEventImportSeries,
+        this.db.calendarEventImportOccurrences,
         this.db.categoryValues,
         this.db.categoryAssignments,
         this.db.classificationMappingPresets,
@@ -158,67 +176,170 @@ export class CalendarEventImportMutationService {
         const inverseEvents: ImportOperation[] = [];
         const forwardAssignments: ImportOperation[] = [];
         const inverseAssignments: ImportOperation[] = [];
+        const forwardSeries: ImportOperation[] = [];
+        const inverseSeries: ImportOperation[] = [];
+        const forwardOccurrences: ImportOperation[] = [];
+        const inverseOccurrences: ImportOperation[] = [];
         const created: CalendarEvent[] = [];
         const updated: CalendarEvent[] = [];
+        const removed: CalendarEvent[] = [];
+        const validatedSeries = new Set<string>();
+        const validatedOccurrences = new Set<string>();
+        const writtenSeries = new Set<string>();
+        const writtenOccurrences = new Set<string>();
 
         for (const row of preview.rows) {
+          if (row.classification === 'review' || row.classification === 'blocked') {
+            throw new Error(`Row ${row.sourceRow} is not eligible for Calendar Event import.`);
+          }
           const plan = row.planned;
-          if (row.classification === 'skip') {
-            if (plan?.existingEvent) {
-              await this.validateExpectedEvent(plan.existingEvent, row.sourceRow);
-              await this.validateExpectedAssignments(
-                plan.existingEvent.id,
-                plan.expectedAssignments,
-                row.sourceRow,
-              );
+          if (!plan) {
+            if (row.classification !== 'skip') {
+              throw new Error(`Row ${row.sourceRow} has no reviewed Calendar Event plan.`);
             }
             continue;
           }
-          if (row.classification !== 'create' && row.classification !== 'update') {
-            throw new Error(`Row ${row.sourceRow} is not eligible for Calendar Event import.`);
-          }
-          if (!plan?.event) throw new Error(`Row ${row.sourceRow} has no reviewed Calendar Event.`);
-          const planned = calendarEventSchema.parse(plan.event);
-          const identity = planned.importIdentityKey;
-          if (!identity)
-            throw new Error(`Row ${row.sourceRow} has no stable Calendar Event identity.`);
 
-          if (row.classification === 'create') {
-            if (await this.db.calendarEvents.get(planned.id)) {
-              throw new Error(`Row ${row.sourceRow} Calendar Event ID changed after preview.`);
+          if (plan.expectedSeries && !validatedSeries.has(plan.expectedSeries.id)) {
+            await this.validateExpectedSeries(plan.expectedSeries, row.sourceRow);
+            validatedSeries.add(plan.expectedSeries.id);
+          }
+          if (plan.expectedOccurrence && !validatedOccurrences.has(plan.expectedOccurrence.id)) {
+            await this.validateExpectedOccurrence(plan.expectedOccurrence, row.sourceRow);
+            validatedOccurrences.add(plan.expectedOccurrence.id);
+          }
+          if (plan.series && !writtenSeries.has(plan.series.id)) {
+            const series = calendarEventImportSeriesSchema.parse(plan.series);
+            if (plan.expectedSeries) {
+              if (plan.expectedSeries.id !== series.id) {
+                throw new Error(`Row ${row.sourceRow} recurrence series ID changed after preview.`);
+              }
+              forwardSeries.push(putCalendarEventImportSeriesOperation(series));
+              inverseSeries.unshift(putCalendarEventImportSeriesOperation(plan.expectedSeries));
+            } else {
+              if (await this.db.calendarEventImportSeries.get(series.id)) {
+                throw new Error(`Row ${row.sourceRow} recurrence series ID changed after preview.`);
+              }
+              const owner = await this.db.calendarEventImportSeries
+                .where('seriesIdentityKey')
+                .equals(series.seriesIdentityKey)
+                .first();
+              if (owner) {
+                throw new Error(
+                  `Row ${row.sourceRow} recurrence series identity changed after preview.`,
+                );
+              }
+              forwardSeries.push(putCalendarEventImportSeriesOperation(series));
+              inverseSeries.unshift(deleteCalendarEventImportSeriesOperation(series.id));
             }
-            if (currentByIdentity.has(identity)) {
-              throw new Error(
-                `Row ${row.sourceRow} Calendar Event identity changed after preview.`,
+            writtenSeries.add(series.id);
+          }
+          if (plan.occurrence && !writtenOccurrences.has(plan.occurrence.id)) {
+            const occurrence = calendarEventImportOccurrenceSchema.parse(plan.occurrence);
+            if (plan.expectedOccurrence) {
+              if (plan.expectedOccurrence.id !== occurrence.id) {
+                throw new Error(
+                  `Row ${row.sourceRow} recurrence occurrence ID changed after preview.`,
+                );
+              }
+              forwardOccurrences.push(putCalendarEventImportOccurrenceOperation(occurrence));
+              inverseOccurrences.unshift(
+                putCalendarEventImportOccurrenceOperation(plan.expectedOccurrence),
+              );
+            } else {
+              if (await this.db.calendarEventImportOccurrences.get(occurrence.id)) {
+                throw new Error(
+                  `Row ${row.sourceRow} recurrence occurrence ID changed after preview.`,
+                );
+              }
+              const owner = await this.db.calendarEventImportOccurrences
+                .where('occurrenceIdentityKey')
+                .equals(occurrence.occurrenceIdentityKey)
+                .first();
+              if (owner) {
+                throw new Error(
+                  `Row ${row.sourceRow} recurrence occurrence identity changed after preview.`,
+                );
+              }
+              forwardOccurrences.push(putCalendarEventImportOccurrenceOperation(occurrence));
+              inverseOccurrences.unshift(
+                deleteCalendarEventImportOccurrenceOperation(occurrence.id),
               );
             }
-            created.push(planned);
-            forwardEvents.push(putImportedCalendarEventOperation(planned));
-            inverseEvents.unshift(deleteImportedCalendarEventOperation(planned.id));
-          } else {
-            const expected = plan.existingEvent;
-            if (!expected) throw new Error(`Row ${row.sourceRow} has no expected Event snapshot.`);
-            await this.validateExpectedEvent(expected, row.sourceRow);
-            const identityOwner = currentByIdentity.get(identity);
-            if (identityOwner && identityOwner.id !== expected.id) {
-              throw new Error(
-                `Row ${row.sourceRow} Calendar Event identity now belongs to another Event.`,
-              );
-            }
-            updated.push(planned);
-            forwardEvents.push(putImportedCalendarEventOperation(planned));
-            inverseEvents.unshift(putImportedCalendarEventOperation(expected));
-            if (expected.importIdentityKey && expected.importIdentityKey !== identity) {
-              currentByIdentity.delete(expected.importIdentityKey);
-            }
+            writtenOccurrences.add(occurrence.id);
           }
-          currentByIdentity.set(identity, planned);
 
-          await this.validateExpectedAssignments(
-            plan.existingEvent?.id,
-            plan.expectedAssignments,
-            row.sourceRow,
-          );
+          const expectedEvent = plan.existingEvent;
+          if (expectedEvent) {
+            await this.validateExpectedEvent(expectedEvent, row.sourceRow);
+            await this.validateExpectedAssignments(
+              expectedEvent.id,
+              plan.expectedAssignments,
+              row.sourceRow,
+            );
+          } else if (plan.expectedAssignments.length > 0) {
+            throw new Error(`Row ${row.sourceRow} has invalid expected category assignments.`);
+          }
+
+          if (plan.eventMutation === 'put') {
+            if (!plan.event)
+              throw new Error(`Row ${row.sourceRow} has no reviewed Calendar Event.`);
+            const planned = calendarEventSchema.parse(plan.event);
+            if (expectedEvent) {
+              if (planned.id !== expectedEvent.id) {
+                throw new Error(`Row ${row.sourceRow} Calendar Event ID changed after preview.`);
+              }
+              const identity = planned.importIdentityKey;
+              if (identity) {
+                const identityOwner = currentByIdentity.get(identity);
+                if (identityOwner && identityOwner.id !== expectedEvent.id) {
+                  throw new Error(
+                    `Row ${row.sourceRow} Calendar Event identity now belongs to another Event.`,
+                  );
+                }
+              }
+              updated.push(planned);
+              forwardEvents.push(putImportedCalendarEventOperation(planned));
+              inverseEvents.unshift(putImportedCalendarEventOperation(expectedEvent));
+              if (
+                expectedEvent.importIdentityKey &&
+                expectedEvent.importIdentityKey !== planned.importIdentityKey
+              ) {
+                currentByIdentity.delete(expectedEvent.importIdentityKey);
+              }
+            } else {
+              if (await this.db.calendarEvents.get(planned.id)) {
+                throw new Error(`Row ${row.sourceRow} Calendar Event ID changed after preview.`);
+              }
+              const identity = planned.importIdentityKey;
+              if (!identity) {
+                throw new Error(`Row ${row.sourceRow} has no stable Calendar Event identity.`);
+              }
+              if (currentByIdentity.has(identity)) {
+                throw new Error(
+                  `Row ${row.sourceRow} Calendar Event identity changed after preview.`,
+                );
+              }
+              created.push(planned);
+              forwardEvents.push(putImportedCalendarEventOperation(planned));
+              inverseEvents.unshift(deleteImportedCalendarEventOperation(planned.id));
+            }
+            if (planned.importIdentityKey)
+              currentByIdentity.set(planned.importIdentityKey, planned);
+          } else if (plan.eventMutation === 'delete') {
+            if (!expectedEvent) {
+              throw new Error(`Row ${row.sourceRow} has no expected Calendar Event to remove.`);
+            }
+            removed.push(expectedEvent);
+            forwardEvents.push(deleteImportedCalendarEventOperation(expectedEvent.id));
+            inverseEvents.unshift(putImportedCalendarEventOperation(expectedEvent));
+            if (expectedEvent.importIdentityKey) {
+              currentByIdentity.delete(expectedEvent.importIdentityKey);
+            }
+          } else if (row.classification === 'create' && !plan.occurrence && !plan.series) {
+            throw new Error(`Row ${row.sourceRow} has no create operation.`);
+          }
+
           for (const assignment of plan.assignmentsToDelete) {
             forwardAssignments.push(deleteImportCategoryAssignmentOperation(assignment.id));
             inverseAssignments.unshift(putImportCategoryAssignmentOperation(assignment));
@@ -259,6 +380,7 @@ export class CalendarEventImportMutationService {
           totalRows: preview.summary.total,
           createdCount: preview.summary.createCount,
           updatedCount: preview.summary.updateCount,
+          removedCount: preview.summary.removeCount,
           skippedCount: preview.summary.skipCount,
           reviewCount: 0,
           blockedCount: 0,
@@ -282,13 +404,17 @@ export class CalendarEventImportMutationService {
         const forward = createImportCommand([
           ...forwardCategoryValues,
           ...mappingOperations.forward,
+          ...forwardSeries,
           ...forwardEvents,
           ...forwardAssignments,
+          ...forwardOccurrences,
           putImportRunOperation(importRun),
         ]);
         const inverse = createImportCommand([
+          ...inverseOccurrences,
           ...inverseAssignments,
           ...inverseEvents,
+          ...inverseSeries,
           ...mappingOperations.inverse,
           ...inverseCategoryValues,
           deleteImportRunOperation(importRun.id),
@@ -300,9 +426,11 @@ export class CalendarEventImportMutationService {
             'This reviewed Calendar Event import is too large for safe Undo/Redo. Split the source into smaller imports.',
           );
         }
+        const changedEventCount = created.length + updated.length + removed.length;
+        const changedMetadataCount = writtenSeries.size + writtenOccurrences.size;
         const log = changeLogSchema.parse({
           id: this.createId(),
-          label: `Import ${created.length + updated.length} reviewed Calendar Events`,
+          label: `Reconcile ${changedEventCount || changedMetadataCount} reviewed Calendar Event${changedEventCount === 1 ? '' : 's'}`,
           commandType: 'import-center.calendar-events.reviewed',
           forwardJson,
           inverseJson,
@@ -316,6 +444,7 @@ export class CalendarEventImportMutationService {
         return {
           created,
           updated,
+          removed,
           skippedCount: preview.summary.skipCount,
           createdCategoryValues: preview.newCategoryValues,
           restoredCategoryValues: preview.restoredCategoryValues.map((value) => value.after),
@@ -333,6 +462,30 @@ export class CalendarEventImportMutationService {
       undoLabel: result.log.label,
     });
     return result;
+  }
+
+  private async validateExpectedSeries(
+    expected: CalendarEventImportSeries,
+    sourceRow: number,
+  ): Promise<void> {
+    const current = await this.db.calendarEventImportSeries.get(expected.id);
+    if (!current || !sameRecord(calendarEventImportSeriesSchema.parse(current), expected)) {
+      throw new Error(
+        `Row ${sourceRow} recurrence series changed after preview. Generate a new preview.`,
+      );
+    }
+  }
+
+  private async validateExpectedOccurrence(
+    expected: CalendarEventImportOccurrence,
+    sourceRow: number,
+  ): Promise<void> {
+    const current = await this.db.calendarEventImportOccurrences.get(expected.id);
+    if (!current || !sameRecord(calendarEventImportOccurrenceSchema.parse(current), expected)) {
+      throw new Error(
+        `Row ${sourceRow} recurrence occurrence changed after preview. Generate a new preview.`,
+      );
+    }
   }
 
   private async validateExpectedEvent(expected: CalendarEvent, sourceRow: number): Promise<void> {

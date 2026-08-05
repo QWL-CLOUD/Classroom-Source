@@ -13,6 +13,12 @@ export async function applyImportOperations(
     } else if (operation.table === 'calendarEvents') {
       if (operation.action === 'put') await db.calendarEvents.put(operation.record);
       else await db.calendarEvents.delete(operation.id);
+    } else if (operation.table === 'calendarEventImportSeries') {
+      if (operation.action === 'put') await db.calendarEventImportSeries.put(operation.record);
+      else await db.calendarEventImportSeries.delete(operation.id);
+    } else if (operation.table === 'calendarEventImportOccurrences') {
+      if (operation.action === 'put') await db.calendarEventImportOccurrences.put(operation.record);
+      else await db.calendarEventImportOccurrences.delete(operation.id);
     } else if (operation.table === 'libraryItems') {
       if (operation.action === 'put') await db.libraryItems.put(operation.record);
       else await db.libraryItems.delete(operation.id);

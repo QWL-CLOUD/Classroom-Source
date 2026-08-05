@@ -41,6 +41,8 @@ export class EditHistoryService {
       [
         this.db.assessmentEvidence,
         this.db.calendarEvents,
+        this.db.calendarEventImportSeries,
+        this.db.calendarEventImportOccurrences,
         this.db.categoryValues,
         this.db.categoryAssignments,
         this.db.classificationMappingPresets,
@@ -93,6 +95,8 @@ export class EditHistoryService {
       [
         this.db.assessmentEvidence,
         this.db.calendarEvents,
+        this.db.calendarEventImportSeries,
+        this.db.calendarEventImportOccurrences,
         this.db.categoryValues,
         this.db.categoryAssignments,
         this.db.classificationMappingPresets,

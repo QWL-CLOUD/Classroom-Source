@@ -62,6 +62,7 @@ export interface ImportHistoryEntry {
   totalRows: number;
   createdCount: number;
   updatedCount: number;
+  removedCount: number;
   skippedCount: number;
   reviewCount: number;
   blockedCount: number;
