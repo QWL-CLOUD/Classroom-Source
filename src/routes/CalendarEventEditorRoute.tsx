@@ -1,8 +1,17 @@
+import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowLeft, CalendarDays, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { ZodError } from 'zod';
 
-import type { CalendarEvent } from '@/domain/models/entities';
+import { classroomDb } from '@/data/db/ClassroomDatabase';
+import {
+  categoryAssignmentSchema,
+  categoryValueSchema,
+  schoolYearSchema,
+  type CalendarEvent,
+  type CategoryValue,
+  type SchoolYear,
+} from '@/domain/models/entities';
 import { formatCalendarMinute, getCalendarMonthRange } from '@/features/calendar/calendarReadModel';
 import {
   calendarEventMutationService,
@@ -22,6 +31,9 @@ import styles from './CalendarEventEditorRoute.module.css';
 interface CalendarEventFormProps {
   event: CalendarEvent | null;
   initialDate: string;
+  schoolYears: SchoolYear[];
+  eventTypes: CategoryValue[];
+  assignedTypeId?: string;
   service?: CalendarEventMutationService;
   onSaved: (event: CalendarEvent) => void;
   onDeleted: () => void;
@@ -48,20 +60,51 @@ function getValidationMessage(cause: unknown): string {
   return cause instanceof Error ? cause.message : 'Calendar event could not be saved.';
 }
 
+function compareSchoolYears(first: SchoolYear, second: SchoolYear): number {
+  return (
+    Number(second.active) - Number(first.active) ||
+    second.startsOn.localeCompare(first.startsOn) ||
+    first.label.localeCompare(second.label)
+  );
+}
+
+function compareEventTypes(first: CategoryValue, second: CategoryValue): number {
+  return (
+    Number(first.lifecycleState !== 'active') - Number(second.lifecycleState !== 'active') ||
+    first.sortOrder - second.sortOrder ||
+    first.name.localeCompare(second.name)
+  );
+}
+
 function CalendarEventForm({
   event,
   initialDate,
+  schoolYears,
+  eventTypes,
+  assignedTypeId,
   service = calendarEventMutationService,
   onSaved,
   onDeleted,
   onCancel,
 }: CalendarEventFormProps) {
+  const activeSchoolYearId = schoolYears.find((schoolYear) => schoolYear.active)?.id ?? '';
+  const defaultTypeId =
+    eventTypes.find((value) => value.lifecycleState === 'active' && value.isDefault)?.id ?? '';
   const [values, setValues] = useState<CalendarEventEditorValues>(() =>
-    event ? toCalendarEventEditorValues(event) : createCalendarEventEditorValues(initialDate),
+    event
+      ? toCalendarEventEditorValues(event, assignedTypeId)
+      : createCalendarEventEditorValues(initialDate, activeSchoolYearId, defaultTypeId),
   );
   const [saving, setSaving] = useState(false);
   const [deleteArmed, setDeleteArmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const visibleSchoolYears = schoolYears.filter(
+    (schoolYear) =>
+      schoolYear.lifecycleState !== 'archived' || schoolYear.id === event?.schoolYearId,
+  );
+  const visibleEventTypes = eventTypes.filter(
+    (value) => value.lifecycleState === 'active' || value.id === values.categoryValueId,
+  );
 
   function update<K extends keyof CalendarEventEditorValues>(
     key: K,
@@ -127,6 +170,48 @@ function CalendarEventForm({
         </label>
 
         <label>
+          <span>School year</span>
+          <select
+            value={values.schoolYearId}
+            onChange={(input) => update('schoolYearId', input.target.value)}
+          >
+            <option value="">No School Year (legacy/manual)</option>
+            {visibleSchoolYears.map((schoolYear) => (
+              <option
+                key={schoolYear.id}
+                value={schoolYear.id}
+                disabled={
+                  schoolYear.lifecycleState === 'archived' && schoolYear.id !== event?.schoolYearId
+                }
+              >
+                {schoolYear.label}
+                {schoolYear.lifecycleState === 'archived' ? ' — Archived' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
+          <span>Calendar Event Type</span>
+          <select
+            value={values.categoryValueId}
+            onChange={(input) => update('categoryValueId', input.target.value)}
+          >
+            <option value="">No canonical type</option>
+            {visibleEventTypes.map((value) => (
+              <option
+                key={value.id}
+                value={value.id}
+                disabled={value.lifecycleState !== 'active' && value.id !== assignedTypeId}
+              >
+                {value.name}
+                {value.lifecycleState === 'archived' ? ' — Archived' : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label>
           <span>Start date</span>
           <input
             type="date"
@@ -174,11 +259,34 @@ function CalendarEventForm({
           />
         </label>
 
-        <label className={styles.fullWidth}>
-          <span>Category</span>
+        {values.categoryValueId ? (
+          <p className={styles.fullWidth}>
+            The canonical Calendar Event Type supplies the saved category name.
+          </p>
+        ) : (
+          <label className={styles.fullWidth}>
+            <span>Category</span>
+            <input
+              value={values.category}
+              onChange={(input) => update('category', input.target.value)}
+            />
+          </label>
+        )}
+
+        <label>
+          <span>Location</span>
           <input
-            value={values.category}
-            onChange={(input) => update('category', input.target.value)}
+            value={values.location}
+            onChange={(input) => update('location', input.target.value)}
+          />
+        </label>
+
+        <label>
+          <span>Time zone</span>
+          <input
+            value={values.timeZone}
+            placeholder="America/New_York"
+            onChange={(input) => update('timeZone', input.target.value)}
           />
         </label>
 
@@ -245,6 +353,23 @@ export function CalendarEventEditorRoute() {
     startDate: range.monthStartDate,
     endDate: range.monthEndDate,
   });
+  const editorOptions = useLiveQuery(async () => {
+    const [schoolYearRows, typeRows, assignmentRows] = await Promise.all([
+      classroomDb.schoolYears.toArray(),
+      classroomDb.categoryValues.where('familyId').equals('calendar-event-type').toArray(),
+      classroomDb.categoryAssignments.where('entityType').equals('calendar-event').toArray(),
+    ]);
+    const assignments = assignmentRows
+      .map((value) => categoryAssignmentSchema.parse(value))
+      .filter((value) => value.familyId === 'calendar-event-type');
+    return {
+      schoolYears: schoolYearRows
+        .map((value) => schoolYearSchema.parse(value))
+        .sort(compareSchoolYears),
+      eventTypes: typeRows.map((value) => categoryValueSchema.parse(value)).sort(compareEventTypes),
+      typeByEventId: new Map(assignments.map((value) => [value.entityId, value.categoryValueId])),
+    };
+  }, []);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -286,7 +411,12 @@ export function CalendarEventEditorRoute() {
             <ArrowLeft size={17} aria-hidden="true" />
             Back to Calendar
           </a>
-          <button className="button button-primary" type="button" onClick={openCreate}>
+          <button
+            className="button button-primary"
+            type="button"
+            disabled={!editorOptions}
+            onClick={openCreate}
+          >
             <Plus size={17} aria-hidden="true" />
             New event
           </button>
@@ -352,8 +482,14 @@ export function CalendarEventEditorRoute() {
                     {event.endDate && event.endDate !== event.startDate ? (
                       <p>Through {formatLongDate(event.endDate)}</p>
                     ) : null}
+                    {event.schoolYearId ? <p>School Year linked</p> : null}
                   </div>
-                  <button className="button" type="button" onClick={() => openEdit(event.id)}>
+                  <button
+                    className="button"
+                    type="button"
+                    disabled={!editorOptions}
+                    onClick={() => openEdit(event.id)}
+                  >
                     <Pencil size={16} aria-hidden="true" />
                     Edit
                   </button>
@@ -365,9 +501,14 @@ export function CalendarEventEditorRoute() {
 
         {editorOpen ? (
           <CalendarEventForm
-            key={editingEvent?.id ?? `new-${date}`}
+            key={`${editingEvent?.id ?? `new-${date}`}:${editorOptions?.typeByEventId.get(editingEvent?.id ?? '') ?? ''}`}
             event={editingEvent}
             initialDate={date}
+            schoolYears={editorOptions?.schoolYears ?? []}
+            eventTypes={editorOptions?.eventTypes ?? []}
+            assignedTypeId={
+              editingEvent ? editorOptions?.typeByEventId.get(editingEvent.id) : undefined
+            }
             onCancel={closeEditor}
             onSaved={(saved) => {
               setDate(saved.startDate);

@@ -1,9 +1,11 @@
 import { z } from 'zod';
 
 import {
+  calendarEventSchema,
   categoryAssignmentSchema,
   categoryValueSchema,
   classificationMappingPresetSchema,
+  type CalendarEvent,
   type CategoryAssignment,
   type CategoryValue,
   type ClassificationMappingPreset,
@@ -48,6 +50,18 @@ export const deleteCategoryAssignmentOperationSchema = z.object({
   id: z.string().min(1),
 });
 
+const putCalendarEventOperationSchema = z.object({
+  table: z.literal('calendarEvents'),
+  action: z.literal('put'),
+  record: calendarEventSchema,
+});
+
+const deleteCalendarEventOperationSchema = z.object({
+  table: z.literal('calendarEvents'),
+  action: z.literal('delete'),
+  id: z.string().min(1),
+});
+
 export const categoryAssignmentOperationSchema = z.union([
   putCategoryAssignmentOperationSchema,
   deleteCategoryAssignmentOperationSchema,
@@ -58,6 +72,8 @@ export const categoryOperationSchema = z.union([
   deleteCategoryValueOperationSchema,
   putClassificationMappingPresetOperationSchema,
   deleteClassificationMappingPresetOperationSchema,
+  putCalendarEventOperationSchema,
+  deleteCalendarEventOperationSchema,
   putCategoryAssignmentOperationSchema,
   deleteCategoryAssignmentOperationSchema,
 ]);
@@ -99,6 +115,14 @@ export function deleteClassificationMappingPresetOperation(id: string): Category
     action: 'delete',
     id,
   });
+}
+
+export function putCategoryCalendarEventOperation(record: CalendarEvent): CategoryOperation {
+  return categoryOperationSchema.parse({ table: 'calendarEvents', action: 'put', record });
+}
+
+export function deleteCategoryCalendarEventOperation(id: string): CategoryOperation {
+  return categoryOperationSchema.parse({ table: 'calendarEvents', action: 'delete', id });
 }
 
 export function putCategoryAssignmentOperation(

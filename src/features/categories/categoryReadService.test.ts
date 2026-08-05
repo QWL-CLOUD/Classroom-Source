@@ -41,7 +41,7 @@ afterEach(async () => {
 });
 
 describe('CategoryReadService', () => {
-  it('exposes the twelve locked families and only active values in selectors', async () => {
+  it('exposes the thirteen locked families and only active values in selectors', async () => {
     await database.categoryValues.bulkPut([
       value({ id: 'active', name: 'Active', sortOrder: 1 }),
       value({
@@ -67,6 +67,7 @@ describe('CategoryReadService', () => {
       'resource-format',
       'task-label',
       'support-area',
+      'calendar-event-type',
     ]);
     expect((await service.listSelectableValues('purpose-tag')).map((item) => item.id)).toEqual([
       'active',

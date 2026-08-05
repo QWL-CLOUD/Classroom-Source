@@ -56,6 +56,29 @@ describe('SchoolYearReadService', () => {
       },
     ]);
 
+    await database.calendarEvents.bulkPut([
+      {
+        id: 'event-current',
+        title: 'Current holiday',
+        startDate: '2026-12-24',
+        schoolYearId: 'current',
+        category: 'School Holiday',
+      },
+      {
+        id: 'event-past',
+        title: 'Past holiday',
+        startDate: '2025-12-24',
+        schoolYearId: 'past',
+        category: 'School Holiday',
+      },
+      {
+        id: 'event-legacy',
+        title: 'Legacy event',
+        startDate: '2026-01-10',
+        category: 'Calendar',
+      },
+    ]);
+
     const model = await new SchoolYearReadService(database).load('2026-07-21');
     expect(model.activeSchoolYear?.id).toBe('current');
     expect(model.activeSchoolYearCount).toBe(1);
@@ -64,10 +87,12 @@ describe('SchoolYearReadService', () => {
       expect.objectContaining({
         schoolYear: expect.objectContaining({ id: 'current' }),
         learnerContextCount: 1,
+        calendarEventCount: 1,
       }),
       expect.objectContaining({
         schoolYear: expect.objectContaining({ id: 'past' }),
         learnerContextCount: 1,
+        calendarEventCount: 1,
       }),
     ]);
   });

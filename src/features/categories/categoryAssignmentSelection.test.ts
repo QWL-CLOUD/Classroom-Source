@@ -184,6 +184,46 @@ describe('category assignment selection', () => {
     ).toEqual(['focus-tag', 'purpose-tag']);
   });
 
+  it('exposes one canonical Calendar Event Type and preserves assigned archived history', async () => {
+    await database.categoryValues.bulkPut([
+      value('event-type-holiday', 'School Holiday', 'calendar-event-type', { isDefault: true }),
+      value('event-type-pd', 'Professional Development', 'calendar-event-type', {
+        lifecycleState: 'archived',
+        archivedAt: now,
+        sortOrder: 1,
+      }),
+    ]);
+    await database.categoryAssignments.put({
+      id: 'event-type-assignment',
+      familyId: 'calendar-event-type',
+      categoryValueId: 'event-type-pd',
+      entityType: 'calendar-event',
+      entityId: 'event-1',
+      createdAt: now,
+    });
+
+    const existing = await loadCategorySelectionSnapshot(database, 'calendar-event', 'event-1', [
+      'calendar-event-type',
+    ]);
+    expect(existing.families[0]?.family.selectionMode).toBe('single');
+    expect(existing.families[0]?.values.map((item) => item.id)).toEqual([
+      'event-type-holiday',
+      'event-type-pd',
+    ]);
+    expect(existing.initialSelections).toEqual({
+      'calendar-event-type': ['event-type-pd'],
+    });
+
+    await expect(
+      buildCategoryAssignmentChangePlan(database, 'calendar-event', 'event-2', {
+        selections: { 'calendar-event-type': ['event-type-holiday', 'event-type-pd'] },
+        allowedFamilyIds: ['calendar-event-type'],
+        createId: () => 'unused',
+        now,
+      }),
+    ).rejects.toThrow('Calendar Event Types allows only one selected value.');
+  });
+
   it('creates a default task assignment and undoes the task and label atomically', async () => {
     await database.categoryValues.put(
       value('task-default', 'Priority', 'task-label', { isDefault: true }),

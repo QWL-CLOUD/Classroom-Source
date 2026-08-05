@@ -136,21 +136,66 @@ export const scheduleExceptionSchema = z.object({
 export const calendarEventSchema = z
   .object({
     id: idSchema,
-    title: z.string().min(1),
+    title: z.string().trim().min(1).max(500),
     startDate: localDateSchema,
     endDate: localDateSchema.optional(),
     startMinute: minuteSchema.optional(),
     endMinute: minuteSchema.optional(),
-    category: z.string().default('Calendar'),
-    details: z.string().optional(),
+    category: z.string().trim().min(1).max(120).default('Calendar'),
+    details: z.string().trim().max(10_000).optional(),
     contextId: idSchema.optional(),
-    source: z.string().optional(),
+    schoolYearId: idSchema.optional(),
+    location: z.string().trim().max(1000).optional(),
+    timeZone: z.string().trim().max(200).optional(),
+    source: z.string().trim().max(500).optional(),
+    externalSource: z.string().trim().min(1).max(500).optional(),
+    externalKey: z.string().trim().min(1).max(500).optional(),
+    importIdentityKey: z.string().trim().min(1).max(1200).optional(),
+    lastImportRunId: idSchema.optional(),
   })
-  .refine(
-    (value) =>
-      !value.endMinute || value.startMinute === undefined || value.endMinute > value.startMinute,
-    { message: 'endMinute must be after startMinute', path: ['endMinute'] },
-  );
+  .superRefine((value, context) => {
+    const endDate = value.endDate ?? value.startDate;
+    if (endDate < value.startDate) {
+      context.addIssue({
+        code: 'custom',
+        message: 'The event end date must be on or after the start date.',
+        path: ['endDate'],
+      });
+    }
+    if (
+      value.startMinute !== undefined &&
+      value.endMinute !== undefined &&
+      endDate === value.startDate &&
+      value.endMinute <= value.startMinute
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'The event end time must be after the start time on the same date.',
+        path: ['endMinute'],
+      });
+    }
+    if (value.externalKey && !value.externalSource) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An external event key requires an external source.',
+        path: ['externalSource'],
+      });
+    }
+    if (value.importIdentityKey && (!value.externalSource || !value.externalKey)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An event import identity requires both an external source and external key.',
+        path: ['importIdentityKey'],
+      });
+    }
+    if (value.lastImportRunId && (!value.schoolYearId || !value.importIdentityKey)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An imported Calendar event requires a School Year and stable import identity.',
+        path: ['lastImportRunId'],
+      });
+    }
+  });
 
 export const lessonSeriesSchema = z.object({
   id: idSchema,
@@ -988,6 +1033,7 @@ export const categoryFamilyIdSchema = z.enum([
   'resource-format',
   'task-label',
   'support-area',
+  'calendar-event-type',
 ]);
 
 export const categoryColorKeySchema = z.enum([
@@ -1141,6 +1187,7 @@ export const categoryAssignableEntityTypeSchema = z.enum([
   'learner-notice',
   'lesson-template',
   'library-item',
+  'calendar-event',
 ]);
 
 export const categoryAssignmentSchema = z.object({

@@ -128,6 +128,14 @@ describe('SchoolYearMutationService', () => {
       updatedAt: '2026-05-01T12:00:00.000Z',
     });
 
+    await database.calendarEvents.put({
+      id: 'historical-event',
+      title: 'Historical holiday',
+      startDate: '2025-12-24',
+      schoolYearId: 'historical-year',
+      category: 'School Holiday',
+    });
+
     await expect(service.archive('active-year')).rejects.toThrow(/Set another school year/);
     ids = ['log-archive'];
     await service.archive('historical-year');
@@ -139,9 +147,10 @@ describe('SchoolYearMutationService', () => {
     expect(impact).toMatchObject({
       learnerContextCount: 1,
       assessmentEvidenceCount: 1,
+      calendarEventCount: 1,
       canDelete: false,
     });
-    await expect(service.delete('historical-year')).rejects.toThrow(/assessment evidence/);
+    await expect(service.delete('historical-year')).rejects.toThrow(/Calendar event/);
   });
 
   it('deletes only empty inactive years and restores them through undo', async () => {

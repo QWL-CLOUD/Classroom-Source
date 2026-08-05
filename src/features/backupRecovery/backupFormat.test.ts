@@ -175,6 +175,99 @@ describe('Classroom backup format', () => {
     expect(preview.warnings.join(' ')).toMatch(/predates classification mapping presets/);
   });
 
+  it('restores a schema v14 backup without guessing Calendar Event ownership', () => {
+    const tables = emptyBackupTables();
+    tables.calendarEvents.push({
+      id: 'legacy-calendar-event',
+      title: 'Legacy holiday',
+      startDate: '2026-12-24',
+      category: 'Holiday',
+      source: 'user',
+    });
+    const current = createBackupEnvelope(tables, {
+      backupId: 'legacy-v14-backup',
+      exportedAt: now,
+    });
+    const legacyEnvelope = {
+      ...current,
+      databaseSchemaVersion: 14,
+    } as ClassroomBackupEnvelope;
+
+    const preview = buildRestorePreview(resign(legacyEnvelope));
+
+    expect(preview.validTables.calendarEvents).toEqual([
+      expect.objectContaining({ id: 'legacy-calendar-event' }),
+    ]);
+    expect(preview.validTables.calendarEvents[0]).not.toHaveProperty('schoolYearId');
+    expect(preview.validTables.calendarEvents[0]).not.toHaveProperty('importIdentityKey');
+    expect(preview.warnings.join(' ')).toMatch(/without guessed ownership or provenance/);
+  });
+
+  it('round-trips Calendar Event ownership, canonical type assignment, and import provenance on DB v15', () => {
+    const tables = emptyBackupTables();
+    tables.schoolYears.push({
+      id: 'year-1',
+      label: '2026–2027',
+      startsOn: '2026-08-24',
+      endsOn: '2027-06-14',
+      active: true,
+      lifecycleState: 'active',
+    });
+    tables.calendarEvents.push({
+      id: 'calendar-event-1',
+      title: 'PD Day',
+      startDate: '2026-08-28',
+      schoolYearId: 'year-1',
+      category: 'Professional Development',
+      location: 'Main campus',
+      timeZone: 'America/New_York',
+      externalSource: 'district calendar',
+      externalKey: 'pd-2026-08-28',
+      importIdentityKey: 'calendar-event\u0000district calendar\u0000pd-2026-08-28',
+      lastImportRunId: 'calendar-import-1',
+    });
+    tables.categoryValues.push({
+      id: 'event-type-pd',
+      familyId: 'calendar-event-type',
+      name: 'Professional Development',
+      normalizedName: 'professional development',
+      aliases: ['PD'],
+      normalizedAliases: ['pd'],
+      sortOrder: 0,
+      isDefault: false,
+      lifecycleState: 'active',
+      createdAt: now,
+      updatedAt: now,
+    });
+    tables.categoryAssignments.push({
+      id: 'event-type-assignment',
+      familyId: 'calendar-event-type',
+      categoryValueId: 'event-type-pd',
+      entityType: 'calendar-event',
+      entityId: 'calendar-event-1',
+      createdAt: now,
+    });
+
+    const envelope = createBackupEnvelope(tables, {
+      backupId: 'calendar-foundation-backup',
+      exportedAt: now,
+    });
+    const preview = buildRestorePreview(serializeBackupEnvelope(envelope));
+
+    expect(envelope.databaseSchemaVersion).toBe(15);
+    expect(preview.quarantineCount).toBe(0);
+    expect(preview.validTables.calendarEvents[0]).toMatchObject({
+      schoolYearId: 'year-1',
+      location: 'Main campus',
+      timeZone: 'America/New_York',
+      lastImportRunId: 'calendar-import-1',
+    });
+    expect(preview.validTables.categoryAssignments[0]).toMatchObject({
+      familyId: 'calendar-event-type',
+      entityType: 'calendar-event',
+    });
+  });
+
   it('validates canonical Import Center history records', () => {
     const tables = emptyBackupTables();
     tables.importRuns.push({
@@ -201,7 +294,7 @@ describe('Classroom backup format', () => {
     expect(preview.validTables.importRuns).toHaveLength(1);
   });
 
-  it('round-trips imported Activities, text-only workflow fields, controlled labels, and import metadata on DB v14', () => {
+  it('round-trips imported Activities, text-only workflow fields, controlled labels, and import metadata on DB v15', () => {
     const tables = emptyBackupTables();
     tables.libraryItems.push({
       id: 'activity-imported',
@@ -321,7 +414,7 @@ describe('Classroom backup format', () => {
     expect(preview.validTables.assessmentEvidence).toHaveLength(1);
   });
 
-  it('round-trips expanded Library classification families on DB v14', () => {
+  it('round-trips expanded Library classification families on DB v15', () => {
     const tables = emptyBackupTables();
     tables.libraryItems.push({
       id: 'assessment-classified',
@@ -400,7 +493,7 @@ describe('Classroom backup format', () => {
     });
     const preview = buildRestorePreview(serializeBackupEnvelope(envelope));
 
-    expect(envelope.databaseSchemaVersion).toBe(14);
+    expect(envelope.databaseSchemaVersion).toBe(15);
     expect(preview.quarantineCount).toBe(0);
     expect(familyIds(preview.validTables.categoryValues)).toEqual(['language-level', 'subject']);
     expect(familyIds(preview.validTables.categoryAssignments)).toEqual([

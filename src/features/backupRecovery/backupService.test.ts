@@ -125,6 +125,27 @@ describe('BackupRecoveryService', () => {
       createdAt: firstTime,
       updatedAt: firstTime,
     });
+    await database.schoolYears.put({
+      id: 'year-1',
+      label: '2026–2027',
+      startsOn: '2026-08-24',
+      endsOn: '2027-06-14',
+      active: true,
+      lifecycleState: 'active',
+    });
+    await database.calendarEvents.put({
+      id: 'current-calendar-event',
+      title: 'PD Day',
+      startDate: '2026-08-28',
+      schoolYearId: 'year-1',
+      category: 'Professional Development',
+      location: 'Main campus',
+      timeZone: 'America/New_York',
+      externalSource: 'district calendar',
+      externalKey: 'pd-1',
+      importIdentityKey: 'calendar-event\u0000district calendar\u0000pd-1',
+      lastImportRunId: 'calendar-import-run',
+    });
     await database.importRuns.put({
       id: 'current-import-run',
       importType: 'assessments',
@@ -165,6 +186,13 @@ describe('BackupRecoveryService', () => {
     expect(envelope.tables.categoryValues).toHaveLength(1);
     expect(envelope.tables.categoryAssignments).toHaveLength(1);
     expect(envelope.tables.classificationMappingPresets).toHaveLength(1);
+    expect(envelope.tables.calendarEvents[0]).toMatchObject({
+      id: 'current-calendar-event',
+      schoolYearId: 'year-1',
+      location: 'Main campus',
+      timeZone: 'America/New_York',
+      lastImportRunId: 'calendar-import-run',
+    });
     expect(envelope.tables).not.toHaveProperty('backupSnapshots');
     expect(envelope.tableCounts.tasks).toBe(1);
   });
@@ -212,6 +240,23 @@ describe('BackupRecoveryService', () => {
       createdAt: firstTime,
       updatedAt: firstTime,
     });
+    incoming.schoolYears.push({
+      id: 'restored-year',
+      label: '2026–2027',
+      startsOn: '2026-08-24',
+      endsOn: '2027-06-14',
+      active: true,
+      lifecycleState: 'active',
+    });
+    incoming.calendarEvents.push({
+      id: 'restored-calendar-event',
+      title: 'Restored holiday',
+      startDate: '2026-12-24',
+      schoolYearId: 'restored-year',
+      category: 'School Holiday',
+      location: 'District',
+      timeZone: 'America/New_York',
+    });
     incoming.classificationMappingPresets.push({
       id: 'restored-mapping',
       familyId: 'subject',
@@ -247,6 +292,10 @@ describe('BackupRecoveryService', () => {
     expect(await database.assessmentEvidence.get('restored-evidence')).toBeDefined();
     expect(await database.importRuns.get('restored-import-run')).toBeDefined();
     expect(await database.classificationMappingPresets.get('restored-mapping')).toBeDefined();
+    expect(await database.calendarEvents.get('restored-calendar-event')).toMatchObject({
+      schoolYearId: 'restored-year',
+      category: 'School Holiday',
+    });
     expect(await database.backupSnapshots.count()).toBe(1);
     expect(await database.restoreRuns.count()).toBe(1);
     expect(await database.restoreQuarantineRecords.count()).toBe(1);
@@ -447,7 +496,7 @@ describe('BackupRecoveryService', () => {
     }).createBackup();
     const preview = buildRestorePreview(serializeBackupEnvelope(envelope));
 
-    expect(envelope.databaseSchemaVersion).toBe(14);
+    expect(envelope.databaseSchemaVersion).toBe(15);
     expect(preview.quarantineCount).toBe(0);
     expect(familyIds(preview.validTables.categoryValues)).toEqual(['language', 'subject']);
     expect(familyIds(preview.validTables.categoryAssignments)).toEqual(['language', 'subject']);
