@@ -468,4 +468,79 @@ describe('CategoryMutationService', () => {
       service.assign('subject-mathematics', 'library-item', 'missing-library-item'),
     ).rejects.toThrow(/target record no longer exists/);
   });
+
+  it('assigns and renames a Calendar Event Type with an atomic category snapshot update', async () => {
+    await database.calendarEvents.put({
+      id: 'event-1',
+      title: 'PD Day',
+      startDate: '2026-08-28',
+      category: 'Calendar',
+    });
+    await database.categoryValues.put(
+      value('event-type-pd', 'Professional Development', 'calendar-event-type'),
+    );
+    ids = ['event-assignment', 'log-assign-event'];
+
+    await service.assign('event-type-pd', 'calendar-event', 'event-1');
+    expect(await database.calendarEvents.get('event-1')).toMatchObject({
+      category: 'Professional Development',
+    });
+    expect(await database.categoryAssignments.get('event-assignment')).toMatchObject({
+      familyId: 'calendar-event-type',
+      entityType: 'calendar-event',
+    });
+
+    ids = ['log-rename-event-type'];
+    await service.rename('event-type-pd', 'Staff Development');
+    expect(await database.calendarEvents.get('event-1')).toMatchObject({
+      category: 'Staff Development',
+    });
+
+    await history.undo();
+    expect(await database.calendarEvents.get('event-1')).toMatchObject({
+      category: 'Professional Development',
+    });
+    await history.undo();
+    expect(await database.calendarEvents.get('event-1')).toMatchObject({ category: 'Calendar' });
+    expect(await database.categoryAssignments.get('event-assignment')).toBeUndefined();
+  });
+
+  it('merges Calendar Event Types while retargeting assignments and snapshots', async () => {
+    await database.calendarEvents.put({
+      id: 'event-merge',
+      title: 'PD Day',
+      startDate: '2026-08-28',
+      category: 'PD Day',
+    });
+    await database.categoryValues.bulkPut([
+      value('event-type-source', 'PD Day', 'calendar-event-type'),
+      value('event-type-target', 'Professional Development', 'calendar-event-type', {
+        sortOrder: 1,
+      }),
+    ]);
+    await database.categoryAssignments.put({
+      id: 'event-merge-assignment',
+      familyId: 'calendar-event-type',
+      categoryValueId: 'event-type-source',
+      entityType: 'calendar-event',
+      entityId: 'event-merge',
+      createdAt: now,
+    });
+    ids = ['log-merge-event-type'];
+
+    await service.merge('event-type-source', 'event-type-target');
+
+    expect(await database.categoryAssignments.get('event-merge-assignment')).toMatchObject({
+      categoryValueId: 'event-type-target',
+    });
+    expect(await database.calendarEvents.get('event-merge')).toMatchObject({
+      category: 'Professional Development',
+    });
+
+    await history.undo();
+    expect(await database.categoryAssignments.get('event-merge-assignment')).toMatchObject({
+      categoryValueId: 'event-type-source',
+    });
+    expect(await database.calendarEvents.get('event-merge')).toMatchObject({ category: 'PD Day' });
+  });
 });

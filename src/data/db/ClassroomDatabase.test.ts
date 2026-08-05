@@ -12,7 +12,7 @@ afterEach(async () => {
 });
 
 describe('ClassroomDatabase schema upgrades', () => {
-  it('upgrades legacy data to schema v14 and adds Student, roster, Assessment Evidence, and Import Center stores without losing Tasks', async () => {
+  it('upgrades legacy data to schema v15 and adds Student, roster, Assessment Evidence, and Import Center stores without losing Tasks', async () => {
     const name = `classroom-v20-upgrade-${crypto.randomUUID()}`;
     names.push(name);
     const legacy = new Dexie(name);
@@ -33,7 +33,7 @@ describe('ClassroomDatabase schema upgrades', () => {
     const upgraded = new ClassroomDatabase(name);
     await upgraded.open();
 
-    expect(upgraded.verno).toBe(14);
+    expect(upgraded.verno).toBe(15);
     expect(await upgraded.tasks.get('legacy-task')).toBeDefined();
     await upgraded.learnerContexts.put({
       id: 'class-1',
@@ -118,6 +118,52 @@ describe('ClassroomDatabase schema upgrades', () => {
       updatedAt: '2026-08-03T12:00:00.000Z',
     });
     expect(await upgraded.classificationMappingPresets.count()).toBe(1);
+
+    await upgraded.schoolYears.put({
+      id: 'year-1',
+      label: '2026–2027',
+      startsOn: '2026-08-24',
+      endsOn: '2027-06-14',
+      active: true,
+      lifecycleState: 'active',
+    });
+    await upgraded.calendarEvents.bulkPut([
+      {
+        id: 'manual-event-1',
+        title: 'Manual event one',
+        startDate: '2026-08-24',
+        category: 'Calendar',
+      },
+      {
+        id: 'manual-event-2',
+        title: 'Manual event two',
+        startDate: '2026-08-25',
+        category: 'Calendar',
+      },
+      {
+        id: 'imported-event',
+        title: 'Imported event',
+        startDate: '2026-08-26',
+        schoolYearId: 'year-1',
+        category: 'Professional Development',
+        externalSource: 'district calendar',
+        externalKey: 'event-1',
+        importIdentityKey: 'calendar-event\u0000district calendar\u0000event-1',
+      },
+    ]);
+    expect(await upgraded.calendarEvents.count()).toBe(3);
+    await expect(
+      upgraded.calendarEvents.put({
+        id: 'duplicate-imported-event',
+        title: 'Duplicate identity',
+        startDate: '2026-08-27',
+        schoolYearId: 'year-1',
+        category: 'Professional Development',
+        externalSource: 'district calendar',
+        externalKey: 'event-1',
+        importIdentityKey: 'calendar-event\u0000district calendar\u0000event-1',
+      }),
+    ).rejects.toThrow();
 
     await upgraded.learnerServiceOccurrences.put({
       id: 'notice-1:2026-07-21',

@@ -113,6 +113,14 @@ export const CATEGORY_FAMILIES = [
     entityTypes: ['learner-notice'],
     assignmentAvailability: 'current',
   },
+  {
+    id: 'calendar-event-type',
+    label: 'Calendar Event Types',
+    description: 'Canonical types for school-wide and dated Calendar events.',
+    selectionMode: 'single',
+    entityTypes: ['calendar-event'],
+    assignmentAvailability: 'current',
+  },
 ] as const satisfies readonly CategoryFamilyDefinition[];
 
 const familyById = new Map<CategoryFamilyId, CategoryFamilyDefinition>(

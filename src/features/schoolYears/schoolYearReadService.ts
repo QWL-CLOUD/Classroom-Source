@@ -7,6 +7,7 @@ import { parseLocalDate, todayLocalDate, toLocalDateString } from '@/shared/date
 export interface SchoolYearListItem {
   schoolYear: SchoolYear;
   learnerContextCount: number;
+  calendarEventCount: number;
 }
 
 export interface SchoolYearReadModel {
@@ -66,14 +67,23 @@ export class SchoolYearReadService {
   constructor(private readonly db: ClassroomDatabase = classroomDb) {}
 
   async load(currentDate = todayLocalDate()): Promise<SchoolYearReadModel> {
-    const [schoolYearValues, contexts] = await Promise.all([
+    const [schoolYearValues, contexts, calendarEvents] = await Promise.all([
       this.db.schoolYears.toArray(),
       this.db.learnerContexts.toArray(),
+      this.db.calendarEvents.toArray(),
     ]);
     const schoolYears = schoolYearValues.map((value) => schoolYearSchema.parse(value));
     const contextCounts = new Map<string, number>();
     for (const context of contexts) {
       contextCounts.set(context.schoolYearId, (contextCounts.get(context.schoolYearId) ?? 0) + 1);
+    }
+    const calendarEventCounts = new Map<string, number>();
+    for (const event of calendarEvents) {
+      if (!event.schoolYearId) continue;
+      calendarEventCounts.set(
+        event.schoolYearId,
+        (calendarEventCounts.get(event.schoolYearId) ?? 0) + 1,
+      );
     }
     const activeYears = schoolYears.filter((schoolYear) => schoolYear.active);
     const activeSchoolYear = activeYears.sort(compareSchoolYears)[0] ?? null;
@@ -83,6 +93,7 @@ export class SchoolYearReadService {
       items: schoolYears.sort(compareSchoolYears).map((schoolYear) => ({
         schoolYear,
         learnerContextCount: contextCounts.get(schoolYear.id) ?? 0,
+        calendarEventCount: calendarEventCounts.get(schoolYear.id) ?? 0,
       })),
       activeSchoolYear,
       activeSchoolYearCount: activeYears.length,

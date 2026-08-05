@@ -62,6 +62,13 @@ async function seedCategorySelectorFoundation(page: Page): Promise<void> {
           categoryValue('task-priority', 'task-label', 'Priority', 0, true),
           categoryValue('task-family', 'task-label', 'Family', 1),
           categoryValue('support-reading', 'support-area', 'Reading support', 0, true),
+          categoryValue(
+            'event-type-conference',
+            'calendar-event-type',
+            'Parent Conference',
+            0,
+            true,
+          ),
         ];
         for (const value of values) transaction.objectStore('categoryValues').put(value);
       });
@@ -73,7 +80,7 @@ async function seedCategorySelectorFoundation(page: Page): Promise<void> {
 
 async function findEntityIdByTitle(
   page: Page,
-  storeName: 'lessonPlans' | 'tasks' | 'learnerNotices',
+  storeName: 'lessonPlans' | 'tasks' | 'learnerNotices' | 'calendarEvents',
   title: string,
 ): Promise<string> {
   return page.evaluate(
@@ -216,6 +223,17 @@ test('active category selectors preserve stable assignments across planning, tas
   await expect(
     page.getByRole('group', { name: 'Focus Tags' }).getByText('Speaking & Listening'),
   ).toHaveCount(0);
+
+  await page.goto('./#/calendar/edit?date=2026-07-20');
+  await page.getByRole('button', { name: 'New event' }).click();
+  const calendarEditor = page.getByRole('region', { name: 'Calendar event editor' });
+  await expect(calendarEditor.getByLabel('Calendar Event Type')).toHaveValue(
+    'event-type-conference',
+  );
+  await calendarEditor.getByLabel('Title').fill('Category-linked conference');
+  await calendarEditor.getByRole('button', { name: 'Save event' }).click();
+  const eventId = await findEntityIdByTitle(page, 'calendarEvents', 'Category-linked conference');
+  await expectAssignment(page, 'calendar-event', eventId, 'event-type-conference');
 
   await page.goto('./#/tasks');
   await page.getByRole('button', { name: 'New task' }).click();

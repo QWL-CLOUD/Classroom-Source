@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { classroomDb, type ClassroomDatabase } from '@/data/db/ClassroomDatabase';
 import {
+  calendarEventSchema,
   categoryAssignmentSchema,
   categoryColorKeySchema,
   categoryFamilyIdSchema,
@@ -21,6 +22,7 @@ import { notifyEditHistoryChanged } from '@/features/editing/editHistorySignal';
 import {
   createCategoryCommand,
   deleteCategoryAssignmentOperation,
+  putCategoryCalendarEventOperation,
   deleteCategoryValueOperation,
   putClassificationMappingPresetOperation,
   putCategoryAssignmentOperation,
@@ -169,8 +171,12 @@ export class CategoryMutationService {
     const parsed = categoryValueEditorValuesSchema.parse(values);
     const result = await this.db.transaction(
       'rw',
-      this.db.categoryValues,
-      this.db.changeLog,
+      [
+        this.db.categoryValues,
+        this.db.categoryAssignments,
+        this.db.calendarEvents,
+        this.db.changeLog,
+      ],
       async (): Promise<CommitResult<CategoryValue>> => {
         const existing = await this.requireValue(id);
         this.requireNotMerged(existing);
@@ -203,7 +209,7 @@ export class CategoryMutationService {
           iconKey: parsed.iconKey,
           updatedAt: this.now(),
         });
-        return this.commitSingleValueChange(
+        return this.commitValueChangeWithCalendarEventSnapshots(
           existing,
           updated,
           'category.update',
@@ -219,8 +225,12 @@ export class CategoryMutationService {
     const parsedName = z.string().trim().min(1).max(120).parse(name);
     const result = await this.db.transaction(
       'rw',
-      this.db.categoryValues,
-      this.db.changeLog,
+      [
+        this.db.categoryValues,
+        this.db.categoryAssignments,
+        this.db.calendarEvents,
+        this.db.changeLog,
+      ],
       async (): Promise<CommitResult<CategoryValue>> => {
         const existing = await this.requireValue(id);
         this.requireNotMerged(existing);
@@ -242,7 +252,7 @@ export class CategoryMutationService {
           normalizedAliases: aliases.normalizedAliases,
           updatedAt: this.now(),
         });
-        return this.commitSingleValueChange(
+        return this.commitValueChangeWithCalendarEventSnapshots(
           existing,
           updated,
           'category.rename',
@@ -479,6 +489,7 @@ export class CategoryMutationService {
         this.db.tasks,
         this.db.learnerNotices,
         this.db.libraryItems,
+        this.db.calendarEvents,
         this.db.changeLog,
       ],
       async (): Promise<CommitResult<CategoryAssignment>> => {
@@ -506,12 +517,23 @@ export class CategoryMutationService {
         });
         const replacements =
           getCategoryFamily(value.familyId).selectionMode === 'single' ? validatedExisting : [];
+        const calendarEvent =
+          entityType === 'calendar-event'
+            ? calendarEventSchema.parse(await this.db.calendarEvents.get(entityId))
+            : undefined;
+        const updatedCalendarEvent = calendarEvent
+          ? calendarEventSchema.parse({ ...calendarEvent, category: value.name })
+          : undefined;
         const commands: CategoryCommandPair = {
           forward: createCategoryCommand([
             ...replacements.map((item) => deleteCategoryAssignmentOperation(item.id)),
             putCategoryAssignmentOperation(assignment),
+            ...(updatedCalendarEvent
+              ? [putCategoryCalendarEventOperation(updatedCalendarEvent)]
+              : []),
           ]),
           inverse: createCategoryCommand([
+            ...(calendarEvent ? [putCategoryCalendarEventOperation(calendarEvent)] : []),
             deleteCategoryAssignmentOperation(assignment.id),
             ...replacements.map(putCategoryAssignmentOperation),
           ]),
@@ -528,13 +550,27 @@ export class CategoryMutationService {
   async unassign(assignmentId: string): Promise<void> {
     const log = await this.db.transaction(
       'rw',
-      this.db.categoryAssignments,
-      this.db.changeLog,
+      [this.db.categoryAssignments, this.db.calendarEvents, this.db.changeLog],
       async (): Promise<ChangeLog> => {
         const existing = await this.requireAssignment(assignmentId);
+        const calendarEvent =
+          existing.familyId === 'calendar-event-type' && existing.entityType === 'calendar-event'
+            ? calendarEventSchema.parse(await this.db.calendarEvents.get(existing.entityId))
+            : undefined;
+        const updatedCalendarEvent = calendarEvent
+          ? calendarEventSchema.parse({ ...calendarEvent, category: 'Calendar' })
+          : undefined;
         const commands: CategoryCommandPair = {
-          forward: createCategoryCommand([deleteCategoryAssignmentOperation(existing.id)]),
-          inverse: createCategoryCommand([putCategoryAssignmentOperation(existing)]),
+          forward: createCategoryCommand([
+            deleteCategoryAssignmentOperation(existing.id),
+            ...(updatedCalendarEvent
+              ? [putCategoryCalendarEventOperation(updatedCalendarEvent)]
+              : []),
+          ]),
+          inverse: createCategoryCommand([
+            ...(calendarEvent ? [putCategoryCalendarEventOperation(calendarEvent)] : []),
+            putCategoryAssignmentOperation(existing),
+          ]),
         };
         const nextLog = this.createChangeLog(
           'category.unassign',
@@ -566,6 +602,7 @@ export class CategoryMutationService {
       this.db.categoryValues,
       this.db.categoryAssignments,
       this.db.classificationMappingPresets,
+      this.db.calendarEvents,
       this.db.changeLog,
       async (): Promise<CommitResult<CategoryValue>> => {
         if (sourceId === targetId) throw new Error('Choose a different replacement value.');
@@ -620,6 +657,27 @@ export class CategoryMutationService {
             assignmentForward.push(putCategoryAssignmentOperation(moved));
             targetAssignmentKeys.add(key);
           }
+        }
+
+        const calendarEventSnapshotForward: CategoryOperation[] = [];
+        const calendarEventSnapshotInverse: CategoryOperation[] = [];
+        const calendarEventIds = [
+          ...new Set(
+            sourceAssignments
+              .filter((assignment) => assignment.entityType === 'calendar-event')
+              .map((assignment) => assignment.entityId),
+          ),
+        ];
+        for (const eventId of calendarEventIds) {
+          const current = await this.db.calendarEvents.get(eventId);
+          if (!current) throw new Error('The assigned Calendar event no longer exists.');
+          const event = calendarEventSchema.parse(current);
+          calendarEventSnapshotInverse.push(putCategoryCalendarEventOperation(event));
+          calendarEventSnapshotForward.push(
+            putCategoryCalendarEventOperation(
+              calendarEventSchema.parse({ ...event, category: target.name }),
+            ),
+          );
         }
 
         const mappingForward: CategoryOperation[] = sourceMappingPresets.map((preset) =>
@@ -679,6 +737,7 @@ export class CategoryMutationService {
         const commands: CategoryCommandPair = {
           forward: createCategoryCommand([
             ...assignmentForward,
+            ...calendarEventSnapshotForward,
             ...mappingForward,
             putCategoryValueOperation(updatedSource),
             ...(targetChanged ? [putCategoryValueOperation(updatedTarget)] : []),
@@ -687,6 +746,7 @@ export class CategoryMutationService {
             putCategoryValueOperation(source),
             ...(targetChanged ? [putCategoryValueOperation(target)] : []),
             ...mappingInverse,
+            ...calendarEventSnapshotInverse,
             ...assignmentInverse,
           ]),
         };
@@ -703,6 +763,42 @@ export class CategoryMutationService {
     );
     this.notifyNewChange(result.log);
     return result.value;
+  }
+
+  private async commitValueChangeWithCalendarEventSnapshots(
+    existing: CategoryValue,
+    updated: CategoryValue,
+    commandType: string,
+    label: string,
+  ): Promise<CommitResult<CategoryValue>> {
+    if (existing.familyId !== 'calendar-event-type' || existing.name === updated.name) {
+      return this.commitSingleValueChange(existing, updated, commandType, label);
+    }
+    const assignments = (
+      await this.db.categoryAssignments.where('categoryValueId').equals(existing.id).toArray()
+    )
+      .map((assignment) => categoryAssignmentSchema.parse(assignment))
+      .filter((assignment) => assignment.entityType === 'calendar-event');
+    const forward: CategoryOperation[] = [putCategoryValueOperation(updated)];
+    const inverse: CategoryOperation[] = [putCategoryValueOperation(existing)];
+    for (const assignment of assignments) {
+      const current = await this.db.calendarEvents.get(assignment.entityId);
+      if (!current) throw new Error('The assigned Calendar event no longer exists.');
+      const event = calendarEventSchema.parse(current);
+      forward.push(
+        putCategoryCalendarEventOperation(
+          calendarEventSchema.parse({ ...event, category: updated.name }),
+        ),
+      );
+      inverse.push(putCategoryCalendarEventOperation(event));
+    }
+    const commands: CategoryCommandPair = {
+      forward: createCategoryCommand(forward),
+      inverse: createCategoryCommand(inverse),
+    };
+    const log = this.createChangeLog(commandType, label, commands, updated.updatedAt);
+    await this.commit(commands.forward.operations, log);
+    return { value: updated, log };
   }
 
   private async commitSingleValueChange(
@@ -737,6 +833,9 @@ export class CategoryMutationService {
         } else {
           await this.db.classificationMappingPresets.delete(operation.id);
         }
+      } else if (operation.table === 'calendarEvents') {
+        if (operation.action === 'put') await this.db.calendarEvents.put(operation.record);
+        else await this.db.calendarEvents.delete(operation.id);
       } else if (operation.action === 'put') {
         await this.db.categoryAssignments.put(operation.record);
       } else {
@@ -846,6 +945,8 @@ export class CategoryMutationService {
       exists = Boolean(await this.db.learnerNotices.get(entityId));
     } else if (entityType === 'library-item') {
       exists = Boolean(await this.db.libraryItems.get(entityId));
+    } else if (entityType === 'calendar-event') {
+      exists = Boolean(await this.db.calendarEvents.get(entityId));
     } else {
       throw new Error(`Assignments to ${entityType} records are not available.`);
     }

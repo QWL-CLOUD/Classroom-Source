@@ -395,9 +395,10 @@ export function SettingsRoute() {
               </div>
             ) : (
               <div className={styles.yearGrid}>
-                {state.data.items.map(({ schoolYear, learnerContextCount }) => {
+                {state.data.items.map(({ schoolYear, learnerContextCount, calendarEventCount }) => {
                   const archived = schoolYear.lifecycleState === 'archived';
-                  const canDelete = !schoolYear.active && learnerContextCount === 0;
+                  const canDelete =
+                    !schoolYear.active && learnerContextCount === 0 && calendarEventCount === 0;
                   return (
                     <article
                       key={schoolYear.id}
@@ -423,6 +424,10 @@ export function SettingsRoute() {
                           <span className={`${styles.badge} ${styles.usageBadge}`}>
                             {learnerContextCount} learner context
                             {learnerContextCount === 1 ? '' : 's'}
+                          </span>
+                          <span className={`${styles.badge} ${styles.usageBadge}`}>
+                            {calendarEventCount} Calendar event
+                            {calendarEventCount === 1 ? '' : 's'}
                           </span>
                         </div>
                       </div>
@@ -476,9 +481,13 @@ export function SettingsRoute() {
                           title={
                             schoolYear.active
                               ? 'The active school year cannot be deleted.'
-                              : learnerContextCount > 0
-                                ? 'Archive this year; linked learner contexts prevent deletion.'
-                                : undefined
+                              : learnerContextCount > 0 && calendarEventCount > 0
+                                ? 'Archive this year; linked learner contexts and Calendar events prevent deletion.'
+                                : learnerContextCount > 0
+                                  ? 'Archive this year; linked learner contexts prevent deletion.'
+                                  : calendarEventCount > 0
+                                    ? 'Archive this year; linked Calendar events prevent deletion.'
+                                    : undefined
                           }
                           onClick={() => void remove(schoolYear)}
                         >

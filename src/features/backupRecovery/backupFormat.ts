@@ -34,11 +34,12 @@ import {
 } from '@/domain/models/entities';
 
 export const CLASSROOM_BACKUP_FORMAT = 'classroom-v20-backup-v1' as const;
-export const CLASSROOM_DATABASE_SCHEMA_VERSION = 14;
+export const CLASSROOM_DATABASE_SCHEMA_VERSION = 15;
 const LEGACY_ROSTERLESS_SCHEMA_VERSION = 10;
 const LEGACY_EVIDENCELESS_SCHEMA_VERSION = 11;
 const LEGACY_IMPORTLESS_SCHEMA_VERSION = 12;
 const LEGACY_PRESETLESS_SCHEMA_VERSION = 13;
+const LEGACY_CALENDAR_IDENTITYLESS_SCHEMA_VERSION = 14;
 export const CLASSROOM_APP_VERSION = '20.0.0-alpha.0';
 export const MAX_BACKUP_FILE_BYTES = 100 * 1024 * 1024;
 
@@ -269,13 +270,14 @@ export function buildRestorePreview(rawText: string): RestorePreview {
   }
   if (
     parsed.databaseSchemaVersion !== CLASSROOM_DATABASE_SCHEMA_VERSION &&
+    parsed.databaseSchemaVersion !== LEGACY_CALENDAR_IDENTITYLESS_SCHEMA_VERSION &&
     parsed.databaseSchemaVersion !== LEGACY_PRESETLESS_SCHEMA_VERSION &&
     parsed.databaseSchemaVersion !== LEGACY_IMPORTLESS_SCHEMA_VERSION &&
     parsed.databaseSchemaVersion !== LEGACY_EVIDENCELESS_SCHEMA_VERSION &&
     parsed.databaseSchemaVersion !== LEGACY_ROSTERLESS_SCHEMA_VERSION
   ) {
     throw new Error(
-      `This backup uses database schema ${String(parsed.databaseSchemaVersion)}. Classroom supports schemas ${LEGACY_ROSTERLESS_SCHEMA_VERSION}, ${LEGACY_EVIDENCELESS_SCHEMA_VERSION}, ${LEGACY_IMPORTLESS_SCHEMA_VERSION}, ${LEGACY_PRESETLESS_SCHEMA_VERSION}, and ${CLASSROOM_DATABASE_SCHEMA_VERSION}.`,
+      `This backup uses database schema ${String(parsed.databaseSchemaVersion)}. Classroom supports schemas ${LEGACY_ROSTERLESS_SCHEMA_VERSION}, ${LEGACY_EVIDENCELESS_SCHEMA_VERSION}, ${LEGACY_IMPORTLESS_SCHEMA_VERSION}, ${LEGACY_PRESETLESS_SCHEMA_VERSION}, ${LEGACY_CALENDAR_IDENTITYLESS_SCHEMA_VERSION}, and ${CLASSROOM_DATABASE_SCHEMA_VERSION}.`,
     );
   }
   if (
@@ -424,6 +426,11 @@ export function buildRestorePreview(rawText: string): RestorePreview {
   } else if (parsed.databaseSchemaVersion === LEGACY_PRESETLESS_SCHEMA_VERSION) {
     warnings.push(
       'This backup predates classification mapping presets. The classificationMappingPresets table will be restored empty.',
+    );
+  }
+  if (parsed.databaseSchemaVersion <= LEGACY_CALENDAR_IDENTITYLESS_SCHEMA_VERSION) {
+    warnings.push(
+      'This backup predates Calendar Event School Year ownership and stable import identity. Existing Calendar events will remain valid without guessed ownership or provenance.',
     );
   }
   if (quarantined.length > 0) {

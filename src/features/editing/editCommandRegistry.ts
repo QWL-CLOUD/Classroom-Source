@@ -262,6 +262,9 @@ export async function applySupportedEditCommand(
         } else {
           await db.classificationMappingPresets.delete(operation.id);
         }
+      } else if (operation.table === 'calendarEvents') {
+        if (operation.action === 'put') await db.calendarEvents.put(operation.record);
+        else await db.calendarEvents.delete(operation.id);
       } else if (operation.action === 'put') {
         await db.categoryAssignments.put(operation.record);
       } else {
@@ -271,8 +274,16 @@ export async function applySupportedEditCommand(
     return;
   }
   if (parsed.entity === 'calendar-event') {
-    if (parsed.command.action === 'put') await db.calendarEvents.put(parsed.command.record);
-    else await db.calendarEvents.delete(parsed.command.id);
+    for (const operation of parsed.command.operations) {
+      if (operation.table === 'calendarEvents') {
+        if (operation.action === 'put') await db.calendarEvents.put(operation.record);
+        else await db.calendarEvents.delete(operation.id);
+      } else if (operation.action === 'put') {
+        await db.categoryAssignments.put(operation.record);
+      } else {
+        await db.categoryAssignments.delete(operation.id);
+      }
+    }
     return;
   }
 

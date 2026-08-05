@@ -71,4 +71,42 @@ describe('mixed edit history', () => {
       canRedo: false,
     });
   });
+
+  it('keeps legacy single-record Calendar Event commands undoable', async () => {
+    await database.calendarEvents.put({
+      id: 'legacy-event',
+      title: 'Legacy event',
+      startDate: '2026-07-17',
+      category: 'Calendar',
+    });
+    await database.changeLog.put({
+      id: 'legacy-calendar-log',
+      label: 'Create legacy event',
+      commandType: 'calendar-event.create',
+      forwardJson: JSON.stringify({
+        table: 'calendarEvents',
+        action: 'put',
+        record: {
+          id: 'legacy-event',
+          title: 'Legacy event',
+          startDate: '2026-07-17',
+          category: 'Calendar',
+        },
+      }),
+      inverseJson: JSON.stringify({
+        table: 'calendarEvents',
+        action: 'delete',
+        id: 'legacy-event',
+      }),
+      createdAt: '2026-07-16T21:00:00.000Z',
+    });
+    const history = new EditHistoryService(database, {
+      now: () => '2026-07-16T22:00:00.000Z',
+    });
+
+    await history.undo();
+    expect(await database.calendarEvents.get('legacy-event')).toBeUndefined();
+    await history.redo();
+    expect(await database.calendarEvents.get('legacy-event')).toBeDefined();
+  });
 });

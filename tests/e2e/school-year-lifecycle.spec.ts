@@ -27,7 +27,10 @@ async function addHistoricalLearnerContext(page: Page, schoolYearLabel: string):
         throw new Error('School year not found.');
 
       await new Promise<void>((resolve, reject) => {
-        const transaction = database.transaction('learnerContexts', 'readwrite');
+        const transaction = database.transaction(
+          ['learnerContexts', 'calendarEvents'],
+          'readwrite',
+        );
         transaction.onerror = () => reject(transaction.error);
         transaction.onabort = () => reject(transaction.error);
         transaction.oncomplete = () => resolve();
@@ -37,6 +40,13 @@ async function addHistoricalLearnerContext(page: Page, schoolYearLabel: string):
           name: 'Historical Grade 3',
           schoolYearId: schoolYear.id,
           status: 'active',
+        });
+        transaction.objectStore('calendarEvents').put({
+          id: 'historical-calendar-event',
+          title: 'Historical school holiday',
+          startDate: '2026-05-25',
+          schoolYearId: schoolYear.id,
+          category: 'School Holiday',
         });
       });
       return schoolYear.id;
@@ -75,6 +85,9 @@ test('school year lifecycle prepares rollover, preserves history, and stays glob
   await expect(page.getByRole('heading', { level: 1, name: 'School Years' })).toBeVisible();
   await expect(page.getByRole('article', { name: '2026–2027 school year' })).toContainText(
     '1 learner context',
+  );
+  await expect(page.getByRole('article', { name: '2026–2027 school year' })).toContainText(
+    '1 Calendar event',
   );
 
   await page.getByRole('button', { name: 'Prepare next school year' }).click();
@@ -116,6 +129,10 @@ test('school year lifecycle prepares rollover, preserves history, and stays glob
   await historicalYear.getByRole('button', { name: 'Archive' }).click();
   await expect(historicalYear).toContainText('Archived');
   await expect(historicalYear.getByRole('button', { name: 'Delete empty year' })).toBeDisabled();
+  await expect(historicalYear.getByRole('button', { name: 'Delete empty year' })).toHaveAttribute(
+    'title',
+    /Calendar events prevent deletion/,
+  );
 
   const accessibilityResults = await new AxeBuilder({ page }).analyze();
   expect(
