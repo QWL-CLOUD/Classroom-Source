@@ -1,38 +1,47 @@
 # Classroom v20 Source
 
-A local-first teaching workspace.
+A local-first teaching workspace for personal instructional planning, scheduling, learner support,
+assessment evidence, reusable content, and controlled data imports.
 
-**Owner:** Alyssa  
-**Credit:** Designed by: Alyssa × ChatGPT
+**Owner:** Alyssa
 
-This repository is the React + TypeScript source rebuild of Classroom. The legacy `QWL-CLOUD/Classroom` repository remains a frozen product and data-format reference.
+**Credit:** Designed by Alyssa × ChatGPT
+
+This repository is the React + TypeScript source rebuild of Classroom. The legacy
+`QWL-CLOUD/Classroom` repository remains a frozen product and data-format reference.
 
 ## Current status
 
-- App version: `20.0.0-alpha.0`
-- Phase 0: source foundation complete
-- Phase 1B–1E: private legacy migration, rollback, and acceptance complete
-- Phase 2A–2F: repository-backed views and controlled Calendar editing complete
-- Phase 2 completion audit: automated closure complete; private real-data acceptance remains a local browser check
-- Phase 3C-1–3C-6: Planning/Session lifecycle, Lesson Flow, Lesson Series ordering and Bump,
-  learner lifecycle, occurrence-first planning, safe deletion, and lifecycle closure complete
-- Phase 3D-1–3D-4: Task lifecycle, source-linked Reminders, Learner Support & Notices, and the
-  real-time Personal Agenda aggregation complete
-- Phase 3D-5B-1: global shell and responsive foundation adds a mobile navigation drawer,
-  route-aware content widths, shared editor headers, and sticky editor actions
+- App version: `20.0.0-pilot.1`
+- Database schema: v16
+- Portable backup schema: v16
+- Personal-pilot closure: runtime recovery, privacy-safe System Health diagnostics, recurrence-safe
+  School Year deletion, and Chromium/WebKit readiness
+- Teaching Insights remains explicitly planned and is not part of the personal pilot
 
-## Phase 2 capabilities
+The current pilot includes:
 
-- Repository-backed reads from the `classroom-v20` IndexedDB database
-- Calendar month view combining recurring Schedule Blocks and dated Calendar events
-- Monday–Sunday Week view with weekends, parent/child blocks, cross-day events, and duplicate suppression
-- Today timeline with All day, Past, Now, and Upcoming states
-- Learners views for Classes, Groups, and Individuals with Upcoming, Unscheduled, and Completed planning
-- Validated create, edit, and delete flows for dated Calendar events
-- Transactional change log with global Undo and Redo
-- Hash Router URLs compatible with the GitHub Pages `/Classroom-Source/` base path
-- Lesson Series management with rename, archive/restore, container-only deletion, and compound
-  Undo/Redo that preserves Plans, Sessions, and completed teaching history
+- Today, Week, Calendar, Personal Agenda, Tasks, and Reminders
+- Classes, Groups, Individuals, learner rosters, learner notices, and learner services
+- Lesson Plans, Lesson Flow, Lesson Series, Session occurrences, and occurrence-first planning
+- Library Activities, Resources, Assessments, Lesson Templates, Standards, and managed categories
+- Canonical Assessment Evidence linked to stable Student records
+- Canonical Import Center for rosters, Standards, Activities, Resources, Assessments, and Calendar
+  Events
+- CSV/XLSX templates and reviewed import workflows
+- ICS Calendar Event import, including supported recurrence rules, RDATE/EXDATE, moved/cancelled
+  occurrences, source reconciliation, and atomic Undo/Redo
+- School Year rollover and guarded lifecycle actions
+- Portable Backup & Recovery with legacy-schema validation and safety snapshots
+- Persistent global Undo/Redo for supported mutations
+- Responsive navigation and accessibility checks
+
+## Local-first boundary
+
+Classroom stores user records in the browser's `classroom-v20` IndexedDB database. It does not
+provide cloud sync, accounts, shared calendars, background uploads, or multi-user visibility.
+Portable backups are the primary recovery mechanism. “Local-first” does not mean that the deployed
+application assets are available offline; no service worker or PWA cache is included in this pilot.
 
 ## Main routes
 
@@ -40,9 +49,19 @@ This repository is the React + TypeScript source rebuild of Classroom. The legac
 - `#/week?date=YYYY-MM-DD`
 - `#/calendar?date=YYYY-MM-DD`
 - `#/agenda?date=YYYY-MM-DD`
-- `#/calendar/edit?date=YYYY-MM-DD`
+- `#/tasks`
 - `#/learners`
+- `#/planning/edit`
+- `#/planning/session`
+- `#/library`
+- `#/templates`
+- `#/standards`
+- `#/categories`
+- `#/import`
 - `#/migration`
+- `#/export`
+- `#/settings`
+- `#/settings/rollover`
 - `#/system-health`
 
 ## Local setup
@@ -59,24 +78,38 @@ Open the URL printed by Vite.
 ```bash
 npm run format
 npm run check
-npx playwright install chromium
+npx playwright install chromium webkit
 npm run test:e2e
 ```
 
-Pull-request CI runs formatting, linting, TypeScript, unit tests, the privacy scan, production build verification, and Chromium Playwright tests.
+The full Playwright suite runs in Chromium. The dedicated Personal Pilot Readiness scenarios also
+run in WebKit to protect Safari-relevant IndexedDB persistence, downloads, storage capability
+handling, focus, responsive navigation, and critical accessibility behavior.
+
+See [`docs/testing.md`](docs/testing.md) and
+[`docs/personal-pilot-closure.md`](docs/personal-pilot-closure.md).
+
+## Recovery and diagnostics
+
+- **Backup & Recovery** exports the complete portable v16 user dataset and validates restores before
+  atomic replacement.
+- **System Health** reports the app/database version, active School Year count, browser storage
+  status, and compact workspace counts.
+- The downloadable System Health diagnostic contains counts and statuses only. It excludes record
+  content, names, IDs, file paths, and raw imported data.
+- The root Error Boundary provides safe reload, System Health, and Backup & Recovery actions if an
+  unexpected render failure occurs.
 
 ## Migration safety
 
 - Legacy `cos-*` localStorage is read-only.
 - Migration writes occur in a single IndexedDB transaction.
 - Quarantined records remain outside active Calendar, Week, and Today queries.
-- Rollback only removes records created by the migration and not subsequently modified.
-- Do not delete or overwrite the legacy browser data automatically.
-
-## Private real-data acceptance
-
-The public repository cannot inspect a user's local IndexedDB contents. Complete the privacy-safe checklist in [`docs/PHASE_2_COMPLETION_AUDIT.md`](docs/PHASE_2_COMPLETION_AUDIT.md) in the same browser profile that contains the migrated data.
+- Rollback removes only migration-created records that were not subsequently modified.
+- Never delete or overwrite legacy browser data automatically.
 
 ## Privacy
 
-Do not place real backups, learner data, schedules, copyrighted standards, school calendars, or imported files in this repository. Keep them in a separate private folder and select them only through the browser's local file picker.
+Do not place real backups, learner data, schedules, copyrighted standards, school calendars, or
+imported files in this repository. Keep them in a separate private folder and select them only
+through the browser's local file picker.

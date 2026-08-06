@@ -30,5 +30,10 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'webkit-pilot',
+      testMatch: /personal-pilot-readiness\.spec\.ts/,
+      use: { ...devices['Desktop Safari'] },
+    },
   ],
 });

@@ -79,6 +79,45 @@ describe('SchoolYearReadService', () => {
       },
     ]);
 
+    await database.assessmentEvidence.put({
+      id: 'evidence-past',
+      studentId: 'student-1',
+      schoolYearId: 'past',
+      occurredOn: '2026-05-01',
+      title: 'Historical evidence',
+      kind: 'observation',
+      observation: { text: 'Preserve.' },
+      standardIds: [],
+      status: 'active',
+      createdAt: '2026-05-01T12:00:00.000Z',
+      updatedAt: '2026-05-01T12:00:00.000Z',
+    });
+    await database.calendarEventImportSeries.put({
+      id: 'series-past',
+      schoolYearId: 'past',
+      externalSource: 'ics',
+      externalKey: 'series@example.test',
+      seriesIdentityKey: 'series-past-key',
+      masterFingerprint: 'fnv1a32:11111111',
+      calendarTimeZoneFingerprint: 'fnv1a32:22222222',
+      recurrenceEngineVersion: 'classroom-rfc5545-v1+ical.js-2.2.1',
+      lastImportRunId: 'run-past',
+      createdAt: '2026-07-21T16:00:00.000Z',
+      updatedAt: '2026-07-21T16:00:00.000Z',
+    });
+    await database.calendarEventImportOccurrences.put({
+      id: 'occurrence-past',
+      seriesId: 'series-past',
+      schoolYearId: 'past',
+      occurrenceKey: 'date\u00002026-05-01\u0000',
+      occurrenceIdentityKey: 'occurrence-past-key',
+      sourceStatus: 'excluded',
+      managementStatus: 'suppressed',
+      lastImportRunId: 'run-past',
+      createdAt: '2026-07-21T16:00:00.000Z',
+      updatedAt: '2026-07-21T16:00:00.000Z',
+    });
+
     const model = await new SchoolYearReadService(database).load('2026-07-21');
     expect(model.activeSchoolYear?.id).toBe('current');
     expect(model.activeSchoolYearCount).toBe(1);
@@ -87,12 +126,18 @@ describe('SchoolYearReadService', () => {
       expect.objectContaining({
         schoolYear: expect.objectContaining({ id: 'current' }),
         learnerContextCount: 1,
+        assessmentEvidenceCount: 0,
         calendarEventCount: 1,
+        recurrenceSeriesCount: 0,
+        recurrenceOccurrenceCount: 0,
       }),
       expect.objectContaining({
         schoolYear: expect.objectContaining({ id: 'past' }),
         learnerContextCount: 1,
+        assessmentEvidenceCount: 1,
         calendarEventCount: 1,
+        recurrenceSeriesCount: 1,
+        recurrenceOccurrenceCount: 1,
       }),
     ]);
   });

@@ -28,7 +28,12 @@ async function addHistoricalLearnerContext(page: Page, schoolYearLabel: string):
 
       await new Promise<void>((resolve, reject) => {
         const transaction = database.transaction(
-          ['learnerContexts', 'calendarEvents'],
+          [
+            'learnerContexts',
+            'calendarEvents',
+            'calendarEventImportSeries',
+            'calendarEventImportOccurrences',
+          ],
           'readwrite',
         );
         transaction.onerror = () => reject(transaction.error);
@@ -47,6 +52,31 @@ async function addHistoricalLearnerContext(page: Page, schoolYearLabel: string):
           startDate: '2026-05-25',
           schoolYearId: schoolYear.id,
           category: 'School Holiday',
+        });
+        transaction.objectStore('calendarEventImportSeries').put({
+          id: 'historical-series',
+          schoolYearId: schoolYear.id,
+          externalSource: 'ics',
+          externalKey: 'historical-series@example.test',
+          seriesIdentityKey: 'historical-series-key',
+          masterFingerprint: 'fnv1a32:11111111',
+          calendarTimeZoneFingerprint: 'fnv1a32:22222222',
+          recurrenceEngineVersion: 'classroom-rfc5545-v1+ical.js-2.2.1',
+          lastImportRunId: 'historical-import-run',
+          createdAt: '2026-08-05T20:00:00.000Z',
+          updatedAt: '2026-08-05T20:00:00.000Z',
+        });
+        transaction.objectStore('calendarEventImportOccurrences').put({
+          id: 'historical-occurrence',
+          seriesId: 'historical-series',
+          schoolYearId: schoolYear.id,
+          occurrenceKey: 'date\u00002026-05-25\u0000',
+          occurrenceIdentityKey: 'historical-occurrence-key',
+          sourceStatus: 'excluded',
+          managementStatus: 'suppressed',
+          lastImportRunId: 'historical-import-run',
+          createdAt: '2026-08-05T20:00:00.000Z',
+          updatedAt: '2026-08-05T20:00:00.000Z',
         });
       });
       return schoolYear.id;
@@ -88,6 +118,9 @@ test('school year lifecycle prepares rollover, preserves history, and stays glob
   );
   await expect(page.getByRole('article', { name: '2026–2027 school year' })).toContainText(
     '1 Calendar event',
+  );
+  await expect(page.getByRole('article', { name: '2026–2027 school year' })).toContainText(
+    '2 recurring import records',
   );
 
   await page.getByRole('button', { name: 'Prepare next school year' }).click();
@@ -131,7 +164,7 @@ test('school year lifecycle prepares rollover, preserves history, and stays glob
   await expect(historicalYear.getByRole('button', { name: 'Delete empty year' })).toBeDisabled();
   await expect(historicalYear.getByRole('button', { name: 'Delete empty year' })).toHaveAttribute(
     'title',
-    /Calendar events prevent deletion/,
+    /Calendar events, recurring import ownership prevent deletion/,
   );
 
   const accessibilityResults = await new AxeBuilder({ page }).analyze();

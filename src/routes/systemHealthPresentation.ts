@@ -1,3 +1,4 @@
+import { CLASSROOM_DATABASE_SCHEMA_VERSION } from '@/features/backupRecovery/backupFormat';
 import type {
   WorkspaceDataSummary,
   WorkspaceReadState,
@@ -13,7 +14,7 @@ export interface LiveHealthCheck {
   tone: HealthCheckTone;
 }
 
-export const EXPECTED_SCHEMA_VERSION = 9;
+export const EXPECTED_SCHEMA_VERSION = CLASSROOM_DATABASE_SCHEMA_VERSION;
 
 export function buildLiveHealthChecks(
   summaryState: WorkspaceReadState<WorkspaceDataSummary>,

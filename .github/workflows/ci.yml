@@ -45,8 +45,8 @@ jobs:
       - name: Verify build
         run: npm run verify:build
 
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit
 
-      - name: End-to-end tests
+      - name: Chromium full suite and WebKit pilot readiness
         run: npm run test:e2e

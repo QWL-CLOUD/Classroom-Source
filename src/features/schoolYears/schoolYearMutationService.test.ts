@@ -153,6 +153,61 @@ describe('SchoolYearMutationService', () => {
     await expect(service.delete('historical-year')).rejects.toThrow(/Calendar event/);
   });
 
+  it('blocks deletion when recurrence ownership exists without a materialized Calendar Event', async () => {
+    await database.schoolYears.put({
+      id: 'recurrence-only-year',
+      label: '2023–2024',
+      startsOn: '2023-07-01',
+      endsOn: '2024-06-30',
+      active: false,
+      lifecycleState: 'archived',
+      archivedAt: '2026-07-21T16:00:00.000Z',
+    });
+    await database.calendarEventImportSeries.put({
+      id: 'series-1',
+      schoolYearId: 'recurrence-only-year',
+      externalSource: 'ics',
+      externalKey: 'district-series@example.test',
+      seriesIdentityKey:
+        'calendar-event-series\u0000ics\u0000recurrence-only-year\u0000district-series@example.test',
+      masterFingerprint: 'fnv1a32:11111111',
+      calendarTimeZoneFingerprint: 'fnv1a32:22222222',
+      recurrenceEngineVersion: 'classroom-rfc5545-v1+ical.js-2.2.1',
+      lastImportRunId: 'import-run-1',
+      createdAt: '2026-07-21T16:00:00.000Z',
+      updatedAt: '2026-07-21T16:00:00.000Z',
+    });
+    await database.calendarEventImportOccurrences.put({
+      id: 'occurrence-1',
+      seriesId: 'series-1',
+      schoolYearId: 'recurrence-only-year',
+      occurrenceKey: 'date\u00002024-05-01\u0000',
+      occurrenceIdentityKey:
+        'calendar-event-series\u0000ics\u0000recurrence-only-year\u0000district-series@example.test\u0000date\u00002024-05-01\u0000',
+      sourceStatus: 'excluded',
+      managementStatus: 'suppressed',
+      sourceOccurrenceFingerprint: 'fnv1a32:33333333',
+      lastImportRunId: 'import-run-1',
+      createdAt: '2026-07-21T16:00:00.000Z',
+      updatedAt: '2026-07-21T16:00:00.000Z',
+    });
+
+    const impact = await service.previewDelete('recurrence-only-year');
+
+    expect(impact).toMatchObject({
+      learnerContextCount: 0,
+      assessmentEvidenceCount: 0,
+      calendarEventCount: 0,
+      recurrenceSeriesCount: 1,
+      recurrenceOccurrenceCount: 1,
+      canDelete: false,
+    });
+    await expect(service.delete('recurrence-only-year')).rejects.toThrow(
+      /recurring import series.*recurring import occurrence/,
+    );
+    expect(await database.schoolYears.get('recurrence-only-year')).toBeDefined();
+  });
+
   it('deletes only empty inactive years and restores them through undo', async () => {
     await database.schoolYears.put({
       id: 'empty-year',

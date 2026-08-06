@@ -60,10 +60,20 @@ export function parseNavigationGroupPreferences(
 
 export function readNavigationGroupPreferences(): NavigationGroupPreferences {
   if (typeof window === 'undefined') return { ...DEFAULT_NAVIGATION_GROUP_PREFERENCES };
-  return parseNavigationGroupPreferences(window.localStorage.getItem(NAVIGATION_GROUP_STORAGE_KEY));
+  try {
+    return parseNavigationGroupPreferences(
+      window.localStorage.getItem(NAVIGATION_GROUP_STORAGE_KEY),
+    );
+  } catch {
+    return { ...DEFAULT_NAVIGATION_GROUP_PREFERENCES };
+  }
 }
 
 export function writeNavigationGroupPreferences(preferences: NavigationGroupPreferences): void {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(NAVIGATION_GROUP_STORAGE_KEY, JSON.stringify(preferences));
+  try {
+    window.localStorage.setItem(NAVIGATION_GROUP_STORAGE_KEY, JSON.stringify(preferences));
+  } catch {
+    // Navigation preferences are nonessential. Keep the in-memory state when storage is blocked.
+  }
 }

@@ -210,6 +210,7 @@ test('Backup & Recovery downloads a privacy-safe full local backup', async ({ pa
 
   expect(envelope.format).toBe('classroom-v20-backup-v1');
   expect(envelope.databaseSchemaVersion).toBe(16);
+  expect(envelope.appVersion).toBe('20.0.0-pilot.1');
   expect(envelope).not.toHaveProperty('filePath');
   expect(envelope.tables).toMatchObject({
     tasks: [expect.objectContaining({ id: 'current-task', title: 'Current task before restore' })],

@@ -7,7 +7,10 @@ import { parseLocalDate, todayLocalDate, toLocalDateString } from '@/shared/date
 export interface SchoolYearListItem {
   schoolYear: SchoolYear;
   learnerContextCount: number;
+  assessmentEvidenceCount: number;
   calendarEventCount: number;
+  recurrenceSeriesCount: number;
+  recurrenceOccurrenceCount: number;
 }
 
 export interface SchoolYearReadModel {
@@ -67,15 +70,32 @@ export class SchoolYearReadService {
   constructor(private readonly db: ClassroomDatabase = classroomDb) {}
 
   async load(currentDate = todayLocalDate()): Promise<SchoolYearReadModel> {
-    const [schoolYearValues, contexts, calendarEvents] = await Promise.all([
+    const [
+      schoolYearValues,
+      contexts,
+      assessmentEvidence,
+      calendarEvents,
+      recurrenceSeries,
+      recurrenceOccurrences,
+    ] = await Promise.all([
       this.db.schoolYears.toArray(),
       this.db.learnerContexts.toArray(),
+      this.db.assessmentEvidence.toArray(),
       this.db.calendarEvents.toArray(),
+      this.db.calendarEventImportSeries.toArray(),
+      this.db.calendarEventImportOccurrences.toArray(),
     ]);
     const schoolYears = schoolYearValues.map((value) => schoolYearSchema.parse(value));
     const contextCounts = new Map<string, number>();
     for (const context of contexts) {
       contextCounts.set(context.schoolYearId, (contextCounts.get(context.schoolYearId) ?? 0) + 1);
+    }
+    const assessmentEvidenceCounts = new Map<string, number>();
+    for (const evidence of assessmentEvidence) {
+      assessmentEvidenceCounts.set(
+        evidence.schoolYearId,
+        (assessmentEvidenceCounts.get(evidence.schoolYearId) ?? 0) + 1,
+      );
     }
     const calendarEventCounts = new Map<string, number>();
     for (const event of calendarEvents) {
@@ -83,6 +103,20 @@ export class SchoolYearReadService {
       calendarEventCounts.set(
         event.schoolYearId,
         (calendarEventCounts.get(event.schoolYearId) ?? 0) + 1,
+      );
+    }
+    const recurrenceSeriesCounts = new Map<string, number>();
+    for (const series of recurrenceSeries) {
+      recurrenceSeriesCounts.set(
+        series.schoolYearId,
+        (recurrenceSeriesCounts.get(series.schoolYearId) ?? 0) + 1,
+      );
+    }
+    const recurrenceOccurrenceCounts = new Map<string, number>();
+    for (const occurrence of recurrenceOccurrences) {
+      recurrenceOccurrenceCounts.set(
+        occurrence.schoolYearId,
+        (recurrenceOccurrenceCounts.get(occurrence.schoolYearId) ?? 0) + 1,
       );
     }
     const activeYears = schoolYears.filter((schoolYear) => schoolYear.active);
@@ -93,7 +127,10 @@ export class SchoolYearReadService {
       items: schoolYears.sort(compareSchoolYears).map((schoolYear) => ({
         schoolYear,
         learnerContextCount: contextCounts.get(schoolYear.id) ?? 0,
+        assessmentEvidenceCount: assessmentEvidenceCounts.get(schoolYear.id) ?? 0,
         calendarEventCount: calendarEventCounts.get(schoolYear.id) ?? 0,
+        recurrenceSeriesCount: recurrenceSeriesCounts.get(schoolYear.id) ?? 0,
+        recurrenceOccurrenceCount: recurrenceOccurrenceCounts.get(schoolYear.id) ?? 0,
       })),
       activeSchoolYear,
       activeSchoolYearCount: activeYears.length,

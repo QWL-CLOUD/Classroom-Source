@@ -1,14 +1,61 @@
 # Testing Strategy
 
-- **Vitest:** local-date rules, Zod schemas, recurrence rules, migration normalization, command logic
-- **React Testing Library:** URL-driven pages and shared-record behavior
-- **fake-indexeddb:** Dexie transactions and schema upgrades
-- **Playwright:** route history, reload, Week controls, migration preview, planning, bump, undo/redo
-- **axe-core:** baseline accessibility checks
-- **GitHub Actions:** format, lint, typecheck, tests, privacy scan, build, smoke tests, deploy
+Classroom uses layered automated and manual validation. Test totals are intentionally not fixed in
+this document because they change as the product grows.
 
-Phase 3C-5 baseline: 40 Vitest files / 147 tests and 28 Playwright scenarios. Lesson Series
-lifecycle coverage includes rename, archive, restore, container-only deletion, linked-record count
-preview, preserved scheduled/completed Sessions, compound Undo/Redo, and axe accessibility.
+## Quality pipeline
 
-No System Health test is allowed to infer business correctness by scanning visible DOM text.
+`npm run check` runs, in order:
+
+1. Prettier verification
+2. ESLint
+3. TypeScript project type checking
+4. Vitest
+5. the public-source privacy scan
+6. the production build
+7. built-artifact verification
+
+Vitest and React Testing Library cover domain schemas, read models, mutation services, migration and
+restore validation, recurrence expansion/reconciliation, persistent Undo/Redo, accessibility-aware
+components, and storage/error fallback behavior. `fake-indexeddb` is used for real Dexie schema and
+transaction tests.
+
+## Playwright projects
+
+- **Chromium:** runs the complete E2E suite, including navigation, planning, Calendar, imports,
+  Backup/Restore, lifecycle guards, responsive behavior, and accessibility checks.
+- **WebKit pilot:** runs only `personal-pilot-readiness.spec.ts`. It protects the Safari-relevant
+  personal-pilot path without duplicating every historical Chromium scenario.
+
+The pilot specification covers:
+
+- creating the first active School Year;
+- IndexedDB persistence after reload;
+- System Health app/database readiness;
+- browser storage capability presentation;
+- privacy-safe diagnostic download;
+- portable backup download;
+- core mobile routes without horizontal overflow;
+- responsive navigation focus;
+- no critical automated accessibility violations.
+
+Install both browsers before the E2E run:
+
+```bash
+npx playwright install chromium webkit
+npm run test:e2e
+```
+
+CI and the GitHub Pages deployment both run the full Chromium suite and the WebKit pilot project.
+Deployment is blocked if either project fails. CI retries are diagnostic and do not replace a clean
+first-attempt local acceptance run.
+
+## Manual acceptance
+
+Automated tests cannot inspect a user's private browser data or establish that Safari retained data
+across a real browser restart. Before a personal-pilot release, complete the manual checklist in
+[`personal-pilot-closure.md`](personal-pilot-closure.md), including Backup/Restore, recurrence-owned
+School Year deletion protection, desktop/mobile review, and a real Safari pilot pass.
+
+System Health tests must use repository data and the privacy-safe report contract. They must not
+infer business correctness by scanning unrelated visible text.
