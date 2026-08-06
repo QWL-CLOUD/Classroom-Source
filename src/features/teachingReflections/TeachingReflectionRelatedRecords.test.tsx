@@ -218,7 +218,7 @@ describe('TeachingReflectionRelatedRecords', () => {
         dueMinute: 555,
       }),
     );
-    expect(screen.getByRole('status')).toHaveTextContent('Next Step added.');
+    expect(await screen.findByRole('status')).toHaveTextContent('Next Step added.');
   });
 
   it('uses the existing Task lifecycle for linked Next Steps', async () => {
@@ -228,7 +228,7 @@ describe('TeachingReflectionRelatedRecords', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Complete' }));
     await waitFor(() => expect(nextStepActions.complete).toHaveBeenCalledWith(activeTask.id));
-    expect(screen.getByRole('status')).toHaveTextContent('Next Step completed.');
+    expect(await screen.findByRole('status')).toHaveTextContent('Next Step completed.');
   });
 
   it('keeps existing Tasks visible but blocks creation for archived Reflections', () => {
