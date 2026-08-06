@@ -182,3 +182,47 @@ cause automatic overwrite. Imported Purpose and Focus values use canonical `cate
 `categoryAssignments`, scoped to Activity catalog records. New or restored values, Activity records,
 assignments, `importRuns`, and one compound `changeLog` entry are committed atomically and share one
 global Undo/Redo operation.
+
+## Database v14: classification mapping presets
+
+Schema v14 adds `classificationMappingPresets`. A preset maps normalized imported source text in one
+managed category family to a stable `CategoryValue`. Presets are reusable import assistance, not a
+new instructional-content domain. They participate in reviewed imports, Backup & Recovery, and
+persistent Undo/Redo without changing the ownership of the imported source records.
+
+## Database v15: Calendar Event import identity
+
+Schema v15 extends `CalendarEvent` with School Year ownership and a unique imported identity. The
+canonical Calendar Events Import supports reviewed CSV, XLSX, and non-recurring ICS records. A
+strong imported identity, not title equality, controls automatic update ownership. Imported Events,
+category assignments, mapping presets, ImportRun history, and the change-log command commit in one
+transaction and undo together.
+
+Portable backup v15 includes the Calendar Event identity fields. Older supported backups restore
+with the new fields absent until records are subsequently imported or edited.
+
+## Database v16: ICS recurrence ownership and reconciliation
+
+Schema v16 adds two metadata tables while continuing to materialize Calendar occurrences as ordinary
+`CalendarEvent` records:
+
+- `calendarEventImportSeries` owns one imported recurring series within one School Year and stores
+  the source identity and most recent imported series fingerprint.
+- `calendarEventImportOccurrences` records each source occurrence identity, materialized Event link,
+  imported fingerprint, management state, source status, and suppression/detachment decisions.
+
+The recurrence engine supports the approved DAILY, WEEKLY, MONTHLY, and YEARLY rule subset plus
+INTERVAL, COUNT or UNTIL, BYDAY, BYMONTHDAY, BYMONTH, BYSETPOS, WKST, RDATE, EXDATE, and single moved
+or cancelled occurrence overrides. Unsupported or ambiguous rules are blocked before writes.
+
+Re-import reconciliation distinguishes source changes from local Event edits or deletion. A user can
+restore a deleted occurrence, keep it suppressed, accept a source removal, or detach a locally kept
+Event from import ownership. Events, series metadata, occurrence metadata, ImportRun history, and
+change-log data remain one atomic command for commit and global Undo/Redo.
+
+School Years with recurrence ownership cannot be permanently deleted even when every materialized
+Calendar Event has been cancelled, excluded, suppressed, or detached. This prevents orphaned series
+and occurrence metadata.
+
+Portable backup v16 includes both recurrence tables. Supported v10–v15 backups restore them empty.
+The Personal Pilot Closure does not change the database or backup schema beyond v16.

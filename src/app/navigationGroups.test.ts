@@ -4,6 +4,8 @@ import {
   DEFAULT_NAVIGATION_GROUP_PREFERENCES,
   navigationGroupForPath,
   parseNavigationGroupPreferences,
+  readNavigationGroupPreferences,
+  writeNavigationGroupPreferences,
 } from './navigationGroups';
 
 describe('navigation group preferences', () => {
@@ -39,5 +41,51 @@ describe('navigation group preferences', () => {
     expect(navigationGroupForPath('/insights')).toBe('reflect');
     expect(navigationGroupForPath('/migration')).toBe('settingsData');
     expect(navigationGroupForPath('/system-health')).toBe('settingsData');
+  });
+});
+
+describe('navigation preference storage resilience', () => {
+  it('falls back to defaults when localStorage.getItem throws', () => {
+    const original = window.localStorage;
+    try {
+      Object.defineProperty(window, 'localStorage', {
+        configurable: true,
+        value: {
+          getItem: () => {
+            throw new DOMException('Storage blocked', 'SecurityError');
+          },
+        },
+      });
+
+      expect(readNavigationGroupPreferences()).toEqual(DEFAULT_NAVIGATION_GROUP_PREFERENCES);
+    } finally {
+      Object.defineProperty(window, 'localStorage', {
+        configurable: true,
+        value: original,
+      });
+    }
+  });
+
+  it('does not throw when localStorage.setItem is unavailable', () => {
+    const original = window.localStorage;
+    try {
+      Object.defineProperty(window, 'localStorage', {
+        configurable: true,
+        value: {
+          setItem: () => {
+            throw new DOMException('Storage full', 'QuotaExceededError');
+          },
+        },
+      });
+
+      expect(() =>
+        writeNavigationGroupPreferences({ resources: false, reflect: true, settingsData: true }),
+      ).not.toThrow();
+    } finally {
+      Object.defineProperty(window, 'localStorage', {
+        configurable: true,
+        value: original,
+      });
+    }
   });
 });

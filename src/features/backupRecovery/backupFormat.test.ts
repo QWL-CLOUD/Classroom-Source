@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
+import packageMetadata from '../../../package.json';
+
 import {
   buildRestorePreview,
+  CLASSROOM_APP_VERSION,
   createBackupEnvelope,
   emptyBackupTables,
   serializeBackupEnvelope,
@@ -49,6 +52,14 @@ function resign(envelope: ClassroomBackupEnvelope): string {
 }
 
 describe('Classroom backup format', () => {
+  it('derives the exported app version from package metadata', () => {
+    expect(CLASSROOM_APP_VERSION).toBe(packageMetadata.version);
+    expect(
+      createBackupEnvelope(emptyBackupTables(), { backupId: 'version', exportedAt: now })
+        .appVersion,
+    ).toBe(packageMetadata.version);
+  });
+
   it('creates and validates a complete versioned backup envelope', () => {
     const tables = emptyBackupTables();
     tables.tasks.push(task('task-1'));

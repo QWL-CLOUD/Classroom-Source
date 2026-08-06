@@ -398,108 +398,137 @@ export function SettingsRoute() {
               </div>
             ) : (
               <div className={styles.yearGrid}>
-                {state.data.items.map(({ schoolYear, learnerContextCount, calendarEventCount }) => {
-                  const archived = schoolYear.lifecycleState === 'archived';
-                  const canDelete =
-                    !schoolYear.active && learnerContextCount === 0 && calendarEventCount === 0;
-                  return (
-                    <article
-                      key={schoolYear.id}
-                      className={styles.yearCard}
-                      data-active={schoolYear.active}
-                      data-archived={archived}
-                      aria-label={`${schoolYear.label} school year`}
-                    >
-                      <div className={styles.yearHeader}>
-                        <div>
-                          <h3>{schoolYear.label}</h3>
-                          <p className={styles.yearDates}>
-                            {schoolYear.startsOn} through {schoolYear.endsOn}
-                          </p>
-                        </div>
-                        <div className={styles.statusRow}>
-                          {schoolYear.active ? <span className={styles.badge}>Active</span> : null}
-                          {archived ? (
-                            <span className={`${styles.badge} ${styles.archivedBadge}`}>
-                              Archived
+                {state.data.items.map(
+                  ({
+                    schoolYear,
+                    learnerContextCount,
+                    assessmentEvidenceCount,
+                    calendarEventCount,
+                    recurrenceSeriesCount,
+                    recurrenceOccurrenceCount,
+                  }) => {
+                    const archived = schoolYear.lifecycleState === 'archived';
+                    const recurrenceOwnershipCount =
+                      recurrenceSeriesCount + recurrenceOccurrenceCount;
+                    const canDelete =
+                      !schoolYear.active &&
+                      learnerContextCount === 0 &&
+                      assessmentEvidenceCount === 0 &&
+                      calendarEventCount === 0 &&
+                      recurrenceOwnershipCount === 0;
+                    const linkedRecordLabels = [
+                      learnerContextCount > 0 ? 'learner contexts' : null,
+                      assessmentEvidenceCount > 0 ? 'assessment evidence' : null,
+                      calendarEventCount > 0 ? 'Calendar events' : null,
+                      recurrenceOwnershipCount > 0 ? 'recurring import ownership' : null,
+                    ].filter((label): label is string => label !== null);
+                    return (
+                      <article
+                        key={schoolYear.id}
+                        className={styles.yearCard}
+                        data-active={schoolYear.active}
+                        data-archived={archived}
+                        aria-label={`${schoolYear.label} school year`}
+                      >
+                        <div className={styles.yearHeader}>
+                          <div>
+                            <h3>{schoolYear.label}</h3>
+                            <p className={styles.yearDates}>
+                              {schoolYear.startsOn} through {schoolYear.endsOn}
+                            </p>
+                          </div>
+                          <div className={styles.statusRow}>
+                            {schoolYear.active ? (
+                              <span className={styles.badge}>Active</span>
+                            ) : null}
+                            {archived ? (
+                              <span className={`${styles.badge} ${styles.archivedBadge}`}>
+                                Archived
+                              </span>
+                            ) : null}
+                            <span className={`${styles.badge} ${styles.usageBadge}`}>
+                              {learnerContextCount} learner context
+                              {learnerContextCount === 1 ? '' : 's'}
                             </span>
-                          ) : null}
-                          <span className={`${styles.badge} ${styles.usageBadge}`}>
-                            {learnerContextCount} learner context
-                            {learnerContextCount === 1 ? '' : 's'}
-                          </span>
-                          <span className={`${styles.badge} ${styles.usageBadge}`}>
-                            {calendarEventCount} Calendar event
-                            {calendarEventCount === 1 ? '' : 's'}
-                          </span>
+                            <span className={`${styles.badge} ${styles.usageBadge}`}>
+                              {assessmentEvidenceCount} evidence record
+                              {assessmentEvidenceCount === 1 ? '' : 's'}
+                            </span>
+                            <span className={`${styles.badge} ${styles.usageBadge}`}>
+                              {calendarEventCount} Calendar event
+                              {calendarEventCount === 1 ? '' : 's'}
+                            </span>
+                            <span className={`${styles.badge} ${styles.usageBadge}`}>
+                              {recurrenceOwnershipCount} recurring import record
+                              {recurrenceOwnershipCount === 1 ? '' : 's'}
+                            </span>
+                          </div>
                         </div>
-                      </div>
 
-                      <p className={styles.yearMeta}>
-                        {schoolYear.active
-                          ? 'New year-scoped work uses this active context where supported.'
-                          : archived
-                            ? 'Hidden from active-year selection; historical records remain linked.'
-                            : 'Available to view or activate. Existing records are unchanged.'}
-                      </p>
+                        <p className={styles.yearMeta}>
+                          {schoolYear.active
+                            ? 'New year-scoped work uses this active context where supported.'
+                            : archived
+                              ? 'Hidden from active-year selection; historical records remain linked.'
+                              : 'Available to view or activate. Existing records are unchanged.'}
+                        </p>
 
-                      <div className={styles.yearActions}>
-                        <button
-                          className="button"
-                          type="button"
-                          onClick={() => openEdit(schoolYear)}
-                        >
-                          <Pencil size={16} aria-hidden="true" /> Edit
-                        </button>
-                        {!schoolYear.active && !archived ? (
+                        <div className={styles.yearActions}>
                           <button
-                            className="button button-primary"
+                            className="button"
                             type="button"
-                            disabled={busyId === schoolYear.id}
-                            onClick={() => void setActive(schoolYear)}
+                            onClick={() => openEdit(schoolYear)}
                           >
-                            <CheckCircle2 size={16} aria-hidden="true" /> Set active
+                            <Pencil size={16} aria-hidden="true" /> Edit
                           </button>
-                        ) : null}
-                        <button
-                          className="button"
-                          type="button"
-                          disabled={busyId === schoolYear.id || schoolYear.active}
-                          title={
-                            schoolYear.active ? 'Set another school year active first.' : undefined
-                          }
-                          onClick={() => void toggleArchive(schoolYear)}
-                        >
-                          {archived ? (
-                            <RotateCcw size={16} aria-hidden="true" />
-                          ) : (
-                            <Archive size={16} aria-hidden="true" />
-                          )}
-                          {archived ? 'Restore' : 'Archive'}
-                        </button>
-                        <button
-                          className="button"
-                          type="button"
-                          disabled={!canDelete || busyId === schoolYear.id}
-                          title={
-                            schoolYear.active
-                              ? 'The active school year cannot be deleted.'
-                              : learnerContextCount > 0 && calendarEventCount > 0
-                                ? 'Archive this year; linked learner contexts and Calendar events prevent deletion.'
-                                : learnerContextCount > 0
-                                  ? 'Archive this year; linked learner contexts prevent deletion.'
-                                  : calendarEventCount > 0
-                                    ? 'Archive this year; linked Calendar events prevent deletion.'
-                                    : undefined
-                          }
-                          onClick={() => void remove(schoolYear)}
-                        >
-                          <Trash2 size={16} aria-hidden="true" /> Delete empty year
-                        </button>
-                      </div>
-                    </article>
-                  );
-                })}
+                          {!schoolYear.active && !archived ? (
+                            <button
+                              className="button button-primary"
+                              type="button"
+                              disabled={busyId === schoolYear.id}
+                              onClick={() => void setActive(schoolYear)}
+                            >
+                              <CheckCircle2 size={16} aria-hidden="true" /> Set active
+                            </button>
+                          ) : null}
+                          <button
+                            className="button"
+                            type="button"
+                            disabled={busyId === schoolYear.id || schoolYear.active}
+                            title={
+                              schoolYear.active
+                                ? 'Set another school year active first.'
+                                : undefined
+                            }
+                            onClick={() => void toggleArchive(schoolYear)}
+                          >
+                            {archived ? (
+                              <RotateCcw size={16} aria-hidden="true" />
+                            ) : (
+                              <Archive size={16} aria-hidden="true" />
+                            )}
+                            {archived ? 'Restore' : 'Archive'}
+                          </button>
+                          <button
+                            className="button"
+                            type="button"
+                            disabled={!canDelete || busyId === schoolYear.id}
+                            title={
+                              schoolYear.active
+                                ? 'The active school year cannot be deleted.'
+                                : linkedRecordLabels.length > 0
+                                  ? `Archive this year; linked ${linkedRecordLabels.join(', ')} prevent deletion.`
+                                  : undefined
+                            }
+                            onClick={() => void remove(schoolYear)}
+                          >
+                            <Trash2 size={16} aria-hidden="true" /> Delete empty year
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  },
+                )}
               </div>
             )}
           </section>

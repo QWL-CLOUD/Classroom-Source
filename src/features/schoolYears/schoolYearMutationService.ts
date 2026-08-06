@@ -38,6 +38,8 @@ export interface SchoolYearDeleteImpact {
   learnerContextCount: number;
   assessmentEvidenceCount: number;
   calendarEventCount: number;
+  recurrenceSeriesCount: number;
+  recurrenceOccurrenceCount: number;
   canDelete: boolean;
 }
 
@@ -57,6 +59,14 @@ export function schoolYearDeleteBlockingMessage(impact: SchoolYearDeleteImpact):
   if (impact.calendarEventCount > 0) {
     blockers.push(
       `${impact.calendarEventCount} Calendar event${impact.calendarEventCount === 1 ? '' : 's'}`,
+    );
+  }
+  if (impact.recurrenceSeriesCount > 0) {
+    blockers.push(`${impact.recurrenceSeriesCount} recurring import series`);
+  }
+  if (impact.recurrenceOccurrenceCount > 0) {
+    blockers.push(
+      `${impact.recurrenceOccurrenceCount} recurring import occurrence${impact.recurrenceOccurrenceCount === 1 ? '' : 's'}`,
     );
   }
   const details = blockers.length > 0 ? blockers.join(' and ') : 'protected records';
@@ -225,28 +235,43 @@ export class SchoolYearMutationService {
   async previewDelete(id: string): Promise<SchoolYearDeleteImpact> {
     return this.db.transaction(
       'r',
-      this.db.schoolYears,
-      this.db.learnerContexts,
-      this.db.assessmentEvidence,
-      this.db.calendarEvents,
+      [
+        this.db.schoolYears,
+        this.db.learnerContexts,
+        this.db.assessmentEvidence,
+        this.db.calendarEvents,
+        this.db.calendarEventImportSeries,
+        this.db.calendarEventImportOccurrences,
+      ],
       async () => {
         const schoolYear = await this.requireSchoolYear(id);
-        const [learnerContextCount, assessmentEvidenceCount, calendarEventCount] =
-          await Promise.all([
-            this.db.learnerContexts.where('schoolYearId').equals(id).count(),
-            this.db.assessmentEvidence.where('schoolYearId').equals(id).count(),
-            this.db.calendarEvents.where('schoolYearId').equals(id).count(),
-          ]);
+        const [
+          learnerContextCount,
+          assessmentEvidenceCount,
+          calendarEventCount,
+          recurrenceSeriesCount,
+          recurrenceOccurrenceCount,
+        ] = await Promise.all([
+          this.db.learnerContexts.where('schoolYearId').equals(id).count(),
+          this.db.assessmentEvidence.where('schoolYearId').equals(id).count(),
+          this.db.calendarEvents.where('schoolYearId').equals(id).count(),
+          this.db.calendarEventImportSeries.where('schoolYearId').equals(id).count(),
+          this.db.calendarEventImportOccurrences.where('schoolYearId').equals(id).count(),
+        ]);
         return {
           schoolYearId: id,
           schoolYearLabel: schoolYear.label,
           learnerContextCount,
           assessmentEvidenceCount,
           calendarEventCount,
+          recurrenceSeriesCount,
+          recurrenceOccurrenceCount,
           canDelete:
             learnerContextCount === 0 &&
             assessmentEvidenceCount === 0 &&
             calendarEventCount === 0 &&
+            recurrenceSeriesCount === 0 &&
+            recurrenceOccurrenceCount === 0 &&
             !schoolYear.active,
         };
       },
@@ -256,28 +281,45 @@ export class SchoolYearMutationService {
   async delete(id: string): Promise<void> {
     const log = await this.db.transaction(
       'rw',
-      this.db.schoolYears,
-      this.db.learnerContexts,
-      this.db.assessmentEvidence,
-      this.db.calendarEvents,
-      this.db.changeLog,
+      [
+        this.db.schoolYears,
+        this.db.learnerContexts,
+        this.db.assessmentEvidence,
+        this.db.calendarEvents,
+        this.db.calendarEventImportSeries,
+        this.db.calendarEventImportOccurrences,
+        this.db.changeLog,
+      ],
       async () => {
         const schoolYear = await this.requireSchoolYear(id);
         if (schoolYear.active) throw new Error('The active school year cannot be deleted.');
-        const [learnerContextCount, assessmentEvidenceCount, calendarEventCount] =
-          await Promise.all([
-            this.db.learnerContexts.where('schoolYearId').equals(id).count(),
-            this.db.assessmentEvidence.where('schoolYearId').equals(id).count(),
-            this.db.calendarEvents.where('schoolYearId').equals(id).count(),
-          ]);
+        const [
+          learnerContextCount,
+          assessmentEvidenceCount,
+          calendarEventCount,
+          recurrenceSeriesCount,
+          recurrenceOccurrenceCount,
+        ] = await Promise.all([
+          this.db.learnerContexts.where('schoolYearId').equals(id).count(),
+          this.db.assessmentEvidence.where('schoolYearId').equals(id).count(),
+          this.db.calendarEvents.where('schoolYearId').equals(id).count(),
+          this.db.calendarEventImportSeries.where('schoolYearId').equals(id).count(),
+          this.db.calendarEventImportOccurrences.where('schoolYearId').equals(id).count(),
+        ]);
         const impact: SchoolYearDeleteImpact = {
           schoolYearId: id,
           schoolYearLabel: schoolYear.label,
           learnerContextCount,
           assessmentEvidenceCount,
           calendarEventCount,
+          recurrenceSeriesCount,
+          recurrenceOccurrenceCount,
           canDelete:
-            learnerContextCount === 0 && assessmentEvidenceCount === 0 && calendarEventCount === 0,
+            learnerContextCount === 0 &&
+            assessmentEvidenceCount === 0 &&
+            calendarEventCount === 0 &&
+            recurrenceSeriesCount === 0 &&
+            recurrenceOccurrenceCount === 0,
         };
         if (!impact.canDelete) throw new Error(schoolYearDeleteBlockingMessage(impact));
         const commands: SchoolYearCommandPair = {

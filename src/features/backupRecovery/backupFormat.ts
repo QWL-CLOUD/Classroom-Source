@@ -1,5 +1,7 @@
 import type { ZodType } from 'zod';
 
+import packageMetadata from '../../../package.json';
+
 import {
   appSettingSchema,
   assessmentEvidenceRecordSchema,
@@ -43,7 +45,7 @@ const LEGACY_IMPORTLESS_SCHEMA_VERSION = 12;
 const LEGACY_PRESETLESS_SCHEMA_VERSION = 13;
 const LEGACY_CALENDAR_IDENTITYLESS_SCHEMA_VERSION = 14;
 const LEGACY_RECURRENCELESS_SCHEMA_VERSION = 15;
-export const CLASSROOM_APP_VERSION = '20.0.0-alpha.0';
+export const CLASSROOM_APP_VERSION = packageMetadata.version;
 export const MAX_BACKUP_FILE_BYTES = 100 * 1024 * 1024;
 
 export const BACKUP_TABLE_NAMES = [

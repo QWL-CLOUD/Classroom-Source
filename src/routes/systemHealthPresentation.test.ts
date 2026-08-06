@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildLiveHealthChecks } from './systemHealthPresentation';
+import { CLASSROOM_DATABASE_SCHEMA_VERSION } from '@/features/backupRecovery/backupFormat';
+import { buildLiveHealthChecks, EXPECTED_SCHEMA_VERSION } from './systemHealthPresentation';
 
 const emptyCounts = {
   schoolYears: 0,
@@ -16,13 +17,17 @@ const emptyCounts = {
 };
 
 describe('System Health live checks', () => {
+  it('uses the shared database schema version', () => {
+    expect(EXPECTED_SCHEMA_VERSION).toBe(CLASSROOM_DATABASE_SCHEMA_VERSION);
+  });
+
   it('requires exactly one active school year', () => {
     const checks = buildLiveHealthChecks(
       {
         status: 'ready',
         data: { activeSchoolYear: null, activeSchoolYearCount: 0, counts: emptyCounts },
       },
-      9,
+      CLASSROOM_DATABASE_SCHEMA_VERSION,
     );
 
     expect(checks.find((check) => check.id === 'active-school-year')).toMatchObject({
@@ -47,7 +52,7 @@ describe('System Health live checks', () => {
           counts: emptyCounts,
         },
       },
-      9,
+      CLASSROOM_DATABASE_SCHEMA_VERSION,
     );
 
     expect(checks.find((check) => check.id === 'active-school-year')).toMatchObject({
@@ -60,7 +65,9 @@ describe('System Health live checks', () => {
   });
 
   it('does not present an unexpected schema as passing', () => {
-    expect(buildLiveHealthChecks({ status: 'loading' }, 10)[1]).toMatchObject({
+    expect(
+      buildLiveHealthChecks({ status: 'loading' }, CLASSROOM_DATABASE_SCHEMA_VERSION + 1)[1],
+    ).toMatchObject({
       statusLabel: 'Needs review',
       tone: 'attention',
     });
