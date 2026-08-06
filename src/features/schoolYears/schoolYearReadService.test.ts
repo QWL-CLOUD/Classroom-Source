@@ -92,6 +92,27 @@ describe('SchoolYearReadService', () => {
       createdAt: '2026-05-01T12:00:00.000Z',
       updatedAt: '2026-05-01T12:00:00.000Z',
     });
+    await database.teachingReflections.put({
+      id: 'reflection-past',
+      sessionOccurrenceId: 'session-past',
+      schoolYearId: 'past',
+      contextId: 'class-2',
+      lessonPlanId: 'plan-past',
+      occurredOn: '2026-05-02',
+      whatWorked: 'Students used the visual routine independently.',
+      sourceSnapshots: {
+        context: { kind: 'class', name: 'Class 2' },
+        lessonPlan: { title: 'Historical lesson' },
+        sessionOccurrence: {
+          date: '2026-05-02',
+          startMinute: 540,
+          endMinute: 600,
+        },
+      },
+      status: 'active',
+      createdAt: '2026-05-02T12:00:00.000Z',
+      updatedAt: '2026-05-02T12:00:00.000Z',
+    });
     await database.calendarEventImportSeries.put({
       id: 'series-past',
       schoolYearId: 'past',
@@ -127,6 +148,7 @@ describe('SchoolYearReadService', () => {
         schoolYear: expect.objectContaining({ id: 'current' }),
         learnerContextCount: 1,
         assessmentEvidenceCount: 0,
+        teachingReflectionCount: 0,
         calendarEventCount: 1,
         recurrenceSeriesCount: 0,
         recurrenceOccurrenceCount: 0,
@@ -135,6 +157,7 @@ describe('SchoolYearReadService', () => {
         schoolYear: expect.objectContaining({ id: 'past' }),
         learnerContextCount: 1,
         assessmentEvidenceCount: 1,
+        teachingReflectionCount: 1,
         calendarEventCount: 1,
         recurrenceSeriesCount: 1,
         recurrenceOccurrenceCount: 1,

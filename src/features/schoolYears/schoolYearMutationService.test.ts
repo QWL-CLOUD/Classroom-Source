@@ -208,6 +208,53 @@ describe('SchoolYearMutationService', () => {
     expect(await database.schoolYears.get('recurrence-only-year')).toBeDefined();
   });
 
+  it('blocks deletion when a Teaching Reflection is the only retained year-owned record', async () => {
+    await database.schoolYears.put({
+      id: 'reflection-only-year',
+      label: '2022–2023',
+      startsOn: '2022-07-01',
+      endsOn: '2023-06-30',
+      active: false,
+      lifecycleState: 'archived',
+      archivedAt: '2026-07-21T16:00:00.000Z',
+    });
+    await database.teachingReflections.put({
+      id: 'reflection-1',
+      sessionOccurrenceId: 'removed-session-1',
+      schoolYearId: 'reflection-only-year',
+      contextId: 'removed-context-1',
+      lessonPlanId: 'removed-plan-1',
+      occurredOn: '2023-05-10',
+      whatToAdjust: 'Use a shorter transition before independent work.',
+      sourceSnapshots: {
+        context: { kind: 'class', name: 'Archived class' },
+        lessonPlan: { title: 'Archived lesson' },
+        sessionOccurrence: {
+          date: '2023-05-10',
+          startMinute: 600,
+          endMinute: 660,
+        },
+      },
+      status: 'active',
+      createdAt: '2023-05-10T16:00:00.000Z',
+      updatedAt: '2023-05-10T16:00:00.000Z',
+    });
+
+    const impact = await service.previewDelete('reflection-only-year');
+
+    expect(impact).toMatchObject({
+      learnerContextCount: 0,
+      assessmentEvidenceCount: 0,
+      teachingReflectionCount: 1,
+      calendarEventCount: 0,
+      recurrenceSeriesCount: 0,
+      recurrenceOccurrenceCount: 0,
+      canDelete: false,
+    });
+    await expect(service.delete('reflection-only-year')).rejects.toThrow(/1 Teaching Reflection/);
+    expect(await database.schoolYears.get('reflection-only-year')).toBeDefined();
+  });
+
   it('deletes only empty inactive years and restores them through undo', async () => {
     await database.schoolYears.put({
       id: 'empty-year',

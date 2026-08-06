@@ -1,5 +1,6 @@
 import type { ClassroomDatabase } from '@/data/db/ClassroomDatabase';
 import { applyAssessmentEvidenceOperations } from '@/features/assessmentEvidence/applyAssessmentEvidenceOperations';
+import { applyTeachingReflectionOperations } from '@/features/teachingReflections/applyTeachingReflectionOperations';
 import {
   ASSESSMENT_EVIDENCE_COMMAND_PREFIX,
   parseAssessmentEvidenceCommand,
@@ -80,6 +81,11 @@ import {
   TASK_COMMAND_PREFIX,
   type TaskCommand,
 } from '@/features/tasks/taskCommands';
+import {
+  parseTeachingReflectionCommand,
+  TEACHING_REFLECTION_COMMAND_PREFIX,
+  type TeachingReflectionCommand,
+} from '@/features/teachingReflections/teachingReflectionCommands';
 
 import {
   CALENDAR_EVENT_COMMAND_PREFIX,
@@ -94,6 +100,7 @@ import {
 
 export type SupportedEditCommand =
   | { entity: 'assessment-evidence'; command: AssessmentEvidenceCommand }
+  | { entity: 'teaching-reflection'; command: TeachingReflectionCommand }
   | { entity: 'category'; command: CategoryCommand }
   | { entity: 'import-center'; command: ImportCommand }
   | { entity: 'calendar-event'; command: CalendarEventCommand }
@@ -114,6 +121,7 @@ export type SupportedEditCommand =
 export function isSupportedEditChangeLog(log: ChangeLog): boolean {
   return (
     log.commandType.startsWith(ASSESSMENT_EVIDENCE_COMMAND_PREFIX) ||
+    log.commandType.startsWith(TEACHING_REFLECTION_COMMAND_PREFIX) ||
     log.commandType.startsWith(CATEGORY_COMMAND_PREFIX) ||
     log.commandType.startsWith(IMPORT_CENTER_COMMAND_PREFIX) ||
     log.commandType.startsWith(CALENDAR_EVENT_COMMAND_PREFIX) ||
@@ -138,6 +146,12 @@ export function parseSupportedEditCommand(commandType: string, json: string): Su
     return {
       entity: 'assessment-evidence',
       command: parseAssessmentEvidenceCommand(json),
+    };
+  }
+  if (commandType.startsWith(TEACHING_REFLECTION_COMMAND_PREFIX)) {
+    return {
+      entity: 'teaching-reflection',
+      command: parseTeachingReflectionCommand(json),
     };
   }
   if (commandType.startsWith(CATEGORY_COMMAND_PREFIX)) {
@@ -245,6 +259,10 @@ export async function applySupportedEditCommand(
 ): Promise<void> {
   if (parsed.entity === 'assessment-evidence') {
     await applyAssessmentEvidenceOperations(db, parsed.command.operations);
+    return;
+  }
+  if (parsed.entity === 'teaching-reflection') {
+    await applyTeachingReflectionOperations(db, parsed.command.operations);
     return;
   }
   if (parsed.entity === 'import-center') {

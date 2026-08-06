@@ -14,6 +14,7 @@ export function useAgendaReadModel(selectedDate: string): AgendaReadModel | unde
       learnerContexts,
       sessions,
       lessonPlans,
+      teachingReflections,
     ] = await Promise.all([
       classroomDb.tasks.toArray(),
       classroomDb.reminders.toArray(),
@@ -22,6 +23,7 @@ export function useAgendaReadModel(selectedDate: string): AgendaReadModel | unde
       classroomDb.learnerContexts.toArray(),
       classroomDb.sessionOccurrences.toArray(),
       classroomDb.lessonPlans.toArray(),
+      classroomDb.teachingReflections.toArray(),
     ]);
     return buildAgendaReadModel(
       {
@@ -32,6 +34,7 @@ export function useAgendaReadModel(selectedDate: string): AgendaReadModel | unde
         learnerContexts,
         sessions,
         lessonPlans,
+        teachingReflections,
       },
       selectedDate,
     );

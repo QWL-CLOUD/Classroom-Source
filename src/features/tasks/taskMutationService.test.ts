@@ -38,6 +38,34 @@ function serviceWithIds(ids: string[], times: string[] = ['2026-07-18T12:00:00.0
   });
 }
 
+async function seedTeachingReflection(status: 'active' | 'archived' = 'active'): Promise<void> {
+  await database.learnerContexts.put({
+    id: 'reflection-context',
+    kind: 'class',
+    name: 'Grade 3',
+    schoolYearId: 'year-1',
+    status: 'archived',
+  });
+  await database.teachingReflections.put({
+    id: 'reflection-1',
+    sessionOccurrenceId: 'session-1',
+    schoolYearId: 'year-1',
+    contextId: 'reflection-context',
+    lessonPlanId: 'plan-1',
+    occurredOn: '2026-07-18',
+    whatToAdjust: 'Use a visual model.',
+    sourceSnapshots: {
+      context: { kind: 'class', name: 'Grade 3' },
+      lessonPlan: { title: 'Fraction workshop' },
+      sessionOccurrence: { date: '2026-07-18', startMinute: 540, endMinute: 600 },
+    },
+    status,
+    archivedAt: status === 'archived' ? '2026-07-19T12:00:00.000Z' : undefined,
+    createdAt: '2026-07-18T12:00:00.000Z',
+    updatedAt: '2026-07-18T12:00:00.000Z',
+  });
+}
+
 describe('TaskMutationService', () => {
   it('creates and edits one shared task with separate Scheduled and Due values', async () => {
     await database.learnerContexts.put({
@@ -229,5 +257,62 @@ describe('TaskMutationService', () => {
       status: 'completed',
       contextId: 'archived-context',
     });
+  });
+
+  it('creates a context-locked Teaching Reflection Next Step through the Task command family', async () => {
+    await seedTeachingReflection();
+    const service = serviceWithIds(['next-step-1', 'create-log']);
+    const history = new EditHistoryService(database, {
+      now: () => '2026-07-18T13:00:00.000Z',
+    });
+
+    const created = await service.createTeachingReflectionNextStep('reflection-1', {
+      title: '  Prepare a visual model  ',
+      notes: '  Use it before partner practice.  ',
+      scheduledDate: '2026-07-20',
+    });
+
+    expect(created).toMatchObject({
+      id: 'next-step-1',
+      title: 'Prepare a visual model',
+      notes: 'Use it before partner practice.',
+      contextId: 'reflection-context',
+      linkedEntityType: 'teaching-reflection',
+      linkedEntityId: 'reflection-1',
+      status: 'active',
+    });
+    expect((await database.changeLog.orderBy('createdAt').last())?.commandType).toBe('task.create');
+
+    await history.undo();
+    expect(await database.tasks.get(created.id)).toBeUndefined();
+    await history.redo();
+    expect(await database.tasks.get(created.id)).toEqual(created);
+
+    await expect(
+      service.update(created.id, {
+        title: created.title,
+        contextId: '',
+      }),
+    ).rejects.toThrow('A Teaching Reflection Next Step must keep its source context.');
+  });
+
+  it('rejects Next Step creation for archived or source-incomplete Teaching Reflections', async () => {
+    await seedTeachingReflection('archived');
+    const service = serviceWithIds(['next-step-1', 'create-log']);
+
+    await expect(
+      service.createTeachingReflectionNextStep('reflection-1', { title: 'Do not create' }),
+    ).rejects.toThrow('Restore this Teaching Reflection before adding a Next Step.');
+
+    await database.teachingReflections.update('reflection-1', {
+      status: 'active',
+      archivedAt: undefined,
+    });
+    await database.learnerContexts.delete('reflection-context');
+    await expect(
+      service.createTeachingReflectionNextStep('reflection-1', { title: 'Still do not create' }),
+    ).rejects.toThrow('The Teaching Reflection context no longer exists.');
+    expect(await database.tasks.count()).toBe(0);
+    expect(await database.changeLog.count()).toBe(0);
   });
 });

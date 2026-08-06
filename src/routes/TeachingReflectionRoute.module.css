@@ -1,0 +1,19 @@
+.statePanel {
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+  color: #4f5955;
+}
+
+.statePanel h1,
+.statePanel p {
+  margin: 0;
+}
+
+.statePanel h1 {
+  color: var(--heading);
+}
+
+.statePanel .button {
+  width: fit-content;
+}

@@ -403,6 +403,7 @@ export function SettingsRoute() {
                     schoolYear,
                     learnerContextCount,
                     assessmentEvidenceCount,
+                    teachingReflectionCount,
                     calendarEventCount,
                     recurrenceSeriesCount,
                     recurrenceOccurrenceCount,
@@ -414,11 +415,13 @@ export function SettingsRoute() {
                       !schoolYear.active &&
                       learnerContextCount === 0 &&
                       assessmentEvidenceCount === 0 &&
+                      teachingReflectionCount === 0 &&
                       calendarEventCount === 0 &&
                       recurrenceOwnershipCount === 0;
                     const linkedRecordLabels = [
                       learnerContextCount > 0 ? 'learner contexts' : null,
                       assessmentEvidenceCount > 0 ? 'assessment evidence' : null,
+                      teachingReflectionCount > 0 ? 'Teaching Reflections' : null,
                       calendarEventCount > 0 ? 'Calendar events' : null,
                       recurrenceOwnershipCount > 0 ? 'recurring import ownership' : null,
                     ].filter((label): label is string => label !== null);
@@ -453,6 +456,10 @@ export function SettingsRoute() {
                             <span className={`${styles.badge} ${styles.usageBadge}`}>
                               {assessmentEvidenceCount} evidence record
                               {assessmentEvidenceCount === 1 ? '' : 's'}
+                            </span>
+                            <span className={`${styles.badge} ${styles.usageBadge}`}>
+                              {teachingReflectionCount} Teaching Reflection
+                              {teachingReflectionCount === 1 ? '' : 's'}
                             </span>
                             <span className={`${styles.badge} ${styles.usageBadge}`}>
                               {calendarEventCount} Calendar event

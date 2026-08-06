@@ -141,6 +141,7 @@ const records = {
       endMinute: 600,
       deliveryState: 'completed',
       completedAt: timestamp,
+      reflectionId: 'insights-reflection-reading',
     },
     {
       id: 'insights-session-vocabulary',
@@ -151,6 +152,7 @@ const records = {
       endMinute: 630,
       deliveryState: 'completed',
       completedAt: timestamp,
+      reflectionId: 'insights-reflection-vocabulary',
     },
     {
       id: 'insights-session-past-scheduled',
@@ -178,6 +180,93 @@ const records = {
       startMinute: 540,
       endMinute: 600,
       deliveryState: 'cancelled',
+    },
+  ],
+  teachingReflections: [
+    {
+      id: 'insights-reflection-reading',
+      sessionOccurrenceId: 'insights-session-reading',
+      schoolYearId: 'insights-current-year',
+      contextId: 'insights-class',
+      lessonPlanId: 'insights-plan-reading',
+      occurredOn: '2026-08-03',
+      whatWorked: 'Students used context clues independently.',
+      whatToAdjust: 'Shorten partner practice before the reading check.',
+      sourceSnapshots: {
+        context: { kind: 'class', name: 'Grade 4 Reading' },
+        lessonPlan: { title: 'Reading Workshop' },
+        sessionOccurrence: { date: '2026-08-03', startMinute: 540, endMinute: 600 },
+      },
+      status: 'active',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+    {
+      id: 'insights-reflection-vocabulary',
+      sessionOccurrenceId: 'insights-session-vocabulary',
+      schoolYearId: 'insights-current-year',
+      contextId: 'insights-group',
+      lessonPlanId: 'insights-plan-vocabulary',
+      occurredOn: '2026-08-04',
+      additionalNotes: 'Archived historical teaching note.',
+      sourceSnapshots: {
+        context: { kind: 'group', name: 'Vocabulary Group' },
+        lessonPlan: { title: 'Vocabulary Practice' },
+        sessionOccurrence: { date: '2026-08-04', startMinute: 600, endMinute: 630 },
+      },
+      status: 'archived',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      archivedAt: timestamp,
+    },
+  ],
+  tasks: [
+    {
+      id: 'insights-next-step-active',
+      title: 'Prepare a shorter partner routine',
+      status: 'active',
+      contextId: 'insights-class',
+      linkedEntityType: 'teaching-reflection',
+      linkedEntityId: 'insights-reflection-reading',
+      order: 0,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+    {
+      id: 'insights-next-step-waiting',
+      title: 'Request a new reading passage',
+      status: 'waiting',
+      contextId: 'insights-class',
+      linkedEntityType: 'teaching-reflection',
+      linkedEntityId: 'insights-reflection-reading',
+      order: 1,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      waitingAt: timestamp,
+    },
+    {
+      id: 'insights-next-step-completed',
+      title: 'Print vocabulary cards',
+      status: 'completed',
+      contextId: 'insights-group',
+      linkedEntityType: 'teaching-reflection',
+      linkedEntityId: 'insights-reflection-vocabulary',
+      order: 2,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      completedAt: timestamp,
+    },
+    {
+      id: 'insights-next-step-cancelled',
+      title: 'Replace the archived activity',
+      status: 'cancelled',
+      contextId: 'insights-group',
+      linkedEntityType: 'teaching-reflection',
+      linkedEntityId: 'insights-reflection-vocabulary',
+      order: 3,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      cancelledAt: timestamp,
     },
   ],
   assessmentEvidence: [
@@ -310,7 +399,7 @@ async function waitForSchema(page: Page): Promise<void> {
   await page.waitForFunction(async () => {
     const databases = await indexedDB.databases();
     return databases.some(
-      (database) => database.name === 'classroom-v20' && (database.version ?? 0) >= 16,
+      (database) => database.name === 'classroom-v20' && (database.version ?? 0) >= 17,
     );
   });
 }
@@ -422,6 +511,20 @@ test('Teaching Insights reports source-linked first-release metrics without unsu
   });
   await expect(metricCard(classification, 'Focus tags')).toContainText('1 assignments');
 
+  const reflection = page.getByRole('region', { name: 'Reflection and Next Steps', exact: true });
+  await expect(reflection.getByText('50%', { exact: true })).toBeVisible();
+  await expect(definition(reflection, 'Active Reflections')).toContainText('1');
+  await expect(definition(reflection, 'Archived Reflections')).toContainText('1');
+  await expect(definition(reflection, 'Reflected completed Sessions')).toContainText('1');
+  await expect(definition(reflection, 'Completed without active Reflection')).toContainText('1');
+  await expect(definition(reflection, 'Open Next Steps')).toContainText('2');
+  await expect(definition(reflection, 'Closed Next Steps')).toContainText('2');
+  await expect(metricCard(reflection, 'Active')).toContainText('1');
+  await expect(metricCard(reflection, 'Waiting')).toContainText('1');
+  await expect(metricCard(reflection, 'Completed')).toContainText('1');
+  await expect(metricCard(reflection, 'Cancelled')).toContainText('1');
+  await expect(reflection).toContainText('does not infer teaching quality');
+
   const review = page.getByRole('region', { name: 'Needs review', exact: true });
   await expect(metricCard(review, 'Affected records')).toContainText('1');
   await expect(metricCard(review, 'Review issues')).toContainText('1');
@@ -442,6 +545,13 @@ test('Teaching Insights reports source-linked first-release metrics without unsu
   await expect(planLink).toHaveAttribute(
     'href',
     '#/planning/edit?plan=insights-plan-reading&return=learners',
+  );
+
+  await reflection.getByText('Reflection sources (2)', { exact: true }).click();
+  const reflectionLink = reflection.getByRole('link', { name: 'Reading Workshop' });
+  await expect(reflectionLink).toHaveAttribute(
+    'href',
+    '#/planning/session/reflection?session=insights-session-reading',
   );
 
   await sessionLink.click();

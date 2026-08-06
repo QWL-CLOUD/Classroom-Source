@@ -13,6 +13,8 @@ import type {
   Standard,
   StandardAlignment,
   StudentRecord,
+  Task,
+  TeachingReflectionRecord,
 } from '@/domain/models/entities';
 import { shiftDays } from '@/shared/dates/localDate';
 
@@ -41,6 +43,8 @@ export interface TeachingInsightsSnapshot {
   standardAlignments: readonly StandardAlignment[];
   categoryValues: readonly CategoryValue[];
   categoryAssignments: readonly CategoryAssignment[];
+  teachingReflections: readonly TeachingReflectionRecord[];
+  tasks: readonly Task[];
 }
 
 export interface TeachingInsightsSessionRow {
@@ -109,6 +113,24 @@ export interface TeachingInsightsStandardPlacement {
   source: TeachingInsightsSourceTrace;
 }
 
+export type TeachingInsightsReflectionSessionState =
+  'completed' | 'reopened' | 'cancelled' | 'unavailable';
+
+export interface TeachingInsightsReflectionRow {
+  id: string;
+  sessionOccurrenceId: string;
+  lessonPlanId: string;
+  lessonPlanTitle: string;
+  contextId: string;
+  contextName: string;
+  occurredOn: string;
+  status: TeachingReflectionRecord['status'];
+  sessionState: TeachingInsightsReflectionSessionState;
+  openNextStepCount: number;
+  closedNextStepCount: number;
+  source: TeachingInsightsSourceTrace;
+}
+
 export interface TeachingInsightsCategoryFamilySummary {
   familyId: TeachingInsightsPlanCategoryFamily;
   assignmentCount: number;
@@ -117,7 +139,7 @@ export interface TeachingInsightsCategoryFamilySummary {
 }
 
 export interface TeachingInsightsView {
-  contractVersion: 1;
+  contractVersion: 2;
   schoolYear: {
     id: string;
     label: string;
@@ -182,6 +204,20 @@ export interface TeachingInsightsView {
   classificationUsage: {
     families: TeachingInsightsCategoryFamilySummary[];
   };
+  reflectionAndNextSteps: {
+    activeReflectionCount: number;
+    archivedReflectionCount: number;
+    reflectedCompletedSessionCount: number;
+    completedSessionWithoutActiveReflectionCount: number;
+    reflectionCoverage: TeachingInsightsRatio;
+    activeNextStepCount: number;
+    waitingNextStepCount: number;
+    completedNextStepCount: number;
+    cancelledNextStepCount: number;
+    openNextStepCount: number;
+    closedNextStepCount: number;
+    reflections: TeachingInsightsReflectionRow[];
+  };
   needsReview: {
     affectedRecordCount: number;
     issueCount: number;
@@ -201,6 +237,7 @@ function sourceHref(
   if (entityType === 'student') return `#/learners?student=${encodeURIComponent(id)}`;
   if (entityType === 'standard') return '#/standards';
   if (entityType === 'library-item') return '#/library';
+  if (entityType === 'task') return '#/tasks';
   return undefined;
 }
 
@@ -209,12 +246,13 @@ function source(
   entityId: string,
   label: string,
   archived = false,
+  href?: string,
 ): TeachingInsightsSourceTrace {
   return {
     entityType,
     entityId,
     label,
-    href: sourceHref(entityType, entityId),
+    href: href ?? sourceHref(entityType, entityId),
     archived: archived || undefined,
   };
 }
@@ -296,6 +334,12 @@ export function buildTeachingInsightsView(input: TeachingInsightsSnapshot): Teac
   const activePlanIds = new Set(activePlans.map((plan) => plan.id));
   const selectedSessions = input.sessionOccurrences.filter((session) =>
     contextsById.has(session.contextId),
+  );
+  const selectedReflections = input.teachingReflections.filter(
+    (reflection) =>
+      reflection.schoolYearId === schoolYear.id &&
+      insideSchoolYear(reflection.occurredOn, schoolYear) &&
+      reflection.occurredOn <= asOfDate,
   );
   const libraryById = new Map(input.libraryItems.map((item) => [item.id, item]));
   const standardsById = new Map(input.standards.map((standard) => [standard.id, standard]));
@@ -704,6 +748,79 @@ export function buildTeachingInsightsView(input: TeachingInsightsSnapshot): Teac
   }
   for (const catalogType of uniqueItems.values()) uniqueItemsByType[catalogType] += 1;
 
+  const sessionsById = new Map(input.sessionOccurrences.map((session) => [session.id, session]));
+  const selectedReflectionIds = new Set(selectedReflections.map((reflection) => reflection.id));
+  const linkedReflectionTasks = input.tasks.filter(
+    (task) =>
+      task.linkedEntityType === 'teaching-reflection' &&
+      task.linkedEntityId !== undefined &&
+      selectedReflectionIds.has(task.linkedEntityId),
+  );
+  const tasksByReflectionId = new Map<string, Task[]>();
+  for (const task of linkedReflectionTasks) {
+    if (!task.linkedEntityId) continue;
+    const linked = tasksByReflectionId.get(task.linkedEntityId) ?? [];
+    linked.push(task);
+    tasksByReflectionId.set(task.linkedEntityId, linked);
+  }
+
+  const activeReflections = selectedReflections.filter(
+    (reflection) => reflection.status === 'active',
+  );
+  const activeReflectionSessionIds = new Set(
+    activeReflections.map((reflection) => reflection.sessionOccurrenceId),
+  );
+  const reflectedCompletedSessionIds = new Set(
+    completedSessionRows
+      .filter((session) => activeReflectionSessionIds.has(session.id))
+      .map((session) => session.id),
+  );
+
+  const reflectionRows: TeachingInsightsReflectionRow[] = selectedReflections.map((reflection) => {
+    const session = sessionsById.get(reflection.sessionOccurrenceId);
+    const linkedTasks = tasksByReflectionId.get(reflection.id) ?? [];
+    const openNextStepCount = linkedTasks.filter(
+      (task) => task.status === 'active' || task.status === 'waiting',
+    ).length;
+    const closedNextStepCount = linkedTasks.length - openNextStepCount;
+    const sessionState: TeachingInsightsReflectionSessionState = !session
+      ? 'unavailable'
+      : session.deliveryState === 'completed'
+        ? 'completed'
+        : session.deliveryState === 'scheduled'
+          ? 'reopened'
+          : 'cancelled';
+    return {
+      id: reflection.id,
+      sessionOccurrenceId: reflection.sessionOccurrenceId,
+      lessonPlanId: reflection.lessonPlanId,
+      lessonPlanTitle: reflection.sourceSnapshots.lessonPlan.title,
+      contextId: reflection.contextId,
+      contextName: reflection.sourceSnapshots.context.name,
+      occurredOn: reflection.occurredOn,
+      status: reflection.status,
+      sessionState,
+      openNextStepCount,
+      closedNextStepCount,
+      source: source(
+        'teaching-reflection',
+        reflection.id,
+        reflection.sourceSnapshots.lessonPlan.title,
+        reflection.status === 'archived',
+        `#/planning/session/reflection?session=${encodeURIComponent(reflection.sessionOccurrenceId)}`,
+      ),
+    };
+  });
+  reflectionRows.sort(
+    (first, second) =>
+      second.occurredOn.localeCompare(first.occurredOn) ||
+      first.lessonPlanTitle.localeCompare(second.lessonPlanTitle, 'en', { sensitivity: 'base' }) ||
+      first.id.localeCompare(second.id),
+  );
+
+  const nextStepCounts = { active: 0, waiting: 0, completed: 0, cancelled: 0 };
+  for (const task of linkedReflectionTasks) nextStepCounts[task.status] += 1;
+
   const categoryFamilyPlanIds = new Map<TeachingInsightsPlanCategoryFamily, Set<string>>();
   const categoryFamilyValueIds = new Map<TeachingInsightsPlanCategoryFamily, Set<string>>();
   const categoryFamilyAssignmentCounts = new Map<TeachingInsightsPlanCategoryFamily, number>();
@@ -757,7 +874,7 @@ export function buildTeachingInsightsView(input: TeachingInsightsSnapshot): Teac
   ).size;
 
   return {
-    contractVersion: 1,
+    contractVersion: 2,
     schoolYear: {
       id: schoolYear.id,
       label: schoolYear.label,
@@ -829,6 +946,28 @@ export function buildTeachingInsightsView(input: TeachingInsightsSnapshot): Teac
     },
     classificationUsage: {
       families: categoryFamilies,
+    },
+    reflectionAndNextSteps: {
+      activeReflectionCount: activeReflections.length,
+      archivedReflectionCount: selectedReflections.length - activeReflections.length,
+      reflectedCompletedSessionCount: reflectedCompletedSessionIds.size,
+      completedSessionWithoutActiveReflectionCount:
+        completedSessionRows.length - reflectedCompletedSessionIds.size,
+      reflectionCoverage:
+        yearStatus === 'future'
+          ? { status: 'unavailable', numerator: 0, denominator: 0, reason: 'future-school-year' }
+          : ratio(
+              reflectedCompletedSessionIds.size,
+              completedSessionRows.length,
+              'no-eligible-records',
+            ),
+      activeNextStepCount: nextStepCounts.active,
+      waitingNextStepCount: nextStepCounts.waiting,
+      completedNextStepCount: nextStepCounts.completed,
+      cancelledNextStepCount: nextStepCounts.cancelled,
+      openNextStepCount: nextStepCounts.active + nextStepCounts.waiting,
+      closedNextStepCount: nextStepCounts.completed + nextStepCounts.cancelled,
+      reflections: reflectionRows,
     },
     needsReview: {
       affectedRecordCount,

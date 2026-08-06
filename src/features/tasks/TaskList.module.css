@@ -223,6 +223,44 @@
   align-items: center;
 }
 
+.sourceReference {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  color: var(--text-secondary);
+  background: var(--surface-soft);
+}
+
+.sourceReference > svg {
+  margin-top: 2px;
+  color: var(--accent-strong);
+}
+
+.sourceReference > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.sourceReference strong {
+  color: var(--heading);
+  font-size: 13px;
+}
+
+.sourceReference span {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.sourceReference[data-state='unavailable'] {
+  border-style: dashed;
+}
+
 .notes {
   margin: 0;
   color: var(--text-secondary);

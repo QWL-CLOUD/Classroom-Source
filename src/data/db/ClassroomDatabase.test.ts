@@ -12,7 +12,7 @@ afterEach(async () => {
 });
 
 describe('ClassroomDatabase schema upgrades', () => {
-  it('upgrades legacy data to schema v16 and adds Student, roster, Assessment Evidence, and Import Center stores without losing Tasks', async () => {
+  it('upgrades legacy data to schema v17 and adds Teaching Reflections without losing existing records', async () => {
     const name = `classroom-v20-upgrade-${crypto.randomUUID()}`;
     names.push(name);
     const legacy = new Dexie(name);
@@ -33,7 +33,7 @@ describe('ClassroomDatabase schema upgrades', () => {
     const upgraded = new ClassroomDatabase(name);
     await upgraded.open();
 
-    expect(upgraded.verno).toBe(16);
+    expect(upgraded.verno).toBe(17);
     expect(await upgraded.tasks.get('legacy-task')).toBeDefined();
     await upgraded.learnerContexts.put({
       id: 'class-1',
@@ -71,6 +71,7 @@ describe('ClassroomDatabase schema upgrades', () => {
       updatedAt: '2026-07-28T12:00:00.000Z',
     });
     expect(await upgraded.assessmentEvidence.count()).toBe(1);
+    expect(await upgraded.teachingReflections.count()).toBe(0);
     await upgraded.reminders.put({
       id: 'reminder-1',
       sourceType: 'task',
@@ -342,6 +343,72 @@ describe('ClassroomDatabase schema upgrades', () => {
     expect(await upgraded.backupSnapshots.count()).toBe(1);
     expect(await upgraded.restoreRuns.count()).toBe(1);
     expect(await upgraded.restoreQuarantineRecords.count()).toBe(1);
+
+    upgraded.close();
+  });
+
+  it('upgrades a v16 database with an empty Reflection table and enforces one Reflection per Session', async () => {
+    const name = `classroom-v20-v16-reflection-upgrade-${crypto.randomUUID()}`;
+    names.push(name);
+    const legacy = new Dexie(name);
+    legacy.version(16).stores({
+      schoolYears: 'id, active, startsOn, endsOn',
+      learnerContexts: 'id, kind, schoolYearId, status, name, linkedStudentId',
+      lessonPlans: 'id, contextId, workflowState, seriesId, preferredScheduleBlockId, updatedAt',
+      sessionOccurrences: 'id, date, lessonPlanId, contextId, scheduleBlockId, deliveryState',
+      tasks: 'id, status, scheduledDate, dueDate, contextId, order, updatedAt',
+    });
+    await legacy.open();
+    await legacy.table('tasks').put({
+      id: 'legacy-task-v16',
+      title: 'Retained task',
+      status: 'active',
+      order: 0,
+      createdAt: '2026-08-06T01:00:00.000Z',
+      updatedAt: '2026-08-06T01:00:00.000Z',
+    });
+    legacy.close();
+
+    const upgraded = new ClassroomDatabase(name);
+    await upgraded.open();
+
+    expect(upgraded.verno).toBe(17);
+    expect(await upgraded.tasks.get('legacy-task-v16')).toBeDefined();
+    expect(await upgraded.teachingReflections.count()).toBe(0);
+
+    const reflection = {
+      id: 'reflection-1',
+      sessionOccurrenceId: 'session-1',
+      schoolYearId: 'year-1',
+      contextId: 'class-1',
+      lessonPlanId: 'lesson-1',
+      occurredOn: '2026-08-05',
+      whatWorked: 'Students explained the strategy clearly.',
+      sourceSnapshots: {
+        context: { kind: 'class' as const, name: 'Grade 3' },
+        lessonPlan: { title: 'Equivalent fractions' },
+        sessionOccurrence: {
+          date: '2026-08-05',
+          startMinute: 600,
+          endMinute: 645,
+        },
+      },
+      status: 'active' as const,
+      createdAt: '2026-08-05T16:00:00.000Z',
+      updatedAt: '2026-08-05T16:00:00.000Z',
+    };
+
+    await upgraded.teachingReflections.put(reflection);
+    expect(await upgraded.teachingReflections.get('reflection-1')).toMatchObject({
+      sessionOccurrenceId: 'session-1',
+      status: 'active',
+    });
+    await expect(
+      upgraded.teachingReflections.put({
+        ...reflection,
+        id: 'reflection-duplicate',
+      }),
+    ).rejects.toThrow();
 
     upgraded.close();
   });

@@ -13,6 +13,8 @@ import type {
   Standard,
   StandardAlignment,
   StudentRecord,
+  Task,
+  TeachingReflectionRecord,
 } from '@/domain/models/entities';
 
 import {
@@ -181,6 +183,49 @@ function categoryAssignment(
   };
 }
 
+function reflection(
+  values: Partial<TeachingReflectionRecord> &
+    Pick<
+      TeachingReflectionRecord,
+      'id' | 'sessionOccurrenceId' | 'contextId' | 'lessonPlanId' | 'occurredOn'
+    > & { contextName?: string; planTitle?: string },
+): TeachingReflectionRecord {
+  return {
+    schoolYearId: schoolYear.id,
+    whatWorked: 'Students compared strategies.',
+    sourceSnapshots: {
+      context: { kind: 'class', name: values.contextName ?? 'Class One' },
+      lessonPlan: { title: values.planTitle ?? 'Reading' },
+      sessionOccurrence: {
+        date: values.occurredOn,
+        startMinute: 540,
+        endMinute: 600,
+      },
+    },
+    status: 'active',
+    createdAt: now,
+    updatedAt: now,
+    ...values,
+    id: values.id,
+    sessionOccurrenceId: values.sessionOccurrenceId,
+    contextId: values.contextId,
+    lessonPlanId: values.lessonPlanId,
+    occurredOn: values.occurredOn,
+  };
+}
+
+function task(values: Partial<Task> & Pick<Task, 'id' | 'title' | 'status'>): Task {
+  return {
+    order: 0,
+    createdAt: now,
+    updatedAt: now,
+    ...values,
+    id: values.id,
+    title: values.title,
+    status: values.status,
+  };
+}
+
 function snapshot(values: Partial<TeachingInsightsSnapshot> = {}): TeachingInsightsSnapshot {
   return {
     schoolYear,
@@ -196,6 +241,8 @@ function snapshot(values: Partial<TeachingInsightsSnapshot> = {}): TeachingInsig
     standardAlignments: [],
     categoryValues: [],
     categoryAssignments: [],
+    teachingReflections: [],
+    tasks: [],
     ...values,
   };
 }
@@ -586,5 +633,166 @@ describe('Teaching Insights read model', () => {
       'evidence-outside-school-year',
       'session-outside-school-year',
     ]);
+  });
+
+  it('derives active Reflection coverage without treating archived or reopened sources as completed coverage', () => {
+    const classroom = context({ id: 'class-1', kind: 'class', name: 'Class One' });
+    const lesson = plan({ id: 'plan-1', contextId: classroom.id, title: 'Reading' });
+    const completedWithReflection = session({
+      id: 'session-reflected',
+      lessonPlanId: lesson.id,
+      contextId: classroom.id,
+      date: '2026-08-03',
+      deliveryState: 'completed',
+      completedAt: now,
+      reflectionId: 'reflection-active',
+    });
+    const completedWithArchivedReflection = session({
+      id: 'session-archived',
+      lessonPlanId: lesson.id,
+      contextId: classroom.id,
+      date: '2026-08-04',
+      deliveryState: 'completed',
+      completedAt: now,
+      reflectionId: 'reflection-archived',
+    });
+    const reopened = session({
+      id: 'session-reopened',
+      lessonPlanId: lesson.id,
+      contextId: classroom.id,
+      date: '2026-08-02',
+      deliveryState: 'scheduled',
+      reflectionId: 'reflection-reopened',
+    });
+
+    const view = buildTeachingInsightsView(
+      snapshot({
+        learnerContexts: [classroom],
+        lessonPlans: [lesson],
+        sessionOccurrences: [completedWithReflection, completedWithArchivedReflection, reopened],
+        teachingReflections: [
+          reflection({
+            id: 'reflection-active',
+            sessionOccurrenceId: completedWithReflection.id,
+            contextId: classroom.id,
+            lessonPlanId: lesson.id,
+            occurredOn: completedWithReflection.date,
+          }),
+          reflection({
+            id: 'reflection-archived',
+            sessionOccurrenceId: completedWithArchivedReflection.id,
+            contextId: classroom.id,
+            lessonPlanId: lesson.id,
+            occurredOn: completedWithArchivedReflection.date,
+            status: 'archived',
+            archivedAt: now,
+          }),
+          reflection({
+            id: 'reflection-reopened',
+            sessionOccurrenceId: reopened.id,
+            contextId: classroom.id,
+            lessonPlanId: lesson.id,
+            occurredOn: reopened.date,
+          }),
+        ],
+      }),
+    );
+
+    expect(view.reflectionAndNextSteps).toMatchObject({
+      activeReflectionCount: 2,
+      archivedReflectionCount: 1,
+      reflectedCompletedSessionCount: 1,
+      completedSessionWithoutActiveReflectionCount: 1,
+      reflectionCoverage: {
+        status: 'available',
+        numerator: 1,
+        denominator: 2,
+        value: 0.5,
+      },
+    });
+    expect(
+      view.reflectionAndNextSteps.reflections.find((row) => row.id === 'reflection-reopened'),
+    ).toMatchObject({ sessionState: 'reopened' });
+  });
+
+  it('counts only Tasks explicitly linked to retained Reflections in the selected School Year', () => {
+    const classroom = context({ id: 'class-1', kind: 'class', name: 'Class One' });
+    const lesson = plan({ id: 'plan-1', contextId: classroom.id, title: 'Reading' });
+    const completed = session({
+      id: 'session-1',
+      lessonPlanId: lesson.id,
+      contextId: classroom.id,
+      date: '2026-08-03',
+      deliveryState: 'completed',
+      completedAt: now,
+      reflectionId: 'reflection-1',
+    });
+    const retainedReflection = reflection({
+      id: 'reflection-1',
+      sessionOccurrenceId: completed.id,
+      contextId: classroom.id,
+      lessonPlanId: lesson.id,
+      occurredOn: completed.date,
+    });
+
+    const view = buildTeachingInsightsView(
+      snapshot({
+        learnerContexts: [classroom],
+        lessonPlans: [lesson],
+        sessionOccurrences: [completed],
+        teachingReflections: [retainedReflection],
+        tasks: [
+          task({
+            id: 'task-active',
+            title: 'Prepare visuals',
+            status: 'active',
+            linkedEntityType: 'teaching-reflection',
+            linkedEntityId: retainedReflection.id,
+          }),
+          task({
+            id: 'task-waiting',
+            title: 'Ask specialist',
+            status: 'waiting',
+            linkedEntityType: 'teaching-reflection',
+            linkedEntityId: retainedReflection.id,
+            waitingAt: now,
+          }),
+          task({
+            id: 'task-completed',
+            title: 'Print cards',
+            status: 'completed',
+            linkedEntityType: 'teaching-reflection',
+            linkedEntityId: retainedReflection.id,
+            completedAt: now,
+          }),
+          task({
+            id: 'task-unrelated',
+            title: 'Unrelated',
+            status: 'cancelled',
+            linkedEntityType: 'teaching-reflection',
+            linkedEntityId: 'other-reflection',
+            cancelledAt: now,
+          }),
+        ],
+      }),
+    );
+
+    expect(view.reflectionAndNextSteps).toMatchObject({
+      activeNextStepCount: 1,
+      waitingNextStepCount: 1,
+      completedNextStepCount: 1,
+      cancelledNextStepCount: 0,
+      openNextStepCount: 2,
+      closedNextStepCount: 1,
+    });
+    expect(view.reflectionAndNextSteps.reflections[0]).toMatchObject({
+      openNextStepCount: 2,
+      closedNextStepCount: 1,
+      source: {
+        entityType: 'teaching-reflection',
+        entityId: retainedReflection.id,
+        href: '#/planning/session/reflection?session=session-1',
+      },
+    });
   });
 });

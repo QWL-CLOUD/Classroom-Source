@@ -742,6 +742,84 @@ export const sessionOccurrenceSchema = z
     path: ['endMinute'],
   });
 
+export const teachingReflectionStatusSchema = z.enum(['active', 'archived']);
+
+export const teachingReflectionContextSnapshotSchema = z.object({
+  kind: z.enum(['class', 'group', 'individual']),
+  name: z.string().trim().min(1).max(240),
+});
+
+export const teachingReflectionLessonPlanSnapshotSchema = z.object({
+  title: z.string().trim().min(1).max(240),
+});
+
+export const teachingReflectionSessionSnapshotSchema = z
+  .object({
+    date: localDateSchema,
+    startMinute: minuteSchema,
+    endMinute: minuteSchema,
+  })
+  .refine((value) => value.endMinute > value.startMinute, {
+    message: 'The reflection Session snapshot end time must be after its start time.',
+    path: ['endMinute'],
+  });
+
+export const teachingReflectionSourceSnapshotsSchema = z.object({
+  context: teachingReflectionContextSnapshotSchema,
+  lessonPlan: teachingReflectionLessonPlanSnapshotSchema,
+  sessionOccurrence: teachingReflectionSessionSnapshotSchema,
+});
+
+const teachingReflectionNarrativeSchema = z.string().trim().min(1).max(10_000).optional();
+
+export const teachingReflectionRecordSchema = z
+  .object({
+    id: idSchema,
+    sessionOccurrenceId: idSchema,
+    schoolYearId: idSchema,
+    contextId: idSchema,
+    lessonPlanId: idSchema,
+    occurredOn: localDateSchema,
+    whatWorked: teachingReflectionNarrativeSchema,
+    whatToAdjust: teachingReflectionNarrativeSchema,
+    additionalNotes: teachingReflectionNarrativeSchema,
+    sourceSnapshots: teachingReflectionSourceSnapshotsSchema,
+    status: teachingReflectionStatusSchema.default('active'),
+    createdAt: timestampSchema,
+    updatedAt: timestampSchema,
+    archivedAt: timestampSchema.optional(),
+  })
+  .superRefine((value, context) => {
+    if (!value.whatWorked && !value.whatToAdjust && !value.additionalNotes) {
+      context.addIssue({
+        code: 'custom',
+        message: 'A teaching reflection requires at least one narrative field.',
+        path: ['whatWorked'],
+      });
+    }
+    if (value.occurredOn !== value.sourceSnapshots.sessionOccurrence.date) {
+      context.addIssue({
+        code: 'custom',
+        message: 'The reflection date must match its Session snapshot date.',
+        path: ['occurredOn'],
+      });
+    }
+    if (value.status === 'active' && value.archivedAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An active teaching reflection cannot contain archivedAt.',
+        path: ['archivedAt'],
+      });
+    }
+    if (value.status === 'archived' && !value.archivedAt) {
+      context.addIssue({
+        code: 'custom',
+        message: 'An archived teaching reflection requires archivedAt.',
+        path: ['archivedAt'],
+      });
+    }
+  });
+
 export const assessmentEvidenceKindSchema = z.enum(['score', 'proficiency', 'observation']);
 
 export const assessmentEvidenceStatusSchema = z.enum(['active', 'archived']);
@@ -1359,6 +1437,12 @@ export const appSettingSchema = z.object({
   valueJson: z.string(),
   updatedAt: timestampSchema,
 });
+
+export type TeachingReflectionStatus = z.infer<typeof teachingReflectionStatusSchema>;
+export type TeachingReflectionSourceSnapshots = z.infer<
+  typeof teachingReflectionSourceSnapshotsSchema
+>;
+export type TeachingReflectionRecord = z.infer<typeof teachingReflectionRecordSchema>;
 
 export type AssessmentEvidenceKind = z.infer<typeof assessmentEvidenceKindSchema>;
 export type AssessmentEvidenceStatus = z.infer<typeof assessmentEvidenceStatusSchema>;

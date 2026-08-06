@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Copy,
   FastForward,
+  NotebookPen,
   RefreshCcw,
   RotateCcw,
   Save,
@@ -22,11 +23,13 @@ import {
   lessonPlanSchema,
   scheduleBlockSchema,
   sessionOccurrenceSchema,
+  teachingReflectionRecordSchema,
   type LearnerContext,
   type LibraryCatalogItem,
   type LessonPlan,
   type ScheduleBlock,
   type SessionOccurrence,
+  type TeachingReflectionRecord,
 } from '@/domain/models/entities';
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
 import { minuteToTime } from '@/features/editing/calendarEventEditorModel';
@@ -50,6 +53,7 @@ import {
   type PlanningMutationService,
 } from '@/features/planning/planningMutationService';
 import type { SeriesBumpPreview } from '@/features/planning/seriesBumpPlanner';
+import { buildTeachingReflectionHref } from '@/features/teachingReflections/teachingReflectionEditorModel';
 import { resolveScheduleOccurrence } from '@/features/scheduleExceptions/scheduleOccurrenceResolver';
 import { useScheduleExceptionsForRange } from '@/features/scheduleExceptions/useScheduleExceptionsForRange';
 import { formatLongDate, parseLocalDate, todayLocalDate } from '@/shared/dates/localDate';
@@ -63,6 +67,7 @@ interface SessionEditorSnapshot {
   session: SessionOccurrence | null;
   scheduleBlocks: ScheduleBlock[];
   libraryItems: LibraryCatalogItem[];
+  reflection: TeachingReflectionRecord | null;
 }
 
 function getErrorMessage(cause: unknown): string {
@@ -83,7 +88,7 @@ function SessionEditorForm({
   returnTo: PlanningReturnTarget;
   service?: PlanningMutationService;
 }) {
-  const { context, plan, session, scheduleBlocks, libraryItems } = snapshot;
+  const { context, plan, session, scheduleBlocks, libraryItems, reflection } = snapshot;
   const defaultBlockId = session?.scheduleBlockId ?? plan?.preferredScheduleBlockId ?? '';
   const defaultBlock = scheduleBlocks.find((block) => block.id === defaultBlockId);
   const [values, setValues] = useState<SessionEditorValues>(() => {
@@ -601,6 +606,45 @@ function SessionEditorForm({
       </section>
 
       {session ? (
+        <section className={styles.reflectionSection} aria-labelledby="session-reflection-heading">
+          <div className={styles.reflectionHeader}>
+            <div>
+              <p className="page-eyebrow">Reflect</p>
+              <h2 id="session-reflection-heading">Teaching Reflection</h2>
+              <p>
+                Record what worked, what should change, and any teaching notes without turning them
+                into learner scores or teaching-quality judgments.
+              </p>
+            </div>
+            {reflection || session.deliveryState === 'completed' ? (
+              <a className="button" href={buildTeachingReflectionHref(session.id, returnTo)}>
+                <NotebookPen aria-hidden="true" size={17} />
+                {reflection ? 'View reflection' : 'Add reflection'}
+              </a>
+            ) : null}
+          </div>
+
+          {reflection ? (
+            <p className={styles.reflectionStatus} role="status">
+              <strong>{reflection.status === 'archived' ? 'Archived' : 'Retained'}</strong>
+              <span>Reflection saved for this Session.</span>
+              {session.deliveryState !== 'completed' ? (
+                <span>The Session is currently reopened; the Reflection remains retained.</span>
+              ) : null}
+            </p>
+          ) : session.deliveryState === 'completed' ? (
+            <p className={styles.reflectionAvailable}>
+              This completed Session is ready for an optional Teaching Reflection.
+            </p>
+          ) : (
+            <p className={styles.reflectionUnavailable}>
+              Teaching Reflection becomes available after the Session is marked completed.
+            </p>
+          )}
+        </section>
+      ) : null}
+
+      {session ? (
         <ReminderPanel
           sourceType="session"
           sourceId={session.id}
@@ -704,8 +748,17 @@ export function SessionEditorRoute() {
     const libraryItems = (await classroomDb.libraryItems.toArray()).map((value) =>
       libraryCatalogItemSchema.parse(value),
     );
+    const reflectionValue = session
+      ? await classroomDb.teachingReflections
+          .where('sessionOccurrenceId')
+          .equals(session.id)
+          .first()
+      : undefined;
+    const reflection = reflectionValue
+      ? teachingReflectionRecordSchema.parse(reflectionValue)
+      : null;
 
-    return { context, plan, session, scheduleBlocks, libraryItems };
+    return { context, plan, session, scheduleBlocks, libraryItems, reflection };
   }, [planId, sessionId]);
 
   if (snapshot === undefined) {

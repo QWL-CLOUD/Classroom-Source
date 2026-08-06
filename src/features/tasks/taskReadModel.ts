@@ -1,4 +1,48 @@
-import { taskSchema, type Task, type TaskStatus } from '@/domain/models/entities';
+import {
+  taskSchema,
+  teachingReflectionRecordSchema,
+  type Task,
+  type TaskStatus,
+  type TeachingReflectionRecord,
+} from '@/domain/models/entities';
+import { TEACHING_REFLECTION_TASK_LINK_TYPE } from '@/features/teachingReflections/teachingReflectionTaskContract';
+
+export interface TeachingReflectionTaskSourcePresentation {
+  state: 'available' | 'unavailable';
+  label: 'Reflection Next Step';
+  detail: string;
+  reflection?: TeachingReflectionRecord;
+}
+
+export function buildTeachingReflectionTaskSourcePresentation(
+  taskValue: unknown,
+  reflectionValues: readonly unknown[],
+): TeachingReflectionTaskSourcePresentation | undefined {
+  const task = taskSchema.parse(taskValue);
+  if (task.linkedEntityType !== TEACHING_REFLECTION_TASK_LINK_TYPE || !task.linkedEntityId) {
+    return undefined;
+  }
+
+  const reflection = reflectionValues
+    .map((value) => teachingReflectionRecordSchema.parse(value))
+    .find((value) => value.id === task.linkedEntityId);
+  if (!reflection) {
+    return {
+      state: 'unavailable',
+      label: 'Reflection Next Step',
+      detail: 'From Teaching Reflection: unavailable source',
+    };
+  }
+
+  return {
+    state: 'available',
+    label: 'Reflection Next Step',
+    detail: `From Teaching Reflection: ${reflection.sourceSnapshots.lessonPlan.title}${
+      reflection.status === 'archived' ? ' · archived reflection' : ''
+    }`,
+    reflection,
+  };
+}
 
 export interface TaskSection {
   status: TaskStatus;

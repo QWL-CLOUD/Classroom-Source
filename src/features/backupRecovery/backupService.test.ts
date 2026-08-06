@@ -47,6 +47,30 @@ function task(id: string, title: string) {
   };
 }
 
+function reflection(id: string, sessionOccurrenceId = 'session-1') {
+  return {
+    id,
+    sessionOccurrenceId,
+    schoolYearId: 'year-1',
+    contextId: 'class-1',
+    lessonPlanId: 'lesson-1',
+    occurredOn: '2026-08-05',
+    whatWorked: 'Students explained the strategy clearly.',
+    sourceSnapshots: {
+      context: { kind: 'class' as const, name: 'Grade 3' },
+      lessonPlan: { title: 'Equivalent fractions' },
+      sessionOccurrence: {
+        date: '2026-08-05',
+        startMinute: 600,
+        endMinute: 645,
+      },
+    },
+    status: 'active' as const,
+    createdAt: firstTime,
+    updatedAt: firstTime,
+  };
+}
+
 beforeEach(async () => {
   const name = `backup-recovery-${crypto.randomUUID()}`;
   names.push(name);
@@ -75,6 +99,7 @@ describe('BackupRecoveryService', () => {
       createdAt: firstTime,
       updatedAt: firstTime,
     });
+    await database.teachingReflections.put(reflection('current-reflection'));
     await database.libraryItems.put({
       id: 'current-activity',
       catalogType: 'activity',
@@ -209,6 +234,7 @@ describe('BackupRecoveryService', () => {
 
     expect(envelope.tables.tasks).toEqual([task('current-task', 'Current task')]);
     expect(envelope.tables.assessmentEvidence).toHaveLength(1);
+    expect(envelope.tables.teachingReflections).toEqual([reflection('current-reflection')]);
     expect(envelope.tables.importRuns).toEqual([
       expect.objectContaining({
         id: 'calendar-import-run',
@@ -258,6 +284,7 @@ describe('BackupRecoveryService', () => {
       createdAt: firstTime,
       updatedAt: firstTime,
     });
+    incoming.teachingReflections.push(reflection('restored-reflection', 'restored-session'));
     incoming.importRuns.push({
       id: 'restored-import-run',
       importType: 'resources',
@@ -364,6 +391,9 @@ describe('BackupRecoveryService', () => {
 
     expect(await database.tasks.toArray()).toEqual([task('new-task', 'After restore')]);
     expect(await database.assessmentEvidence.get('restored-evidence')).toBeDefined();
+    expect(await database.teachingReflections.get('restored-reflection')).toEqual(
+      reflection('restored-reflection', 'restored-session'),
+    );
     expect(await database.importRuns.get('restored-import-run')).toBeDefined();
     expect(await database.classificationMappingPresets.get('restored-mapping')).toBeDefined();
     expect(await database.calendarEvents.get('restored-calendar-event')).toMatchObject({
@@ -381,6 +411,7 @@ describe('BackupRecoveryService', () => {
     const safetyPreview = buildRestorePreview(result.safetySnapshot.payloadJson);
     expect(safetyPreview.validTables.tasks).toEqual([task('old-task', 'Before restore')]);
     expect(safetyPreview.validTables.assessmentEvidence).toEqual([]);
+    expect(safetyPreview.validTables.teachingReflections).toEqual([]);
     expect(safetyPreview.validTables.importRuns).toEqual([]);
     expect(safetyPreview.validTables.classificationMappingPresets).toEqual([]);
   });
@@ -576,7 +607,7 @@ describe('BackupRecoveryService', () => {
     }).createBackup();
     const preview = buildRestorePreview(serializeBackupEnvelope(envelope));
 
-    expect(envelope.databaseSchemaVersion).toBe(16);
+    expect(envelope.databaseSchemaVersion).toBe(17);
     expect(preview.quarantineCount).toBe(0);
     expect(familyIds(preview.validTables.categoryValues)).toEqual(['language', 'subject']);
     expect(familyIds(preview.validTables.categoryAssignments)).toEqual(['language', 'subject']);

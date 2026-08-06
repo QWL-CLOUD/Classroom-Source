@@ -5,7 +5,7 @@ import type {
   LibraryApplicationType,
 } from '@/domain/models/entities';
 
-export const TEACHING_INSIGHTS_CONTRACT_VERSION = 1 as const;
+export const TEACHING_INSIGHTS_CONTRACT_VERSION = 2 as const;
 
 export const teachingInsightsMetricDefinitions = {
   completedSessions: {
@@ -62,6 +62,18 @@ export const teachingInsightsMetricDefinitions = {
     classification: 'derived-metric',
     sourceOfTruth: ['lessonPlans', 'libraryItems', 'learnerContexts'],
   },
+  reflectionCoverage: {
+    id: 'completed-session-reflection-coverage',
+    label: 'Completed Session Reflection Coverage',
+    classification: 'derived-metric',
+    sourceOfTruth: ['teachingReflections', 'sessionOccurrences', 'schoolYears'],
+  },
+  reflectionNextSteps: {
+    id: 'reflection-linked-next-steps',
+    label: 'Reflection-linked Next Steps',
+    classification: 'derived-metric',
+    sourceOfTruth: ['tasks', 'teachingReflections', 'schoolYears'],
+  },
   needsReview: {
     id: 'needs-review',
     label: 'Needs Review',
@@ -99,7 +111,9 @@ export type TeachingInsightsSourceEntityType =
   | 'assessment-evidence'
   | 'library-item'
   | 'standard'
-  | 'category-assignment';
+  | 'category-assignment'
+  | 'teaching-reflection'
+  | 'task';
 
 export interface TeachingInsightsSourceTrace {
   entityType: TeachingInsightsSourceEntityType;

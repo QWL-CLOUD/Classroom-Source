@@ -110,7 +110,7 @@ describe('privacy-safe System Health report', () => {
 
     expect(report.appVersion).toBe(CLASSROOM_APP_VERSION);
     expect(report.database).toEqual({
-      actualSchemaVersion: 16,
+      actualSchemaVersion: 17,
       expectedSchemaVersion: CLASSROOM_DATABASE_SCHEMA_VERSION,
       ready: true,
     });

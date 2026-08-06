@@ -6,6 +6,7 @@ import {
   Clock3,
   Edit3,
   Hourglass,
+  NotebookPen,
   Plus,
   RotateCcw,
   Trash2,
@@ -18,11 +19,17 @@ import { CategoryAssignmentFields } from '@/features/categories/CategoryAssignme
 import type { CategorySelectionMap } from '@/features/categories/categoryAssignmentSelection';
 import { useCategorySelectionDraft } from '@/features/categories/useCategorySelectionDraft';
 import { ReminderPanel } from '@/features/reminders/ReminderPanel';
+import { TEACHING_REFLECTION_TASK_LINK_TYPE } from '@/features/teachingReflections/teachingReflectionTaskContract';
 import { formatShortDate } from '@/shared/dates/localDate';
 import { EditorActionMenu } from '@/shared/ui/EditorActionMenu';
 
 import { taskMutationService, type TaskEditorValues } from './taskMutationService';
-import { buildTaskWorkspaceReadModel, selectTodayTasks } from './taskReadModel';
+import {
+  buildTaskWorkspaceReadModel,
+  buildTeachingReflectionTaskSourcePresentation,
+  selectTodayTasks,
+  type TeachingReflectionTaskSourcePresentation,
+} from './taskReadModel';
 import styles from './TaskList.module.css';
 
 interface TaskListProps {
@@ -110,6 +117,8 @@ function TaskEditor({
         (context) => context.id === initialTask.contextId && context.status === 'archived',
       )
     : undefined;
+  const reflectionContextLocked =
+    initialTask?.linkedEntityType === TEACHING_REFLECTION_TASK_LINK_TYPE;
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -156,6 +165,7 @@ function TaskEditor({
             id={`${id}-context`}
             className="select"
             value={values.contextId}
+            disabled={reflectionContextLocked}
             onChange={(event) =>
               setValues((current) => ({ ...current, contextId: event.target.value }))
             }
@@ -172,6 +182,9 @@ function TaskEditor({
               </option>
             ))}
           </select>
+          {reflectionContextLocked ? (
+            <small>The source Teaching Reflection keeps this Next Step in the same context.</small>
+          ) : null}
         </label>
       </div>
 
@@ -299,11 +312,13 @@ function statusLabel(status: TaskStatus): string {
 function TaskCard({
   task,
   contexts,
+  source,
   busy,
   onRun,
 }: {
   task: Task;
   contexts: LearnerContext[];
+  source?: TeachingReflectionTaskSourcePresentation;
   busy: boolean;
   onRun: (action: () => Promise<unknown>) => Promise<void>;
 }) {
@@ -373,6 +388,16 @@ function TaskCard({
               </span>
             ) : null}
           </div>
+
+          {source ? (
+            <div className={styles.sourceReference} data-state={source.state}>
+              <NotebookPen size={16} aria-hidden="true" />
+              <div>
+                <strong>{source.label}</strong>
+                <span>{source.detail}</span>
+              </div>
+            </div>
+          ) : null}
 
           {task.notes ? <p className={styles.notes}>{task.notes}</p> : null}
 
@@ -606,11 +631,16 @@ export function TaskList({ selectedDate, compact = false, defaultScheduledDate }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const data = useLiveQuery(async () => {
-    const [tasks, contexts] = await Promise.all([
+    const [tasks, contexts, teachingReflections] = await Promise.all([
       classroomDb.tasks.toArray(),
       classroomDb.learnerContexts.toArray(),
+      classroomDb.teachingReflections.toArray(),
     ]);
-    return { model: buildTaskWorkspaceReadModel(tasks), contexts };
+    return {
+      model: buildTaskWorkspaceReadModel(tasks),
+      contexts,
+      teachingReflections,
+    };
   }, []);
 
   const contexts = useMemo(
@@ -722,6 +752,10 @@ export function TaskList({ selectedDate, compact = false, defaultScheduledDate }
                       key={task.id}
                       task={task}
                       contexts={contexts}
+                      source={buildTeachingReflectionTaskSourcePresentation(
+                        task,
+                        data.teachingReflections,
+                      )}
                       busy={busy}
                       onRun={run}
                     />

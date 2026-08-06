@@ -29,6 +29,13 @@ const evidenceKindLabels = {
   observation: 'Observation',
 } as const;
 
+const reflectionSessionStateLabels = {
+  completed: 'Completed',
+  reopened: 'Reopened',
+  cancelled: 'Cancelled',
+  unavailable: 'Source unavailable',
+} as const;
+
 const categoryFamilyLabels = {
   'focus-tag': 'Focus tags',
   'purpose-tag': 'Purpose tags',
@@ -121,6 +128,7 @@ export function TeachingInsightsDashboard({
   const evidence = view.assessmentEvidence;
   const standards = view.standardsUsage;
   const content = view.contentUsage;
+  const reflection = view.reflectionAndNextSteps;
   const review = view.needsReview;
 
   function handleSchoolYearChange(event: ChangeEvent<HTMLSelectElement>): void {
@@ -540,6 +548,121 @@ export function TeachingInsightsDashboard({
           </details>
         </section>
       </div>
+
+      <section className={`card ${styles.section}`} aria-labelledby="reflection-next-steps-heading">
+        <SectionHeader
+          eyebrow="Teaching Reflection"
+          title="Reflection and Next Steps"
+          description="Coverage reports retained active Reflections for completed Sessions. Reflection text remains teacher interpretation and is not analyzed or scored."
+          headingId="reflection-next-steps-heading"
+        />
+        <div className={styles.ratioPanel}>
+          <div>
+            <span>Completed Sessions with an active Reflection</span>
+            <strong>{percentageLabel(reflection.reflectionCoverage)}</strong>
+            <small>
+              {reflection.reflectionCoverage.status === 'available'
+                ? ratioExplanation(reflection.reflectionCoverage)
+                : reflection.reflectionCoverage.reason === 'future-school-year'
+                  ? 'The selected School Year has not started.'
+                  : 'No completed Sessions are retained for this School Year.'}
+            </small>
+          </div>
+          <dl>
+            <div>
+              <dt>Active Reflections</dt>
+              <dd>{numberLabel(reflection.activeReflectionCount)}</dd>
+            </div>
+            <div>
+              <dt>Archived Reflections</dt>
+              <dd>{numberLabel(reflection.archivedReflectionCount)}</dd>
+            </div>
+            <div>
+              <dt>Reflected completed Sessions</dt>
+              <dd>{numberLabel(reflection.reflectedCompletedSessionCount)}</dd>
+            </div>
+            <div>
+              <dt>Completed without active Reflection</dt>
+              <dd>{numberLabel(reflection.completedSessionWithoutActiveReflectionCount)}</dd>
+            </div>
+            <div>
+              <dt>Open Next Steps</dt>
+              <dd>{numberLabel(reflection.openNextStepCount)}</dd>
+            </div>
+            <div>
+              <dt>Closed Next Steps</dt>
+              <dd>{numberLabel(reflection.closedNextStepCount)}</dd>
+            </div>
+          </dl>
+        </div>
+        <div className={styles.compactGrid} aria-label="Reflection-linked Next Step statuses">
+          <article>
+            <span>Active</span>
+            <strong>{numberLabel(reflection.activeNextStepCount)}</strong>
+          </article>
+          <article>
+            <span>Waiting</span>
+            <strong>{numberLabel(reflection.waitingNextStepCount)}</strong>
+          </article>
+          <article>
+            <span>Completed</span>
+            <strong>{numberLabel(reflection.completedNextStepCount)}</strong>
+          </article>
+          <article>
+            <span>Cancelled</span>
+            <strong>{numberLabel(reflection.cancelledNextStepCount)}</strong>
+          </article>
+        </div>
+        <p className={styles.interpretationNote}>
+          Classroom counts Reflection records and linked Task states. It does not infer teaching
+          quality, effectiveness, mastery, or learner progress from Reflection narrative.
+        </p>
+        <details className={styles.disclosure}>
+          <summary>Reflection sources ({numberLabel(reflection.reflections.length)})</summary>
+          {reflection.reflections.length === 0 ? (
+            <p className={styles.emptyText}>
+              No Teaching Reflections are retained for this School Year.
+            </p>
+          ) : (
+            <div
+              className={styles.tableScroller}
+              role="region"
+              tabIndex={0}
+              aria-label="Teaching Reflection source records"
+            >
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Reflection</th>
+                    <th scope="col">Date</th>
+                    <th scope="col">Context</th>
+                    <th scope="col">Reflection status</th>
+                    <th scope="col">Session source</th>
+                    <th scope="col">Next Steps</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reflection.reflections.map((row) => (
+                    <tr key={row.id}>
+                      <th scope="row">
+                        <SourceLink source={row.source}>{row.lessonPlanTitle}</SourceLink>
+                      </th>
+                      <td>{formatLongDate(row.occurredOn)}</td>
+                      <td>{row.contextName}</td>
+                      <td>{row.status === 'archived' ? 'Archived' : 'Active'}</td>
+                      <td>{reflectionSessionStateLabels[row.sessionState]}</td>
+                      <td>
+                        {numberLabel(row.openNextStepCount)} open ·{' '}
+                        {numberLabel(row.closedNextStepCount)} closed
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </details>
+      </section>
 
       <section className={`card ${styles.section}`} aria-labelledby="classification-usage-heading">
         <SectionHeader

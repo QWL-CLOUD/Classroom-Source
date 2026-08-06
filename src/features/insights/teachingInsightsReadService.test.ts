@@ -10,6 +10,8 @@ import {
   schoolYearSchema,
   sessionOccurrenceSchema,
   studentRecordSchema,
+  taskSchema,
+  teachingReflectionRecordSchema,
 } from '@/domain/models/entities';
 
 import { TeachingInsightsReadService } from './teachingInsightsReadService';
@@ -111,6 +113,68 @@ describe('TeachingInsightsReadService', () => {
       completedSessionCount: 1,
       completedTeachingMinutes: 60,
       teachingDayCount: 1,
+    });
+  });
+
+  it('loads Teaching Reflections and exactly linked Next Step Tasks through the read-only transaction', async () => {
+    await seedSchoolYear({
+      id: 'current',
+      label: '2026–2027',
+      startsOn: '2026-07-01',
+      endsOn: '2027-06-30',
+      active: true,
+      lifecycleState: 'active',
+    });
+    await seedCompletedSession({
+      schoolYearId: 'current',
+      contextId: 'class-current',
+      planId: 'plan-current',
+      sessionId: 'session-current',
+      date: '2026-08-03',
+    });
+    await database.teachingReflections.put(
+      teachingReflectionRecordSchema.parse({
+        id: 'reflection-current',
+        sessionOccurrenceId: 'session-current',
+        schoolYearId: 'current',
+        contextId: 'class-current',
+        lessonPlanId: 'plan-current',
+        occurredOn: '2026-08-03',
+        whatWorked: 'Students compared strategies.',
+        sourceSnapshots: {
+          context: { kind: 'class', name: 'class-current' },
+          lessonPlan: { title: 'plan-current' },
+          sessionOccurrence: { date: '2026-08-03', startMinute: 540, endMinute: 600 },
+        },
+        status: 'active',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }),
+    );
+    await database.tasks.put(
+      taskSchema.parse({
+        id: 'task-current',
+        title: 'Prepare comparison cards',
+        status: 'active',
+        contextId: 'class-current',
+        linkedEntityType: 'teaching-reflection',
+        linkedEntityId: 'reflection-current',
+        order: 0,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }),
+    );
+
+    const result = await service.load({ asOfDate: '2026-08-05' });
+
+    expect(result.view?.contractVersion).toBe(2);
+    expect(result.view?.reflectionAndNextSteps).toMatchObject({
+      activeReflectionCount: 1,
+      reflectedCompletedSessionCount: 1,
+      completedSessionWithoutActiveReflectionCount: 0,
+      openNextStepCount: 1,
+      activeNextStepCount: 1,
+      reflectionCoverage: { status: 'available', numerator: 1, denominator: 1, value: 1 },
     });
   });
 
