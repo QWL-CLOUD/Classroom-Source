@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { SchoolYear } from '@/domain/models/entities';
@@ -27,7 +27,7 @@ const schoolYears: SchoolYear[] = [
 
 function createView(overrides: Partial<TeachingInsightsView> = {}): TeachingInsightsView {
   const view: TeachingInsightsView = {
-    contractVersion: 1,
+    contractVersion: 2,
     schoolYear: {
       id: 'current',
       label: '2026–2027',
@@ -135,6 +135,40 @@ function createView(overrides: Partial<TeachingInsightsView> = {}): TeachingInsi
         { familyId: 'theme-tag', assignmentCount: 0, planCount: 0, distinctValueCount: 0 },
       ],
     },
+    reflectionAndNextSteps: {
+      activeReflectionCount: 1,
+      archivedReflectionCount: 0,
+      reflectedCompletedSessionCount: 1,
+      completedSessionWithoutActiveReflectionCount: 1,
+      reflectionCoverage: { status: 'available', numerator: 1, denominator: 2, value: 0.5 },
+      activeNextStepCount: 1,
+      waitingNextStepCount: 1,
+      completedNextStepCount: 1,
+      cancelledNextStepCount: 0,
+      openNextStepCount: 2,
+      closedNextStepCount: 1,
+      reflections: [
+        {
+          id: 'reflection-1',
+          sessionOccurrenceId: 'session-1',
+          lessonPlanId: 'plan-1',
+          lessonPlanTitle: 'Fractions workshop',
+          contextId: 'class-1',
+          contextName: 'Grade 4 Math',
+          occurredOn: '2026-08-04',
+          status: 'active',
+          sessionState: 'completed',
+          openNextStepCount: 2,
+          closedNextStepCount: 1,
+          source: {
+            entityType: 'teaching-reflection',
+            entityId: 'reflection-1',
+            label: 'Fractions workshop',
+            href: '#/planning/session/reflection?session=session-1',
+          },
+        },
+      ],
+    },
     needsReview: {
       affectedRecordCount: 1,
       issueCount: 1,
@@ -172,6 +206,11 @@ describe('TeachingInsightsDashboard', () => {
     expect(screen.getByText('Completed Sessions')).toBeVisible();
     expect(screen.getByText('67%')).toBeVisible();
     expect(screen.getByText('Current retained roster coverage')).toBeVisible();
+    const reflectionSection = screen.getByRole('region', { name: 'Reflection and Next Steps' });
+    expect(within(reflectionSection).getByText('50%')).toBeVisible();
+    expect(
+      within(reflectionSection).getByRole('link', { name: 'Fractions workshop' }),
+    ).toHaveAttribute('href', '#/planning/session/reflection?session=session-1');
     expect(screen.getByText('Past Session is still marked Scheduled.')).toBeVisible();
     expect(screen.getByRole('link', { name: 'Reading workshop' })).toHaveAttribute(
       'href',
@@ -224,16 +263,39 @@ describe('TeachingInsightsDashboard', () => {
               reason: 'no-retained-roster-links',
             },
           },
+          reflectionAndNextSteps: {
+            ...base.reflectionAndNextSteps,
+            activeReflectionCount: 0,
+            archivedReflectionCount: 0,
+            reflectedCompletedSessionCount: 0,
+            completedSessionWithoutActiveReflectionCount: 0,
+            reflectionCoverage: {
+              status: 'unavailable',
+              numerator: 0,
+              denominator: 0,
+              reason: 'no-eligible-records',
+            },
+            activeNextStepCount: 0,
+            waitingNextStepCount: 0,
+            completedNextStepCount: 0,
+            cancelledNextStepCount: 0,
+            openNextStepCount: 0,
+            closedNextStepCount: 0,
+            reflections: [],
+          },
           needsReview: { affectedRecordCount: 0, issueCount: 0, issues: [] },
         })}
         onSchoolYearChange={() => undefined}
       />,
     );
 
-    expect(screen.getAllByText('Not available')).toHaveLength(2);
+    expect(screen.getAllByText('Not available')).toHaveLength(3);
     expect(screen.getByText('No eligible closed-period records.')).toBeVisible();
     expect(
       screen.getByText('No retained roster or linked Individual learner records.'),
+    ).toBeVisible();
+    expect(
+      screen.getByText('No completed Sessions are retained for this School Year.'),
     ).toBeVisible();
     expect(screen.getByText('No review issues were found for this School Year.')).toBeVisible();
     expect(screen.queryByText('0%')).not.toBeInTheDocument();

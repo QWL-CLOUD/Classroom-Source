@@ -1,0 +1,283 @@
+.relatedRecords {
+  display: grid;
+  gap: 18px;
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.sectionHeading,
+.relatedHeading,
+.cardHeading,
+.headingActions,
+.formActions,
+.taskActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.sectionHeading h2,
+.relatedHeading h3,
+.cardHeading h4 {
+  margin: 0;
+  color: var(--heading);
+}
+
+.sectionHeading span,
+.relatedHeading p {
+  margin: 4px 0 0;
+  color: #4f5955;
+}
+
+.relatedSection {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding-top: 17px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.relatedHeading {
+  align-items: center;
+}
+
+.countBadge,
+.kindBadge,
+.statusBadge,
+.taskStatus {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.countBadge {
+  min-width: 30px;
+  justify-content: center;
+  color: #23483f;
+  background: #eef5f1;
+}
+
+.kindBadge {
+  margin-bottom: 6px;
+  color: #304d45;
+  background: #e8f0ed;
+}
+
+.statusBadge,
+.taskStatus {
+  color: #23483f;
+  background: #eef5f1;
+}
+
+.statusBadge[data-status='archived'],
+.taskStatus[data-status='waiting'] {
+  color: #5b4b32;
+  background: #fff4da;
+}
+
+.taskStatus[data-status='completed'] {
+  color: #2d4d67;
+  background: #eaf3fa;
+}
+
+.taskStatus[data-status='cancelled'] {
+  color: #6e302b;
+  background: #fff0ed;
+}
+
+.recordList {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evidenceCard,
+.taskCard {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.cardHeading > div {
+  min-width: 0;
+}
+
+.evidenceValue,
+.taskNotes {
+  margin: 0;
+  color: var(--text-primary);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.recordMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 15px;
+  color: #4f5955;
+  font-size: 12px;
+}
+
+.recordMeta span {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.emptyState,
+.guidance,
+.unscheduled {
+  margin: 0;
+  color: #4f5955;
+  line-height: 1.5;
+}
+
+.emptyState,
+.guidance {
+  padding: 13px;
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+
+.guidance {
+  border: 1px solid #c4b78d;
+  color: #584c2e;
+  background: #fff9e8;
+}
+
+.headingActions,
+.formActions,
+.taskActions {
+  justify-content: flex-start;
+}
+
+.nextStepForm {
+  display: grid;
+  gap: 14px;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.nextStepForm label {
+  display: grid;
+  gap: 6px;
+  color: var(--heading);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.nextStepForm textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  background: #fff;
+  font: inherit;
+  line-height: 1.5;
+}
+
+.nextStepForm textarea:focus {
+  outline: 3px solid rgb(53 95 84 / 25%);
+  border-color: var(--accent-strong);
+}
+
+.dateGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dateGrid fieldset {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+}
+
+.dateGrid legend {
+  padding: 0 4px;
+  color: var(--heading);
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.taskActions {
+  align-items: center;
+}
+
+.taskActions > span {
+  color: #4f5955;
+  font-size: 12px;
+}
+
+.statusMessage,
+.error {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.statusMessage {
+  border: 1px solid #9cb8aa;
+  color: #23483f;
+  background: #eef5f1;
+}
+
+.error {
+  border: 1px solid #d39a91;
+  color: #6e302b;
+  background: #fff0ed;
+}
+
+@media (max-width: 680px) {
+  .relatedRecords {
+    padding: 15px;
+  }
+
+  .sectionHeading,
+  .relatedHeading,
+  .headingActions,
+  .formActions,
+  .taskActions,
+  .sectionHeading > *,
+  .relatedHeading > *,
+  .headingActions > *,
+  .formActions > *,
+  .taskActions > * {
+    width: 100%;
+  }
+
+  .dateGrid,
+  .dateGrid fieldset {
+    grid-template-columns: 1fr;
+  }
+}

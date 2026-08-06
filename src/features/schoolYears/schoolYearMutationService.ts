@@ -37,6 +37,7 @@ export interface SchoolYearDeleteImpact {
   schoolYearLabel: string;
   learnerContextCount: number;
   assessmentEvidenceCount: number;
+  teachingReflectionCount: number;
   calendarEventCount: number;
   recurrenceSeriesCount: number;
   recurrenceOccurrenceCount: number;
@@ -54,6 +55,11 @@ export function schoolYearDeleteBlockingMessage(impact: SchoolYearDeleteImpact):
   if (impact.assessmentEvidenceCount > 0) {
     blockers.push(
       `${impact.assessmentEvidenceCount} assessment evidence record${impact.assessmentEvidenceCount === 1 ? '' : 's'}`,
+    );
+  }
+  if (impact.teachingReflectionCount > 0) {
+    blockers.push(
+      `${impact.teachingReflectionCount} Teaching Reflection${impact.teachingReflectionCount === 1 ? '' : 's'}`,
     );
   }
   if (impact.calendarEventCount > 0) {
@@ -239,6 +245,7 @@ export class SchoolYearMutationService {
         this.db.schoolYears,
         this.db.learnerContexts,
         this.db.assessmentEvidence,
+        this.db.teachingReflections,
         this.db.calendarEvents,
         this.db.calendarEventImportSeries,
         this.db.calendarEventImportOccurrences,
@@ -248,12 +255,14 @@ export class SchoolYearMutationService {
         const [
           learnerContextCount,
           assessmentEvidenceCount,
+          teachingReflectionCount,
           calendarEventCount,
           recurrenceSeriesCount,
           recurrenceOccurrenceCount,
         ] = await Promise.all([
           this.db.learnerContexts.where('schoolYearId').equals(id).count(),
           this.db.assessmentEvidence.where('schoolYearId').equals(id).count(),
+          this.db.teachingReflections.where('schoolYearId').equals(id).count(),
           this.db.calendarEvents.where('schoolYearId').equals(id).count(),
           this.db.calendarEventImportSeries.where('schoolYearId').equals(id).count(),
           this.db.calendarEventImportOccurrences.where('schoolYearId').equals(id).count(),
@@ -263,12 +272,14 @@ export class SchoolYearMutationService {
           schoolYearLabel: schoolYear.label,
           learnerContextCount,
           assessmentEvidenceCount,
+          teachingReflectionCount,
           calendarEventCount,
           recurrenceSeriesCount,
           recurrenceOccurrenceCount,
           canDelete:
             learnerContextCount === 0 &&
             assessmentEvidenceCount === 0 &&
+            teachingReflectionCount === 0 &&
             calendarEventCount === 0 &&
             recurrenceSeriesCount === 0 &&
             recurrenceOccurrenceCount === 0 &&
@@ -285,6 +296,7 @@ export class SchoolYearMutationService {
         this.db.schoolYears,
         this.db.learnerContexts,
         this.db.assessmentEvidence,
+        this.db.teachingReflections,
         this.db.calendarEvents,
         this.db.calendarEventImportSeries,
         this.db.calendarEventImportOccurrences,
@@ -296,12 +308,14 @@ export class SchoolYearMutationService {
         const [
           learnerContextCount,
           assessmentEvidenceCount,
+          teachingReflectionCount,
           calendarEventCount,
           recurrenceSeriesCount,
           recurrenceOccurrenceCount,
         ] = await Promise.all([
           this.db.learnerContexts.where('schoolYearId').equals(id).count(),
           this.db.assessmentEvidence.where('schoolYearId').equals(id).count(),
+          this.db.teachingReflections.where('schoolYearId').equals(id).count(),
           this.db.calendarEvents.where('schoolYearId').equals(id).count(),
           this.db.calendarEventImportSeries.where('schoolYearId').equals(id).count(),
           this.db.calendarEventImportOccurrences.where('schoolYearId').equals(id).count(),
@@ -311,12 +325,14 @@ export class SchoolYearMutationService {
           schoolYearLabel: schoolYear.label,
           learnerContextCount,
           assessmentEvidenceCount,
+          teachingReflectionCount,
           calendarEventCount,
           recurrenceSeriesCount,
           recurrenceOccurrenceCount,
           canDelete:
             learnerContextCount === 0 &&
             assessmentEvidenceCount === 0 &&
+            teachingReflectionCount === 0 &&
             calendarEventCount === 0 &&
             recurrenceSeriesCount === 0 &&
             recurrenceOccurrenceCount === 0,

@@ -8,6 +8,7 @@ export interface SchoolYearListItem {
   schoolYear: SchoolYear;
   learnerContextCount: number;
   assessmentEvidenceCount: number;
+  teachingReflectionCount: number;
   calendarEventCount: number;
   recurrenceSeriesCount: number;
   recurrenceOccurrenceCount: number;
@@ -74,6 +75,7 @@ export class SchoolYearReadService {
       schoolYearValues,
       contexts,
       assessmentEvidence,
+      teachingReflections,
       calendarEvents,
       recurrenceSeries,
       recurrenceOccurrences,
@@ -81,6 +83,7 @@ export class SchoolYearReadService {
       this.db.schoolYears.toArray(),
       this.db.learnerContexts.toArray(),
       this.db.assessmentEvidence.toArray(),
+      this.db.teachingReflections.toArray(),
       this.db.calendarEvents.toArray(),
       this.db.calendarEventImportSeries.toArray(),
       this.db.calendarEventImportOccurrences.toArray(),
@@ -95,6 +98,13 @@ export class SchoolYearReadService {
       assessmentEvidenceCounts.set(
         evidence.schoolYearId,
         (assessmentEvidenceCounts.get(evidence.schoolYearId) ?? 0) + 1,
+      );
+    }
+    const teachingReflectionCounts = new Map<string, number>();
+    for (const reflection of teachingReflections) {
+      teachingReflectionCounts.set(
+        reflection.schoolYearId,
+        (teachingReflectionCounts.get(reflection.schoolYearId) ?? 0) + 1,
       );
     }
     const calendarEventCounts = new Map<string, number>();
@@ -128,6 +138,7 @@ export class SchoolYearReadService {
         schoolYear,
         learnerContextCount: contextCounts.get(schoolYear.id) ?? 0,
         assessmentEvidenceCount: assessmentEvidenceCounts.get(schoolYear.id) ?? 0,
+        teachingReflectionCount: teachingReflectionCounts.get(schoolYear.id) ?? 0,
         calendarEventCount: calendarEventCounts.get(schoolYear.id) ?? 0,
         recurrenceSeriesCount: recurrenceSeriesCounts.get(schoolYear.id) ?? 0,
         recurrenceOccurrenceCount: recurrenceOccurrenceCounts.get(schoolYear.id) ?? 0,

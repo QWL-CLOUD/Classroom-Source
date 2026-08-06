@@ -17,7 +17,7 @@ async function seedInsightsSchoolYear(page: Page): Promise<void> {
         const request = indexedDB.open('classroom-v20');
         request.onerror = () => resolve(false);
         request.onsuccess = () => {
-          const ready = request.result.version >= 16;
+          const ready = request.result.version >= 17;
           request.result.close();
           resolve(ready);
         };
@@ -31,7 +31,16 @@ async function seedInsightsSchoolYear(page: Page): Promise<void> {
     });
     try {
       await new Promise<void>((resolve, reject) => {
-        const transaction = database.transaction(['schoolYears'], 'readwrite');
+        const transaction = database.transaction(
+          [
+            'schoolYears',
+            'learnerContexts',
+            'lessonPlans',
+            'sessionOccurrences',
+            'teachingReflections',
+          ],
+          'readwrite',
+        );
         transaction.onerror = () => reject(transaction.error);
         transaction.onabort = () => reject(transaction.error);
         transaction.oncomplete = () => resolve();
@@ -42,6 +51,50 @@ async function seedInsightsSchoolYear(page: Page): Promise<void> {
           endsOn: '2027-12-31',
           active: true,
           lifecycleState: 'active',
+        });
+        transaction.objectStore('learnerContexts').put({
+          id: 'pilot-reflection-context',
+          kind: 'class',
+          name: 'Pilot Reflection Class',
+          schoolYearId: 'pilot-insights-year',
+          status: 'active',
+        });
+        transaction.objectStore('lessonPlans').put({
+          id: 'pilot-reflection-plan',
+          contextId: 'pilot-reflection-context',
+          title: 'Pilot Reflection Lesson',
+          subject: 'Reflection smoke test',
+          workflowState: 'ready',
+          createdAt: '2026-08-05T12:00:00.000Z',
+          updatedAt: '2026-08-05T12:00:00.000Z',
+        });
+        transaction.objectStore('sessionOccurrences').put({
+          id: 'pilot-reflection-session',
+          lessonPlanId: 'pilot-reflection-plan',
+          contextId: 'pilot-reflection-context',
+          date: '2026-08-05',
+          startMinute: 540,
+          endMinute: 600,
+          deliveryState: 'completed',
+          completedAt: '2026-08-05T12:00:00.000Z',
+          reflectionId: 'pilot-reflection-record',
+        });
+        transaction.objectStore('teachingReflections').put({
+          id: 'pilot-reflection-record',
+          sessionOccurrenceId: 'pilot-reflection-session',
+          schoolYearId: 'pilot-insights-year',
+          contextId: 'pilot-reflection-context',
+          lessonPlanId: 'pilot-reflection-plan',
+          occurredOn: '2026-08-05',
+          whatWorked: 'The pilot reflection route remains readable on mobile.',
+          sourceSnapshots: {
+            context: { kind: 'class', name: 'Pilot Reflection Class' },
+            lessonPlan: { title: 'Pilot Reflection Lesson' },
+            sessionOccurrence: { date: '2026-08-05', startMinute: 540, endMinute: 600 },
+          },
+          status: 'active',
+          createdAt: '2026-08-05T12:00:00.000Z',
+          updatedAt: '2026-08-05T12:00:00.000Z',
         });
       });
     } finally {
@@ -73,7 +126,7 @@ test('personal pilot setup persists and produces privacy-safe diagnostics and ba
   await expect(page.getByRole('heading', { level: 1, name: 'System Health' })).toBeVisible();
   const appVersionCard = page.locator('article').filter({ hasText: 'App version' });
   await expect(appVersionCard.getByText('20.0.0-pilot.1', { exact: true })).toBeVisible();
-  await expect(page.getByText('Version 16', { exact: true })).toBeVisible();
+  await expect(page.getByText('Version 17', { exact: true })).toBeVisible();
   await expect(
     page
       .getByRole('region', { name: 'Current v20 record counts' })
@@ -94,8 +147,8 @@ test('personal pilot setup persists and produces privacy-safe diagnostics and ba
     reportVersion: 1,
     appVersion: '20.0.0-pilot.1',
     database: {
-      actualSchemaVersion: 16,
-      expectedSchemaVersion: 16,
+      actualSchemaVersion: 17,
+      expectedSchemaVersion: 17,
       ready: true,
     },
     schoolYears: { activeCount: 1 },
@@ -107,7 +160,7 @@ test('personal pilot setup persists and produces privacy-safe diagnostics and ba
       containsRawImportedData: false,
     },
   });
-  expect(Object.keys(diagnostic.portableTableCounts as Record<string, number>)).toHaveLength(32);
+  expect(Object.keys(diagnostic.portableTableCounts as Record<string, number>)).toHaveLength(33);
   expect(diagnosticText).not.toContain('Pilot 2026–2027');
   expect(diagnosticText).not.toContain('payloadJson');
 
@@ -123,7 +176,7 @@ test('personal pilot setup persists and produces privacy-safe diagnostics and ba
   const backup = await downloadedJson(await backupDownload);
   expect(backup).toMatchObject({
     format: 'classroom-v20-backup-v1',
-    databaseSchemaVersion: 16,
+    databaseSchemaVersion: 17,
     appVersion: '20.0.0-pilot.1',
   });
 });
@@ -138,6 +191,7 @@ test('personal pilot core routes remain usable without horizontal overflow on mo
     'today?date=2026-08-05',
     'calendar?date=2026-08-05',
     'system-health',
+    'planning/session/reflection?session=pilot-reflection-session&return=learners',
     'insights?schoolYear=pilot-insights-year',
   ]) {
     await page.goto(`./#/${route}`);
@@ -145,6 +199,12 @@ test('personal pilot core routes remain usable without horizontal overflow on mo
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
     ).toBe(true);
+    if (route.startsWith('planning/session/reflection')) {
+      await expect(
+        page.getByRole('heading', { level: 1, name: 'Teaching Reflection' }),
+      ).toBeVisible();
+      await expect(page.getByText('Pilot Reflection Lesson', { exact: true })).toBeVisible();
+    }
   }
 
   await expect(page.getByRole('heading', { level: 1, name: 'Teaching Insights' })).toBeVisible();

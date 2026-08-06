@@ -6,6 +6,7 @@ import type {
   LearnerNotice,
   Reminder,
   Task,
+  TeachingReflectionRecord,
 } from '@/domain/models/entities';
 
 import { buildAgendaReadModel, isPersonalCalendarEvent } from './agendaReadModel';
@@ -65,6 +66,28 @@ function reminder(values: Partial<Reminder> & Pick<Reminder, 'id' | 'sourceId'>)
   };
 }
 
+function reflection(
+  values: Partial<TeachingReflectionRecord> & Pick<TeachingReflectionRecord, 'id'>,
+): TeachingReflectionRecord {
+  return {
+    sessionOccurrenceId: 'session-1',
+    schoolYearId: 'year-1',
+    contextId: 'context-1',
+    lessonPlanId: 'plan-1',
+    occurredOn: '2026-07-20',
+    whatWorked: 'Students used the model.',
+    sourceSnapshots: {
+      context: { kind: 'individual', name: 'Agenda Learner' },
+      lessonPlan: { title: 'Fraction workshop' },
+      sessionOccurrence: { date: '2026-07-20', startMinute: 540, endMinute: 600 },
+    },
+    status: 'active',
+    createdAt: now,
+    updatedAt: now,
+    ...values,
+  };
+}
+
 const context: LearnerContext = {
   id: 'context-1',
   kind: 'individual',
@@ -78,6 +101,7 @@ function build(values: {
   reminders?: Reminder[];
   events?: CalendarEvent[];
   notices?: LearnerNotice[];
+  reflections?: TeachingReflectionRecord[];
 }) {
   return buildAgendaReadModel(
     {
@@ -88,6 +112,7 @@ function build(values: {
       learnerContexts: [context],
       sessions: [],
       lessonPlans: [],
+      teachingReflections: values.reflections ?? [],
     },
     '2026-07-20',
   );
@@ -264,5 +289,41 @@ describe('Personal Agenda read model', () => {
       unscheduledFollowUp: 1,
       total: 6,
     });
+  });
+
+  it('shows unscheduled Teaching Reflection Next Steps with source snapshots', () => {
+    const model = build({
+      reflections: [reflection({ id: 'reflection-1' })],
+      tasks: [
+        task({
+          id: 'reflection-next-step',
+          title: 'Prepare a new visual model',
+          linkedEntityType: 'teaching-reflection',
+          linkedEntityId: 'reflection-1',
+          contextId: 'context-1',
+        }),
+      ],
+    });
+
+    expect(section(model, 'unscheduled-follow-up')).toHaveLength(1);
+    expect(section(model, 'unscheduled-follow-up')[0]).toMatchObject({
+      sourceLabel: 'Reflection Next Step',
+      detailLabel: 'From Teaching Reflection: Fraction workshop',
+      contextName: 'Agenda Learner',
+    });
+
+    const unavailable = build({
+      tasks: [
+        task({
+          id: 'unavailable-reflection-next-step',
+          title: 'Preserved next step',
+          linkedEntityType: 'teaching-reflection',
+          linkedEntityId: 'missing-reflection',
+        }),
+      ],
+    });
+    expect(section(unavailable, 'unscheduled-follow-up')[0]?.detailLabel).toBe(
+      'From Teaching Reflection: unavailable source',
+    );
   });
 });

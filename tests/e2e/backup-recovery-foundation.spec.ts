@@ -209,7 +209,7 @@ test('Backup & Recovery downloads a privacy-safe full local backup', async ({ pa
   const envelope = JSON.parse(await readFile(path!, 'utf8')) as Record<string, unknown>;
 
   expect(envelope.format).toBe('classroom-v20-backup-v1');
-  expect(envelope.databaseSchemaVersion).toBe(16);
+  expect(envelope.databaseSchemaVersion).toBe(17);
   expect(envelope.appVersion).toBe('20.0.0-pilot.1');
   expect(envelope).not.toHaveProperty('filePath');
   expect(envelope.tables).toMatchObject({

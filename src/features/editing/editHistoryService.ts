@@ -40,6 +40,7 @@ export class EditHistoryService {
       'rw',
       [
         this.db.assessmentEvidence,
+        this.db.teachingReflections,
         this.db.calendarEvents,
         this.db.calendarEventImportSeries,
         this.db.calendarEventImportOccurrences,
@@ -94,6 +95,7 @@ export class EditHistoryService {
       'rw',
       [
         this.db.assessmentEvidence,
+        this.db.teachingReflections,
         this.db.calendarEvents,
         this.db.calendarEventImportSeries,
         this.db.calendarEventImportOccurrences,

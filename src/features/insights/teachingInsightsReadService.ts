@@ -12,6 +12,8 @@ import {
   standardAlignmentSchema,
   standardSchema,
   studentRecordSchema,
+  taskSchema,
+  teachingReflectionRecordSchema,
   type SchoolYear,
 } from '@/domain/models/entities';
 import { parseLocalDate, todayLocalDate } from '@/shared/dates/localDate';
@@ -78,6 +80,8 @@ function parseSnapshotRows(values: {
   standardAlignments: readonly unknown[];
   categoryValues: readonly unknown[];
   categoryAssignments: readonly unknown[];
+  teachingReflections: readonly unknown[];
+  tasks: readonly unknown[];
 }): TeachingInsightsSnapshot {
   return {
     schoolYear: values.schoolYear,
@@ -101,6 +105,10 @@ function parseSnapshotRows(values: {
     categoryAssignments: values.categoryAssignments.map((value) =>
       categoryAssignmentSchema.parse(value),
     ),
+    teachingReflections: values.teachingReflections.map((value) =>
+      teachingReflectionRecordSchema.parse(value),
+    ),
+    tasks: values.tasks.map((value) => taskSchema.parse(value)),
   };
 }
 
@@ -126,6 +134,8 @@ export class TeachingInsightsReadService {
         this.db.standardAlignments,
         this.db.categoryValues,
         this.db.categoryAssignments,
+        this.db.teachingReflections,
+        this.db.tasks,
       ],
       async () => {
         const [
@@ -141,6 +151,8 @@ export class TeachingInsightsReadService {
           standardAlignments,
           categoryValues,
           categoryAssignments,
+          teachingReflections,
+          tasks,
         ] = await Promise.all([
           this.db.schoolYears.toArray(),
           this.db.learnerContexts.toArray(),
@@ -154,6 +166,8 @@ export class TeachingInsightsReadService {
           this.db.standardAlignments.toArray(),
           this.db.categoryValues.toArray(),
           this.db.categoryAssignments.toArray(),
+          this.db.teachingReflections.toArray(),
+          this.db.tasks.toArray(),
         ]);
 
         const schoolYears = schoolYearValues
@@ -184,6 +198,8 @@ export class TeachingInsightsReadService {
           standardAlignments,
           categoryValues,
           categoryAssignments,
+          teachingReflections,
+          tasks,
         });
 
         return {

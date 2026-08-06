@@ -42,6 +42,30 @@ function task(id: string) {
   };
 }
 
+function reflection(id: string, sessionOccurrenceId = 'session-1') {
+  return {
+    id,
+    sessionOccurrenceId,
+    schoolYearId: 'year-1',
+    contextId: 'class-1',
+    lessonPlanId: 'lesson-1',
+    occurredOn: '2026-08-05',
+    whatWorked: 'Students explained the strategy clearly.',
+    sourceSnapshots: {
+      context: { kind: 'class' as const, name: 'Grade 3' },
+      lessonPlan: { title: 'Equivalent fractions' },
+      sessionOccurrence: {
+        date: '2026-08-05',
+        startMinute: 600,
+        endMinute: 645,
+      },
+    },
+    status: 'active' as const,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 function resign(envelope: ClassroomBackupEnvelope): string {
   const content: Partial<ClassroomBackupEnvelope> = { ...envelope };
   delete content.integrityHash;
@@ -74,7 +98,7 @@ describe('Classroom backup format', () => {
     expect(preview.validRecordCount).toBe(1);
     expect(preview.quarantineCount).toBe(0);
     expect(preview.validTables.tasks).toEqual([task('task-1')]);
-    expect(preview.tableSummaries).toHaveLength(32);
+    expect(preview.tableSummaries).toHaveLength(33);
   });
 
   it('restores a schema v10 backup with the new Student and roster tables empty', () => {
@@ -214,6 +238,29 @@ describe('Classroom backup format', () => {
     expect(preview.warnings.join(' ')).toMatch(/without guessed ownership or provenance/);
   });
 
+  it('restores a schema v16 backup with Teaching Reflections empty', () => {
+    const current = createBackupEnvelope(emptyBackupTables(), {
+      backupId: 'legacy-v16-backup',
+      exportedAt: now,
+    });
+    const legacyTables = { ...current.tables } as Record<string, unknown[]>;
+    const legacyCounts = { ...current.tableCounts } as Record<string, number>;
+    delete legacyTables.teachingReflections;
+    delete legacyCounts.teachingReflections;
+    const legacyEnvelope = {
+      ...current,
+      databaseSchemaVersion: 16,
+      tables: legacyTables,
+      tableCounts: legacyCounts,
+    } as unknown as ClassroomBackupEnvelope;
+
+    const preview = buildRestorePreview(resign(legacyEnvelope));
+
+    expect(preview.databaseSchemaVersion).toBe(17);
+    expect(preview.validTables.teachingReflections).toEqual([]);
+    expect(preview.warnings.join(' ')).toMatch(/predates Teaching Reflections/);
+  });
+
   it('restores a schema v15 backup with recurrence ownership tables empty', () => {
     const current = createBackupEnvelope(emptyBackupTables(), {
       backupId: 'legacy-v15-backup',
@@ -239,7 +286,7 @@ describe('Classroom backup format', () => {
     expect(preview.warnings.join(' ')).toMatch(/predates ICS recurrence ownership/);
   });
 
-  it('round-trips Calendar recurrence ownership, canonical type assignment, and import provenance on DB v16', () => {
+  it('round-trips Calendar recurrence ownership, canonical type assignment, and import provenance on DB v17', () => {
     const tables = emptyBackupTables();
     tables.schoolYears.push({
       id: 'year-1',
@@ -336,7 +383,7 @@ describe('Classroom backup format', () => {
     });
     const preview = buildRestorePreview(serializeBackupEnvelope(envelope));
 
-    expect(envelope.databaseSchemaVersion).toBe(16);
+    expect(envelope.databaseSchemaVersion).toBe(17);
     expect(preview.quarantineCount).toBe(0);
     expect(preview.validTables.calendarEvents[0]).toMatchObject({
       schoolYearId: 'year-1',
@@ -362,6 +409,22 @@ describe('Classroom backup format', () => {
       sourceKind: 'ics',
       schoolYearId: 'year-1',
     });
+  });
+
+  it('round-trips Teaching Reflections with source snapshots on DB v17', () => {
+    const tables = emptyBackupTables();
+    tables.teachingReflections.push(reflection('reflection-1'));
+
+    const envelope = createBackupEnvelope(tables, {
+      backupId: 'teaching-reflection-backup',
+      exportedAt: now,
+    });
+    const preview = buildRestorePreview(serializeBackupEnvelope(envelope));
+
+    expect(envelope.databaseSchemaVersion).toBe(17);
+    expect(envelope.tableCounts.teachingReflections).toBe(1);
+    expect(preview.quarantineCount).toBe(0);
+    expect(preview.validTables.teachingReflections).toEqual([reflection('reflection-1')]);
   });
 
   it('validates canonical Import Center history records', () => {
@@ -589,7 +652,7 @@ describe('Classroom backup format', () => {
     });
     const preview = buildRestorePreview(serializeBackupEnvelope(envelope));
 
-    expect(envelope.databaseSchemaVersion).toBe(16);
+    expect(envelope.databaseSchemaVersion).toBe(17);
     expect(preview.quarantineCount).toBe(0);
     expect(familyIds(preview.validTables.categoryValues)).toEqual(['language-level', 'subject']);
     expect(familyIds(preview.validTables.categoryAssignments)).toEqual([

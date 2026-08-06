@@ -110,7 +110,7 @@ test('repository-backed v20 counts survive reload and browser navigation', async
       .filter({ hasText: 'App version' })
       .getByText('20.0.0-pilot.1', { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText('Version 16', { exact: true })).toBeVisible();
+  await expect(page.getByText('Version 17', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Download diagnostic report' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Foundation checks' })).toHaveCount(0);
 

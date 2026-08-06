@@ -6,6 +6,7 @@ import {
   reminderSchema,
   sessionOccurrenceSchema,
   taskSchema,
+  teachingReflectionRecordSchema,
   type CalendarEvent,
   type LearnerContext,
   type LearnerNotice,
@@ -14,10 +15,12 @@ import {
   type SessionOccurrence,
   type Task,
   type TaskStatus,
+  type TeachingReflectionRecord,
 } from '@/domain/models/entities';
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
 import { buildReminderListItems } from '@/features/reminders/reminderReadModel';
 import { learnerNoticeKindLabel } from '@/features/learnerNotices/learnerNoticeReadModel';
+import { TEACHING_REFLECTION_TASK_LINK_TYPE } from '@/features/teachingReflections/teachingReflectionTaskContract';
 import { formatShortDate } from '@/shared/dates/localDate';
 
 export type AgendaSectionId =
@@ -74,6 +77,7 @@ export interface AgendaSourceSnapshot {
   learnerContexts: readonly LearnerContext[];
   sessions: readonly SessionOccurrence[];
   lessonPlans: readonly LessonPlan[];
+  teachingReflections: readonly TeachingReflectionRecord[];
 }
 
 const sectionMetadata: Record<AgendaSectionId, Pick<AgendaSection, 'label' | 'description'>> = {
@@ -98,7 +102,7 @@ const sectionMetadata: Record<AgendaSectionId, Pick<AgendaSection, 'label' | 'de
   'unscheduled-follow-up': {
     label: 'Unscheduled follow-up',
     description:
-      'Active follow-up Tasks created from learner notices without a scheduled or due date.',
+      'Active follow-up Tasks created from learner notices or Teaching Reflections without a scheduled or due date.',
   },
 };
 
@@ -150,6 +154,7 @@ function taskAgendaItem(
   selectedDate: string,
   contextNames: ReadonlyMap<string, string>,
   noticeTitles: ReadonlyMap<string, string>,
+  reflectionTitles: ReadonlyMap<string, { title: string; archived: boolean }>,
 ): AgendaItem | null {
   if (task.status === 'completed' || task.status === 'cancelled') return null;
 
@@ -158,12 +163,25 @@ function taskAgendaItem(
     sourceType: 'task' as const,
     sourceId: task.id,
     title: task.title,
-    sourceLabel: task.linkedEntityType === 'learner-notice' ? 'Follow-up Task' : 'Task',
+    sourceLabel:
+      task.linkedEntityType === 'learner-notice'
+        ? 'Learner Follow-up Task'
+        : task.linkedEntityType === TEACHING_REFLECTION_TASK_LINK_TYPE
+          ? 'Reflection Next Step'
+          : 'Task',
     timingLabel: taskTimingLabel(task),
     detailLabel:
       task.linkedEntityType === 'learner-notice' && task.linkedEntityId
         ? `From learner notice: ${noticeTitles.get(task.linkedEntityId) ?? 'Unavailable learner notice'}`
-        : task.notes,
+        : task.linkedEntityType === TEACHING_REFLECTION_TASK_LINK_TYPE && task.linkedEntityId
+          ? (() => {
+              const source = reflectionTitles.get(task.linkedEntityId);
+              if (!source) return 'From Teaching Reflection: unavailable source';
+              return `From Teaching Reflection: ${source.title}${
+                source.archived ? ' · archived reflection' : ''
+              }`;
+            })()
+          : task.notes,
     contextName: task.contextId ? contextNames.get(task.contextId) : undefined,
     href: '#/tasks',
     taskStatus: task.status,
@@ -211,7 +229,8 @@ function taskAgendaItem(
   }
 
   if (
-    task.linkedEntityType === 'learner-notice' &&
+    (task.linkedEntityType === 'learner-notice' ||
+      task.linkedEntityType === TEACHING_REFLECTION_TASK_LINK_TYPE) &&
     task.linkedEntityId &&
     !task.scheduledDate &&
     !task.dueDate
@@ -346,6 +365,9 @@ export function buildAgendaReadModel(
     learnerContexts: values.learnerContexts.map((value) => learnerContextSchema.parse(value)),
     sessions: values.sessions.map((value) => sessionOccurrenceSchema.parse(value)),
     lessonPlans: values.lessonPlans.map((value) => lessonPlanSchema.parse(value)),
+    teachingReflections: values.teachingReflections.map((value) =>
+      teachingReflectionRecordSchema.parse(value),
+    ),
   };
   const contextNames = new Map(
     snapshot.learnerContexts.map((context) => [context.id, context.name] as const),
@@ -353,10 +375,22 @@ export function buildAgendaReadModel(
   const noticeTitles = new Map(
     snapshot.learnerNotices.map((notice) => [notice.id, notice.title] as const),
   );
+  const reflectionTitles = new Map(
+    snapshot.teachingReflections.map(
+      (reflection) =>
+        [
+          reflection.id,
+          {
+            title: reflection.sourceSnapshots.lessonPlan.title,
+            archived: reflection.status === 'archived',
+          },
+        ] as const,
+    ),
+  );
 
   const items: AgendaItem[] = [];
   for (const task of snapshot.tasks) {
-    const item = taskAgendaItem(task, selectedDate, contextNames, noticeTitles);
+    const item = taskAgendaItem(task, selectedDate, contextNames, noticeTitles, reflectionTitles);
     if (item) items.push(item);
   }
   items.push(...reminderAgendaItems(snapshot.reminders, snapshot, selectedDate));

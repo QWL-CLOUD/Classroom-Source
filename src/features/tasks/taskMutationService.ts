@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { classroomDb, type ClassroomDatabase } from '@/data/db/ClassroomDatabase';
 import {
   changeLogSchema,
+  learnerContextSchema,
   taskSchema,
+  teachingReflectionRecordSchema,
   type ChangeLog,
   type LearnerContext,
   type Task,
@@ -20,6 +22,7 @@ import {
 } from '@/features/categories/categoryCommands';
 import { clearSupportedRedoBranch } from '@/features/editing/editCommandRegistry';
 import { notifyEditHistoryChanged } from '@/features/editing/editHistorySignal';
+import { TEACHING_REFLECTION_TASK_LINK_TYPE } from '@/features/teachingReflections/teachingReflectionTaskContract';
 
 import {
   createTaskCommand,
@@ -94,6 +97,7 @@ export const taskEditorValuesSchema = z
   });
 
 export type TaskEditorValues = z.input<typeof taskEditorValuesSchema>;
+export type TeachingReflectionNextStepValues = Omit<TaskEditorValues, 'contextId'>;
 
 export interface TaskMutationDependencies {
   createId?: () => string;
@@ -180,6 +184,73 @@ export class TaskMutationService {
     return result.value;
   }
 
+  async createTeachingReflectionNextStep(
+    reflectionId: string,
+    values: TeachingReflectionNextStepValues,
+    categorySelections?: CategorySelectionMap,
+  ): Promise<Task> {
+    const parsed = taskEditorValuesSchema.parse({ ...values, contextId: undefined });
+    const result = await this.db.transaction(
+      'rw',
+      [
+        this.db.teachingReflections,
+        this.db.tasks,
+        this.db.learnerContexts,
+        this.db.categoryValues,
+        this.db.categoryAssignments,
+        this.db.changeLog,
+      ],
+      async (): Promise<CommitResult<Task>> => {
+        const reflectionRaw = await this.db.teachingReflections.get(reflectionId);
+        if (!reflectionRaw) throw new Error('Teaching Reflection no longer exists.');
+        const reflection = teachingReflectionRecordSchema.parse(reflectionRaw);
+        if (reflection.status !== 'active') {
+          throw new Error('Restore this Teaching Reflection before adding a Next Step.');
+        }
+
+        const contextRaw = await this.db.learnerContexts.get(reflection.contextId);
+        if (!contextRaw) throw new Error('The Teaching Reflection context no longer exists.');
+        learnerContextSchema.parse(contextRaw);
+
+        const now = this.now();
+        const task = taskSchema.parse({
+          id: this.createId(),
+          ...parsed,
+          contextId: reflection.contextId,
+          linkedEntityType: TEACHING_REFLECTION_TASK_LINK_TYPE,
+          linkedEntityId: reflection.id,
+          status: 'active',
+          order: this.order(),
+          createdAt: now,
+          updatedAt: now,
+        });
+        const categoryPlan = await buildCategoryAssignmentChangePlan(this.db, 'task', task.id, {
+          selections: categorySelections,
+          useDefaultsForMissingFamilies: true,
+          createId: this.createId,
+          now,
+        });
+        const commands: TaskCommandPair = {
+          forward: createTaskCommand([putTaskOperation(task), ...categoryPlan.forward]),
+          inverse: createTaskCommand([...categoryPlan.inverse, deleteTaskOperation(task.id)]),
+        };
+        const log = this.createChangeLog(
+          'task.create',
+          `Create Next Step “${task.title}” from Teaching Reflection`,
+          commands,
+          now,
+        );
+        await clearSupportedRedoBranch(this.db);
+        await this.applyOperations(commands.forward.operations);
+        await this.db.changeLog.put(log);
+        return { value: task, log };
+      },
+    );
+
+    this.notifyNewChange(result.log);
+    return result.value;
+  }
+
   async update(
     id: string,
     values: TaskEditorValues,
@@ -195,6 +266,12 @@ export class TaskMutationService {
       this.db.changeLog,
       async (): Promise<CommitResult<Task>> => {
         const existing = await this.requireTask(id);
+        if (
+          existing.linkedEntityType === TEACHING_REFLECTION_TASK_LINK_TYPE &&
+          parsed.contextId !== existing.contextId
+        ) {
+          throw new Error('A Teaching Reflection Next Step must keep its source context.');
+        }
         await this.requireSelectableContext(parsed.contextId, existing.contextId);
         const now = this.now();
         const updated = taskSchema.parse({

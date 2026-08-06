@@ -35,16 +35,18 @@ import {
   standardSchema,
   studentRecordSchema,
   taskSchema,
+  teachingReflectionRecordSchema,
 } from '@/domain/models/entities';
 
 export const CLASSROOM_BACKUP_FORMAT = 'classroom-v20-backup-v1' as const;
-export const CLASSROOM_DATABASE_SCHEMA_VERSION = 16;
+export const CLASSROOM_DATABASE_SCHEMA_VERSION = 17;
 const LEGACY_ROSTERLESS_SCHEMA_VERSION = 10;
 const LEGACY_EVIDENCELESS_SCHEMA_VERSION = 11;
 const LEGACY_IMPORTLESS_SCHEMA_VERSION = 12;
 const LEGACY_PRESETLESS_SCHEMA_VERSION = 13;
 const LEGACY_CALENDAR_IDENTITYLESS_SCHEMA_VERSION = 14;
 const LEGACY_RECURRENCELESS_SCHEMA_VERSION = 15;
+const LEGACY_REFLECTIONLESS_SCHEMA_VERSION = 16;
 export const CLASSROOM_APP_VERSION = packageMetadata.version;
 export const MAX_BACKUP_FILE_BYTES = 100 * 1024 * 1024;
 
@@ -74,6 +76,7 @@ export const BACKUP_TABLE_NAMES = [
   'standardAlignments',
   'standardImportBatches',
   'sessionOccurrences',
+  'teachingReflections',
   'tasks',
   'quickCaptures',
   'reminders',
@@ -112,6 +115,7 @@ const backupSchemas: Record<BackupTableName, ZodType> = {
   standardAlignments: standardAlignmentSchema,
   standardImportBatches: standardImportBatchSchema,
   sessionOccurrences: sessionOccurrenceSchema,
+  teachingReflections: teachingReflectionRecordSchema,
   tasks: taskSchema,
   quickCaptures: quickCaptureSchema,
   reminders: reminderSchema,
@@ -279,6 +283,7 @@ export function buildRestorePreview(rawText: string): RestorePreview {
   }
   if (
     parsed.databaseSchemaVersion !== CLASSROOM_DATABASE_SCHEMA_VERSION &&
+    parsed.databaseSchemaVersion !== LEGACY_REFLECTIONLESS_SCHEMA_VERSION &&
     parsed.databaseSchemaVersion !== LEGACY_RECURRENCELESS_SCHEMA_VERSION &&
     parsed.databaseSchemaVersion !== LEGACY_CALENDAR_IDENTITYLESS_SCHEMA_VERSION &&
     parsed.databaseSchemaVersion !== LEGACY_PRESETLESS_SCHEMA_VERSION &&
@@ -287,7 +292,7 @@ export function buildRestorePreview(rawText: string): RestorePreview {
     parsed.databaseSchemaVersion !== LEGACY_ROSTERLESS_SCHEMA_VERSION
   ) {
     throw new Error(
-      `This backup uses database schema ${String(parsed.databaseSchemaVersion)}. Classroom supports schemas ${LEGACY_ROSTERLESS_SCHEMA_VERSION}, ${LEGACY_EVIDENCELESS_SCHEMA_VERSION}, ${LEGACY_IMPORTLESS_SCHEMA_VERSION}, ${LEGACY_PRESETLESS_SCHEMA_VERSION}, ${LEGACY_CALENDAR_IDENTITYLESS_SCHEMA_VERSION}, ${LEGACY_RECURRENCELESS_SCHEMA_VERSION}, and ${CLASSROOM_DATABASE_SCHEMA_VERSION}.`,
+      `This backup uses database schema ${String(parsed.databaseSchemaVersion)}. Classroom supports schemas ${LEGACY_ROSTERLESS_SCHEMA_VERSION}, ${LEGACY_EVIDENCELESS_SCHEMA_VERSION}, ${LEGACY_IMPORTLESS_SCHEMA_VERSION}, ${LEGACY_PRESETLESS_SCHEMA_VERSION}, ${LEGACY_CALENDAR_IDENTITYLESS_SCHEMA_VERSION}, ${LEGACY_RECURRENCELESS_SCHEMA_VERSION}, ${LEGACY_REFLECTIONLESS_SCHEMA_VERSION}, and ${CLASSROOM_DATABASE_SCHEMA_VERSION}.`,
     );
   }
   if (
@@ -348,6 +353,7 @@ export function buildRestorePreview(rawText: string): RestorePreview {
           'classificationMappingPresets',
           'calendarEventImportSeries',
           'calendarEventImportOccurrences',
+          'teachingReflections',
         ]
       : parsed.databaseSchemaVersion === LEGACY_EVIDENCELESS_SCHEMA_VERSION
         ? [
@@ -356,6 +362,7 @@ export function buildRestorePreview(rawText: string): RestorePreview {
             'classificationMappingPresets',
             'calendarEventImportSeries',
             'calendarEventImportOccurrences',
+            'teachingReflections',
           ]
         : parsed.databaseSchemaVersion === LEGACY_IMPORTLESS_SCHEMA_VERSION
           ? [
@@ -363,18 +370,30 @@ export function buildRestorePreview(rawText: string): RestorePreview {
               'classificationMappingPresets',
               'calendarEventImportSeries',
               'calendarEventImportOccurrences',
+              'teachingReflections',
             ]
           : parsed.databaseSchemaVersion === LEGACY_PRESETLESS_SCHEMA_VERSION
             ? [
                 'classificationMappingPresets',
                 'calendarEventImportSeries',
                 'calendarEventImportOccurrences',
+                'teachingReflections',
               ]
             : parsed.databaseSchemaVersion === LEGACY_CALENDAR_IDENTITYLESS_SCHEMA_VERSION
-              ? ['calendarEventImportSeries', 'calendarEventImportOccurrences']
+              ? [
+                  'calendarEventImportSeries',
+                  'calendarEventImportOccurrences',
+                  'teachingReflections',
+                ]
               : parsed.databaseSchemaVersion === LEGACY_RECURRENCELESS_SCHEMA_VERSION
-                ? ['calendarEventImportSeries', 'calendarEventImportOccurrences']
-                : [],
+                ? [
+                    'calendarEventImportSeries',
+                    'calendarEventImportOccurrences',
+                    'teachingReflections',
+                  ]
+                : parsed.databaseSchemaVersion === LEGACY_REFLECTIONLESS_SCHEMA_VERSION
+                  ? ['teachingReflections']
+                  : [],
   );
   for (const tableName of BACKUP_TABLE_NAMES) {
     const source = parsed.tables[tableName];
@@ -467,6 +486,11 @@ export function buildRestorePreview(rawText: string): RestorePreview {
   if (parsed.databaseSchemaVersion <= LEGACY_RECURRENCELESS_SCHEMA_VERSION) {
     warnings.push(
       'This backup predates ICS recurrence ownership and occurrence reconciliation. Those metadata tables will be restored empty without rewriting existing Calendar events.',
+    );
+  }
+  if (parsed.databaseSchemaVersion <= LEGACY_REFLECTIONLESS_SCHEMA_VERSION) {
+    warnings.push(
+      'This backup predates Teaching Reflections. The teachingReflections table will be restored empty.',
     );
   }
   if (quarantined.length > 0) {

@@ -16,6 +16,7 @@ import {
   schoolYearSchema,
   sessionOccurrenceSchema,
   taskSchema,
+  teachingReflectionRecordSchema,
 } from './entities';
 
 describe('domain schemas', () => {
@@ -48,6 +49,83 @@ describe('domain schemas', () => {
       }),
     ).toThrow();
   });
+  it('requires a source-linked narrative for Teaching Reflections', () => {
+    const reflection = teachingReflectionRecordSchema.parse({
+      id: 'reflection-1',
+      sessionOccurrenceId: 'session-1',
+      schoolYearId: 'year-1',
+      contextId: 'class-1',
+      lessonPlanId: 'lesson-1',
+      occurredOn: '2026-07-14',
+      whatWorked: '  Students used the visual model independently.  ',
+      sourceSnapshots: {
+        context: { kind: 'class', name: 'Grade 3' },
+        lessonPlan: { title: 'Equivalent fractions' },
+        sessionOccurrence: {
+          date: '2026-07-14',
+          startMinute: 600,
+          endMinute: 645,
+        },
+      },
+      status: 'active',
+      createdAt: '2026-07-14T16:00:00.000Z',
+      updatedAt: '2026-07-14T16:00:00.000Z',
+    });
+
+    expect(reflection.whatWorked).toBe('Students used the visual model independently.');
+    expect(() =>
+      teachingReflectionRecordSchema.parse({
+        ...reflection,
+        whatWorked: undefined,
+      }),
+    ).toThrow('at least one narrative field');
+  });
+
+  it('keeps Teaching Reflection lifecycle and Session snapshots internally consistent', () => {
+    const reflection = {
+      id: 'reflection-archived',
+      sessionOccurrenceId: 'session-1',
+      schoolYearId: 'year-1',
+      contextId: 'class-1',
+      lessonPlanId: 'lesson-1',
+      occurredOn: '2026-07-14',
+      additionalNotes: 'Retained historical note.',
+      sourceSnapshots: {
+        context: { kind: 'class' as const, name: 'Grade 3' },
+        lessonPlan: { title: 'Equivalent fractions' },
+        sessionOccurrence: {
+          date: '2026-07-14',
+          startMinute: 600,
+          endMinute: 645,
+        },
+      },
+      status: 'archived' as const,
+      archivedAt: '2026-07-15T12:00:00.000Z',
+      createdAt: '2026-07-14T16:00:00.000Z',
+      updatedAt: '2026-07-15T12:00:00.000Z',
+    };
+
+    expect(teachingReflectionRecordSchema.parse(reflection).status).toBe('archived');
+    expect(() =>
+      teachingReflectionRecordSchema.parse({
+        ...reflection,
+        status: 'active',
+      }),
+    ).toThrow('cannot contain archivedAt');
+    expect(() =>
+      teachingReflectionRecordSchema.parse({
+        ...reflection,
+        sourceSnapshots: {
+          ...reflection.sourceSnapshots,
+          sessionOccurrence: {
+            ...reflection.sourceSnapshots.sessionOccurrence,
+            date: '2026-07-15',
+          },
+        },
+      }),
+    ).toThrow('must match its Session snapshot date');
+  });
+
   it('keeps legacy lesson plans compatible without requiring lesson flow', () => {
     const plan = lessonPlanSchema.parse({
       id: 'lesson-1',

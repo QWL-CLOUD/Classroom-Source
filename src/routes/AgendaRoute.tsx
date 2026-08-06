@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Clock3,
   Hourglass,
+  NotebookPen,
   RotateCcw,
   Users,
 } from 'lucide-react';
@@ -26,6 +27,9 @@ function sourceIcon(item: AgendaItem) {
   if (item.sourceType === 'reminder') return <Bell size={18} aria-hidden="true" />;
   if (item.sourceType === 'calendar-event') return <CalendarDays size={18} aria-hidden="true" />;
   if (item.sourceType === 'learner-notice') return <Users size={18} aria-hidden="true" />;
+  if (item.sourceLabel === 'Reflection Next Step') {
+    return <NotebookPen size={18} aria-hidden="true" />;
+  }
   if (item.taskStatus === 'waiting') return <Hourglass size={18} aria-hidden="true" />;
   return <Check size={18} aria-hidden="true" />;
 }
@@ -35,7 +39,7 @@ function emptyMessage(section: AgendaSectionId): string {
   if (section === 'today') return 'No Agenda items for this date.';
   if (section === 'upcoming') return 'No upcoming dated items.';
   if (section === 'waiting') return 'No Tasks are waiting.';
-  return 'No unscheduled learner follow-up Tasks.';
+  return 'No unscheduled follow-up Tasks.';
 }
 
 export function AgendaRoute() {
@@ -67,7 +71,8 @@ export function AgendaRoute() {
           <p className="page-eyebrow">Workspace</p>
           <h1 className="page-title">Personal Agenda</h1>
           <p className="page-subtitle">
-            See what needs attention across Tasks, Reminders, personal events, and learner support.
+            See what needs attention across Tasks, Reminders, personal events, learner support, and
+            Teaching Reflection Next Steps.
           </p>
         </div>
         <div className={styles.dateToolbar} aria-label="Agenda date navigation">
