@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseCalendarEventIcs } from './calendarEventImportIcsParser';
+import {
+  CALENDAR_EVENT_RECURRENCE_ENGINE_VERSION,
+  parseCalendarEventIcs,
+} from './calendarEventImportIcsParser';
 
 function calendar(...lines: string[]): string {
   return [
@@ -12,9 +15,29 @@ function calendar(...lines: string[]): string {
   ].join('\r\n');
 }
 
+const newYorkTimeZone = [
+  'BEGIN:VTIMEZONE',
+  'TZID:America/New_York',
+  'BEGIN:DAYLIGHT',
+  'DTSTART:19700308T020000',
+  'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU',
+  'TZOFFSETFROM:-0500',
+  'TZOFFSETTO:-0400',
+  'TZNAME:EDT',
+  'END:DAYLIGHT',
+  'BEGIN:STANDARD',
+  'DTSTART:19701101T020000',
+  'RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU',
+  'TZOFFSETFROM:-0400',
+  'TZOFFSETTO:-0500',
+  'TZNAME:EST',
+  'END:STANDARD',
+  'END:VTIMEZONE',
+];
+
 describe('Calendar Event ICS parser', () => {
-  it('unfolds text and converts exclusive all-day DTEND to an inclusive Classroom end date', () => {
-    const parsed = parseCalendarEventIcs(
+  it('unfolds text and converts exclusive all-day DTEND to an inclusive Classroom end date', async () => {
+    const parsed = await parseCalendarEventIcs(
       calendar(
         'BEGIN:VEVENT',
         'UID:PD-2026-A',
@@ -34,6 +57,7 @@ describe('Calendar Event ICS parser', () => {
     );
 
     expect(parsed.rows).toHaveLength(1);
+    expect(parsed.series).toHaveLength(0);
     expect(parsed.rows[0]).toMatchObject({
       externalKey: 'PD-2026-A',
       title: 'Professional learning day',
@@ -48,76 +72,119 @@ describe('Calendar Event ICS parser', () => {
     );
   });
 
-  it('preserves timed wall-time form without converting TZID or UTC values', () => {
-    const tzid = parseCalendarEventIcs(
+  it('groups recurring masters and overrides while retaining source timezone definitions', async () => {
+    const parsed = await parseCalendarEventIcs(
       calendar(
+        ...newYorkTimeZone,
         'BEGIN:VEVENT',
-        'UID:conference-1',
-        'SUMMARY:Family conference',
-        'DTSTART;TZID=America/New_York:20261105T153000',
-        'DTEND;TZID=America/New_York:20261105T161500',
+        'UID:weekly-family-night',
+        'SUMMARY:Family night',
+        'DTSTART;TZID=America/New_York:20261001T183000',
+        'DTEND;TZID=America/New_York:20261001T200000',
+        'RRULE:FREQ=WEEKLY;COUNT=4;BYDAY=TH',
+        'RDATE;TZID=America/New_York:20261030T183000',
+        'EXDATE;TZID=America/New_York:20261015T183000',
+        'END:VEVENT',
+        'BEGIN:VEVENT',
+        'UID:weekly-family-night',
+        'RECURRENCE-ID;TZID=America/New_York:20261022T183000',
+        'SUMMARY:Moved family night',
+        'DTSTART;TZID=America/New_York:20261023T183000',
+        'DTEND;TZID=America/New_York:20261023T200000',
         'END:VEVENT',
       ),
-    ).rows[0];
-    expect(tzid).toMatchObject({
-      startDate: '2026-11-05',
-      endDate: '2026-11-05',
-      startMinute: 15 * 60 + 30,
-      endMinute: 16 * 60 + 15,
-      timeZone: 'America/New_York',
-      validationErrors: [],
-      warnings: [
-        'TZID America/New_York is retained as wall time; Classroom does not evaluate timezone rules.',
-      ],
-    });
+    );
 
-    const utc = parseCalendarEventIcs(
-      calendar(
-        'BEGIN:VEVENT',
-        'UID:utc-1',
-        'SUMMARY:UTC event',
-        'DTSTART:20261105T203000Z',
-        'DTEND:20261105T211500Z',
-        'END:VEVENT',
-      ),
-    ).rows[0];
-    expect(utc).toMatchObject({
-      startMinute: 20 * 60 + 30,
-      endMinute: 21 * 60 + 15,
-      timeZone: 'UTC',
+    expect(parsed.rows).toHaveLength(0);
+    expect(parsed.series).toHaveLength(1);
+    expect(parsed.series[0]).toMatchObject({
+      externalKey: 'weekly-family-night',
+      master: {
+        recurrenceRules: ['FREQ=WEEKLY;COUNT=4;BYDAY=TH'],
+        recurrenceDates: [expect.objectContaining({ date: '2026-10-30' })],
+        exclusionDates: [expect.objectContaining({ date: '2026-10-15' })],
+      },
+      overrides: [
+        expect.objectContaining({
+          recurrenceId: expect.objectContaining({ date: '2026-10-22' }),
+          start: expect.objectContaining({ date: '2026-10-23' }),
+        }),
+      ],
       validationErrors: [],
     });
+    expect(parsed.recurrenceEngineVersion).toBe(CALENDAR_EVENT_RECURRENCE_ENGINE_VERSION);
+    expect(parsed.calendarTimeZoneFingerprint).toMatch(/^fnv1a32:/);
+    expect(parsed.series[0]?.warnings.join(' ')).toContain('retained as wall time');
   });
 
-  it('blocks recurrence, cancellation, lossy seconds, and incompatible time forms per VEVENT', () => {
-    const parsed = parseCalendarEventIcs(
+  it('blocks unresolved or duplicate VTIMEZONE definitions and unsupported override ranges', async () => {
+    const unresolved = await parseCalendarEventIcs(
+      calendar(
+        'BEGIN:VEVENT',
+        'UID:unresolved-zone',
+        'SUMMARY:Unresolved zone',
+        'DTSTART;TZID=America/New_York:20261105T153000',
+        'DTEND;TZID=America/New_York:20261105T161500',
+        'RRULE:FREQ=WEEKLY;COUNT=2',
+        'END:VEVENT',
+      ),
+    );
+    expect(unresolved.series[0]?.validationErrors).toContain(
+      'TZID America/New_York requires a matching VTIMEZONE definition.',
+    );
+
+    const ranged = await parseCalendarEventIcs(
+      calendar(
+        ...newYorkTimeZone,
+        'BEGIN:VEVENT',
+        'UID:ranged-series',
+        'SUMMARY:Ranged series',
+        'DTSTART;TZID=America/New_York:20261105T153000',
+        'DTEND;TZID=America/New_York:20261105T161500',
+        'RRULE:FREQ=WEEKLY;COUNT=2',
+        'END:VEVENT',
+        'BEGIN:VEVENT',
+        'UID:ranged-series',
+        'RECURRENCE-ID;RANGE=THISANDFUTURE;TZID=America/New_York:20261112T153000',
+        'SUMMARY:Ranged override',
+        'DTSTART;TZID=America/New_York:20261112T163000',
+        'DTEND;TZID=America/New_York:20261112T171500',
+        'END:VEVENT',
+      ),
+    );
+    expect(ranged.series[0]?.validationErrors).toEqual(
+      expect.arrayContaining([expect.stringContaining('RANGE=THISANDFUTURE')]),
+    );
+  });
+
+  it('keeps METHOD:CANCEL, cancelled masters, DURATION-only events, and lossy seconds blocked', async () => {
+    const parsed = await parseCalendarEventIcs(
       calendar(
         'METHOD:CANCEL',
         'BEGIN:VEVENT',
         'UID:blocked-1',
         'SUMMARY:Recurring event',
-        'DTSTART;TZID=America/New_York:20261105T153001',
-        'DTEND:20261105T161500Z',
+        'DTSTART:20261105T153001Z',
+        'DURATION:PT45M',
         'RRULE:FREQ=WEEKLY',
         'STATUS:CANCELLED',
         'END:VEVENT',
       ),
     );
 
-    expect(parsed.rows[0]?.validationErrors).toEqual(
+    expect(parsed.series[0]?.validationErrors).toEqual(
       expect.arrayContaining([
         expect.stringContaining('non-zero seconds'),
-        expect.stringContaining('same UTC, TZID, or floating-time form'),
-        'RRULE is not supported in this phase.',
-        'STATUS:CANCELLED is not imported.',
-        'METHOD:CANCEL calendars are not imported.',
+        expect.stringContaining('DURATION'),
+        expect.stringContaining('METHOD:CANCEL'),
+        expect.stringContaining('STATUS:CANCELLED'),
       ]),
     );
   });
 
-  it('rejects malformed calendar structure and calendars without VEVENT components', () => {
-    expect(() => parseCalendarEventIcs('UID:not-a-calendar')).toThrow('BEGIN:VCALENDAR');
-    expect(() => parseCalendarEventIcs(calendar('X-WR-CALNAME:Empty'))).toThrow(
+  it('rejects malformed calendar structure and calendars without VEVENT components', async () => {
+    await expect(parseCalendarEventIcs('UID:not-a-calendar')).rejects.toThrow();
+    await expect(parseCalendarEventIcs(calendar('X-WR-CALNAME:Empty'))).rejects.toThrow(
       'contains no VEVENT',
     );
   });

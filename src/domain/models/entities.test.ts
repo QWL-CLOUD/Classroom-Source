@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   assessmentEvidenceRecordSchema,
+  calendarEventImportOccurrenceSchema,
+  calendarEventImportSeriesSchema,
   categoryFamilyIdSchema,
   categoryValueSchema,
   classificationMappingPresetSchema,
@@ -503,5 +505,71 @@ describe('domain schemas', () => {
         },
       }),
     ).toThrow('linked standardId');
+  });
+
+  it('validates recurrence ownership metadata and removed import counts', () => {
+    const series = calendarEventImportSeriesSchema.parse({
+      id: 'series-1',
+      schoolYearId: 'year-1',
+      externalSource: 'ics',
+      externalKey: 'district-calendar@example.test',
+      seriesIdentityKey: 'series-key-1',
+      masterFingerprint: 'fnv1a32:11111111',
+      calendarTimeZoneFingerprint: 'fnv1a32:22222222',
+      recurrenceEngineVersion: 'classroom-rfc5545-v1+ical.js-2.2.1',
+      lastImportRunId: 'run-1',
+      createdAt: '2026-08-05T12:00:00.000Z',
+      updatedAt: '2026-08-05T12:00:00.000Z',
+    });
+    expect(series.externalSource).toBe('ics');
+
+    expect(
+      calendarEventImportOccurrenceSchema.parse({
+        id: 'occurrence-1',
+        seriesId: series.id,
+        schoolYearId: 'year-1',
+        occurrenceKey: 'date\u00002026-10-12\u0000',
+        occurrenceIdentityKey: 'occurrence-key-1',
+        sourceStatus: 'active',
+        managementStatus: 'materialized',
+        eventId: 'event-1',
+        sourceOccurrenceFingerprint: 'fnv1a32:33333333',
+        lastImportedEventFingerprint: 'fnv1a32:44444444',
+        lastImportRunId: 'run-1',
+        createdAt: '2026-08-05T12:00:00.000Z',
+        updatedAt: '2026-08-05T12:00:00.000Z',
+      }),
+    ).toMatchObject({ eventId: 'event-1', managementStatus: 'materialized' });
+
+    expect(() =>
+      calendarEventImportOccurrenceSchema.parse({
+        id: 'occurrence-invalid',
+        seriesId: series.id,
+        schoolYearId: 'year-1',
+        occurrenceKey: 'date\u00002026-10-13\u0000',
+        occurrenceIdentityKey: 'occurrence-key-invalid',
+        sourceStatus: 'active',
+        managementStatus: 'materialized',
+        lastImportRunId: 'run-1',
+        createdAt: '2026-08-05T12:00:00.000Z',
+        updatedAt: '2026-08-05T12:00:00.000Z',
+      }),
+    ).toThrow('requires an Event');
+
+    const removedOnly = importRunSchema.parse({
+      id: 'run-remove',
+      importType: 'calendar-events',
+      sourceKind: 'ics',
+      schoolYearId: 'year-1',
+      totalRows: 1,
+      createdCount: 0,
+      updatedCount: 0,
+      removedCount: 1,
+      skippedCount: 0,
+      reviewCount: 0,
+      blockedCount: 0,
+      committedAt: '2026-08-05T12:00:00.000Z',
+    });
+    expect(removedOnly.removedCount).toBe(1);
   });
 });

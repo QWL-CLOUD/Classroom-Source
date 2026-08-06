@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 import {
+  calendarEventImportOccurrenceSchema,
+  calendarEventImportSeriesSchema,
   calendarEventSchema,
   categoryAssignmentSchema,
   categoryValueSchema,
@@ -12,6 +14,8 @@ import {
   standardSchema,
   studentRecordSchema,
   type CalendarEvent,
+  type CalendarEventImportOccurrence,
+  type CalendarEventImportSeries,
   type CategoryAssignment,
   type CategoryValue,
   type ClassificationMappingPreset,
@@ -43,6 +47,26 @@ const putCalendarEventOperationSchema = z.object({
 const deleteCalendarEventOperationSchema = z.object({
   action: z.literal('delete'),
   table: z.literal('calendarEvents'),
+  id: z.string().min(1),
+});
+const putCalendarEventImportSeriesOperationSchema = z.object({
+  action: z.literal('put'),
+  table: z.literal('calendarEventImportSeries'),
+  record: calendarEventImportSeriesSchema,
+});
+const deleteCalendarEventImportSeriesOperationSchema = z.object({
+  action: z.literal('delete'),
+  table: z.literal('calendarEventImportSeries'),
+  id: z.string().min(1),
+});
+const putCalendarEventImportOccurrenceOperationSchema = z.object({
+  action: z.literal('put'),
+  table: z.literal('calendarEventImportOccurrences'),
+  record: calendarEventImportOccurrenceSchema,
+});
+const deleteCalendarEventImportOccurrenceOperationSchema = z.object({
+  action: z.literal('delete'),
+  table: z.literal('calendarEventImportOccurrences'),
   id: z.string().min(1),
 });
 const putLibraryItemOperationSchema = z.object({
@@ -133,6 +157,10 @@ export const importOperationSchema = z.union([
   deleteImportRunOperationSchema,
   putCalendarEventOperationSchema,
   deleteCalendarEventOperationSchema,
+  putCalendarEventImportSeriesOperationSchema,
+  deleteCalendarEventImportSeriesOperationSchema,
+  putCalendarEventImportOccurrenceOperationSchema,
+  deleteCalendarEventImportOccurrenceOperationSchema,
   putLibraryItemOperationSchema,
   deleteLibraryItemOperationSchema,
   putCategoryValueOperationSchema,
@@ -190,6 +218,34 @@ export function putImportedCalendarEventOperation(record: CalendarEvent): Import
 
 export function deleteImportedCalendarEventOperation(id: string): ImportOperation {
   return { action: 'delete', table: 'calendarEvents', id };
+}
+
+export function putCalendarEventImportSeriesOperation(
+  record: CalendarEventImportSeries,
+): ImportOperation {
+  return {
+    action: 'put',
+    table: 'calendarEventImportSeries',
+    record: calendarEventImportSeriesSchema.parse(record),
+  };
+}
+
+export function deleteCalendarEventImportSeriesOperation(id: string): ImportOperation {
+  return { action: 'delete', table: 'calendarEventImportSeries', id };
+}
+
+export function putCalendarEventImportOccurrenceOperation(
+  record: CalendarEventImportOccurrence,
+): ImportOperation {
+  return {
+    action: 'put',
+    table: 'calendarEventImportOccurrences',
+    record: calendarEventImportOccurrenceSchema.parse(record),
+  };
+}
+
+export function deleteCalendarEventImportOccurrenceOperation(id: string): ImportOperation {
+  return { action: 'delete', table: 'calendarEventImportOccurrences', id };
 }
 
 export function putImportedLibraryItemOperation(record: LibraryCatalogItem): ImportOperation {

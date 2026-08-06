@@ -12,7 +12,7 @@ afterEach(async () => {
 });
 
 describe('ClassroomDatabase schema upgrades', () => {
-  it('upgrades legacy data to schema v15 and adds Student, roster, Assessment Evidence, and Import Center stores without losing Tasks', async () => {
+  it('upgrades legacy data to schema v16 and adds Student, roster, Assessment Evidence, and Import Center stores without losing Tasks', async () => {
     const name = `classroom-v20-upgrade-${crypto.randomUUID()}`;
     names.push(name);
     const legacy = new Dexie(name);
@@ -33,7 +33,7 @@ describe('ClassroomDatabase schema upgrades', () => {
     const upgraded = new ClassroomDatabase(name);
     await upgraded.open();
 
-    expect(upgraded.verno).toBe(15);
+    expect(upgraded.verno).toBe(16);
     expect(await upgraded.tasks.get('legacy-task')).toBeDefined();
     await upgraded.learnerContexts.put({
       id: 'class-1',
@@ -194,12 +194,59 @@ describe('ClassroomDatabase schema upgrades', () => {
       totalRows: 1,
       createdCount: 1,
       updatedCount: 0,
+      removedCount: 0,
       skippedCount: 0,
       reviewCount: 0,
       blockedCount: 0,
       committedAt: '2026-07-29T12:00:00.000Z',
     });
     expect(await upgraded.importRuns.count()).toBe(1);
+    await upgraded.calendarEventImportSeries.put({
+      id: 'series-1',
+      schoolYearId: 'year-1',
+      externalSource: 'ics',
+      externalKey: 'weekly@example.test',
+      seriesIdentityKey: 'calendar-event-series\u0000ics\u0000year-1\u0000weekly@example.test',
+      masterFingerprint: 'fnv1a32:11111111',
+      calendarTimeZoneFingerprint: 'fnv1a32:22222222',
+      recurrenceEngineVersion: 'classroom-rfc5545-v1+ical.js-2.2.1',
+      lastImportRunId: 'import-run-1',
+      createdAt: '2026-08-05T12:00:00.000Z',
+      updatedAt: '2026-08-05T12:00:00.000Z',
+    });
+    await upgraded.calendarEventImportOccurrences.put({
+      id: 'occurrence-1',
+      seriesId: 'series-1',
+      schoolYearId: 'year-1',
+      occurrenceKey: 'date\u00002026-10-12\u0000',
+      occurrenceIdentityKey:
+        'calendar-event-series\u0000ics\u0000year-1\u0000weekly@example.test\u0000date\u00002026-10-12\u0000',
+      sourceStatus: 'active',
+      managementStatus: 'materialized',
+      eventId: 'imported-event',
+      sourceOccurrenceFingerprint: 'fnv1a32:33333333',
+      lastImportedEventFingerprint: 'fnv1a32:44444444',
+      lastImportRunId: 'import-run-1',
+      createdAt: '2026-08-05T12:00:00.000Z',
+      updatedAt: '2026-08-05T12:00:00.000Z',
+    });
+    expect(await upgraded.calendarEventImportSeries.count()).toBe(1);
+    expect(await upgraded.calendarEventImportOccurrences.count()).toBe(1);
+    await expect(
+      upgraded.calendarEventImportOccurrences.put({
+        id: 'occurrence-duplicate',
+        seriesId: 'series-1',
+        schoolYearId: 'year-1',
+        occurrenceKey: 'date\u00002026-10-13\u0000',
+        occurrenceIdentityKey:
+          'calendar-event-series\u0000ics\u0000year-1\u0000weekly@example.test\u0000date\u00002026-10-12\u0000',
+        sourceStatus: 'excluded',
+        managementStatus: 'suppressed',
+        lastImportRunId: 'import-run-1',
+        createdAt: '2026-08-05T12:00:00.000Z',
+        updatedAt: '2026-08-05T12:00:00.000Z',
+      }),
+    ).rejects.toThrow();
     await upgraded.libraryItems.update('library-resource-1', {
       externalSource: 'district catalog',
       externalKey: 'resource-1',

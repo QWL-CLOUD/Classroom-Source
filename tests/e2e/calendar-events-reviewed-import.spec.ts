@@ -154,7 +154,9 @@ test('Calendar Events import offers formal Excel and CSV templates', async ({ pa
   );
 });
 
-test('recurring ICS Event stays blocked and writes nothing', async ({ page }) => {
+test('recurring ICS Event with unresolved TZID stays blocked and writes nothing', async ({
+  page,
+}) => {
   const title = 'Recurring faculty meeting';
   await page.goto('./#/import?type=calendar-events');
   await seedCalendarImport(page);
@@ -183,7 +185,11 @@ test('recurring ICS Event stays blocked and writes nothing', async ({ page }) =>
 
   const preview = page.getByLabel('Calendar Event import preview');
   await expect(preview.getByText('Blocked', { exact: true })).toBeVisible();
-  await expect(preview.getByText('RRULE is not supported in this phase.')).toBeVisible();
+  await expect(
+    preview.getByText('TZID America/New_York requires a matching VTIMEZONE definition.', {
+      exact: true,
+    }),
+  ).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Commit reviewed Calendar Events' }),
   ).toBeDisabled();

@@ -73,8 +73,10 @@ function ids(): () => string {
   return () => `generated-${++value}`;
 }
 
-function source(...eventLines: string[]): Extract<CalendarEventImportSource, { kind: 'ics' }> {
-  return { kind: 'ics', parsed: parseCalendarEventIcs(calendar(...eventLines)) };
+async function source(
+  ...eventLines: string[]
+): Promise<Extract<CalendarEventImportSource, { kind: 'ics' }>> {
+  return { kind: 'ics', parsed: await parseCalendarEventIcs(calendar(...eventLines)) };
 }
 
 function input(
@@ -107,9 +109,9 @@ function preview(
 }
 
 describe('Calendar Event import preview model', () => {
-  it('creates one all-day Event, applies the default Event Type, and preserves case-sensitive UID identity', () => {
+  it('creates one all-day Event, applies the default Event Type, and preserves case-sensitive UID identity', async () => {
     const result = preview(
-      source(
+      await source(
         'UID:District-PD-01',
         'SUMMARY:Professional learning day',
         'DTSTART;VALUE=DATE:20261012',
@@ -151,7 +153,7 @@ describe('Calendar Event import preview model', () => {
     );
   });
 
-  it('updates only an exact identity in the selected School Year and blocks cross-year ownership', () => {
+  it('updates only an exact identity in the selected School Year and blocks cross-year ownership', async () => {
     const imported = calendarEventSchema.parse({
       id: 'existing-imported',
       title: 'Old title',
@@ -164,7 +166,7 @@ describe('Calendar Event import preview model', () => {
       importIdentityKey: buildCalendarEventIcsIdentity('stable-uid'),
       lastImportRunId: 'older-run',
     });
-    const incoming = source(
+    const incoming = await source(
       'UID:stable-uid',
       'SUMMARY:Updated title',
       'DTSTART;VALUE=DATE:20261012',
@@ -187,7 +189,7 @@ describe('Calendar Event import preview model', () => {
     });
   });
 
-  it('requires an explicit decision before adopting a probable manual duplicate', () => {
+  it('requires an explicit decision before adopting a probable manual duplicate', async () => {
     const manual = calendarEventSchema.parse({
       id: 'manual-event',
       title: 'Family conference',
@@ -198,7 +200,7 @@ describe('Calendar Event import preview model', () => {
       category: 'Calendar',
       schoolYearId: schoolYear.id,
     });
-    const incoming = source(
+    const incoming = await source(
       'UID:conference-uid',
       'SUMMARY:Family conference',
       'DTSTART:20261105T153000',
@@ -237,8 +239,8 @@ describe('Calendar Event import preview model', () => {
     expect(skipped.rows[0]?.classification).toBe('skip');
   });
 
-  it('keeps TENTATIVE and unknown Event Type values in Review until explicitly resolved', () => {
-    const incoming = source(
+  it('keeps TENTATIVE and unknown Event Type values in Review until explicitly resolved', async () => {
+    const incoming = await source(
       'UID:tentative-1',
       'SUMMARY:Draft closure',
       'DTSTART;VALUE=DATE:20270115',
@@ -283,37 +285,46 @@ describe('Calendar Event import preview model', () => {
     ]);
   });
 
-  it('blocks duplicate source identities, dates outside the School Year, and recurring VEVENT data', () => {
-    const recurring = source(
-      'UID:repeat-me',
-      'SUMMARY:Recurring meeting',
-      'DTSTART;VALUE=DATE:20260701',
-      'RRULE:FREQ=WEEKLY',
+  it('materializes supported recurrence as discrete Events and blocks unsupported recurrence', async () => {
+    const recurring = preview(
+      await source(
+        'UID:repeat-me',
+        'SUMMARY:Recurring meeting',
+        'DTSTART;VALUE=DATE:20260903',
+        'RRULE:FREQ=WEEKLY;COUNT=3;BYDAY=TH',
+      ),
     );
-    const first = recurring.parsed.rows[0]!;
-    const duplicateSource: CalendarEventImportSource = {
-      kind: 'ics',
-      parsed: {
-        ...recurring.parsed,
-        rows: [first, { ...first, sourceRow: first.sourceRow + 10, eventOrdinal: 2 }],
-      },
-    };
-    const result = preview(duplicateSource);
 
-    expect(result.rows).toHaveLength(2);
-    for (const row of result.rows) {
-      expect(row.classification).toBe('blocked');
-      expect(row.reasons).toEqual(
-        expect.arrayContaining([
-          expect.stringContaining('RRULE'),
-          expect.stringContaining('within 2026-08-24 through 2027-06-18'),
-          expect.stringContaining('repeats the same Calendar Event identity'),
-        ]),
-      );
-    }
+    expect(recurring.canCommit).toBe(true);
+    expect(recurring.summary).toMatchObject({ createCount: 3, blockedCount: 0 });
+    expect(recurring.rows.map((row) => row.normalized?.startDate)).toEqual([
+      '2026-09-03',
+      '2026-09-10',
+      '2026-09-17',
+    ]);
+    expect(recurring.rows[0]?.planned).toMatchObject({
+      series: {
+        externalKey: 'repeat-me',
+        recurrenceEngineVersion: 'classroom-rfc5545-v1+ical.js-2.2.1',
+      },
+      occurrence: { managementStatus: 'materialized', sourceStatus: 'active' },
+    });
+
+    const blocked = preview(
+      await source(
+        'UID:blocked-repeat',
+        'SUMMARY:Blocked recurring meeting',
+        'DTSTART;VALUE=DATE:20260903',
+        'RRULE:FREQ=HOURLY;COUNT=2',
+      ),
+    );
+    expect(blocked.canCommit).toBe(false);
+    expect(blocked.rows).toHaveLength(1);
+    expect(blocked.rows[0]).toMatchObject({ classification: 'blocked' });
+    expect(blocked.rows[0]?.reasons.join(' ')).toContain('FREQ=HOURLY');
   });
 
-  it('preserves an existing Calendar Event Type assignment when an exact update omits CATEGORIES', () => {
+  it('preserves an existing Calendar Event Type assignment when an exact update omits CATEGORIES', async () => {
     const imported: CalendarEvent = calendarEventSchema.parse({
       id: 'assigned-event',
       title: 'Old PD title',
@@ -334,7 +345,7 @@ describe('Calendar Event import preview model', () => {
       createdAt: generatedAt,
     });
     const result = preview(
-      source('UID:assigned-uid', 'SUMMARY:Updated PD title', 'DTSTART;VALUE=DATE:20261012'),
+      await source('UID:assigned-uid', 'SUMMARY:Updated PD title', 'DTSTART;VALUE=DATE:20261012'),
       { existingEvents: [imported], categoryAssignments: [assignment] },
     );
 
@@ -345,6 +356,157 @@ describe('Calendar Event import preview model', () => {
         expectedAssignments: [{ id: assignment.id }],
         assignmentsToDelete: [],
         assignmentsToCreate: [],
+      },
+    });
+  });
+
+  it('reconciles exact re-import, local edits, manual deletion, and source removal through explicit decisions', async () => {
+    const initialSource = await source(
+      'UID:managed-series',
+      'SUMMARY:Managed weekly event',
+      'DTSTART;VALUE=DATE:20260903',
+      'RRULE:FREQ=WEEKLY;COUNT=2;BYDAY=TH',
+    );
+    const first = preview(initialSource);
+    const existingEvents = first.rows
+      .map((row) => row.planned?.event)
+      .filter((value): value is NonNullable<typeof value> => Boolean(value));
+    const existingSeries = first.rows
+      .map((row) => row.planned?.series)
+      .filter((value): value is NonNullable<typeof value> => Boolean(value));
+    const existingOccurrences = first.rows
+      .map((row) => row.planned?.occurrence)
+      .filter((value): value is NonNullable<typeof value> => Boolean(value));
+    const categoryAssignments = first.rows.flatMap((row) => row.planned?.assignmentsToCreate ?? []);
+
+    const exact = preview(initialSource, {
+      existingEvents,
+      existingSeries,
+      existingOccurrences,
+      categoryAssignments,
+    });
+    expect(exact.canCommit).toBe(false);
+    expect(exact.summary).toMatchObject({ skipCount: 2, createCount: 0, updateCount: 0 });
+
+    const editedEvent = calendarEventSchema.parse({
+      ...existingEvents[0]!,
+      title: 'Locally edited title',
+    });
+    const edited = preview(initialSource, {
+      existingEvents: [editedEvent, existingEvents[1]!],
+      existingSeries,
+      existingOccurrences,
+      categoryAssignments,
+    });
+    const editedRow = edited.rows.find((row) => row.planned?.existingEvent?.id === editedEvent.id);
+    expect(editedRow).toMatchObject({ classification: 'review' });
+    const editedIdentity = editedRow!.rowKey;
+
+    const applySource = preview(initialSource, {
+      existingEvents: [editedEvent, existingEvents[1]!],
+      existingSeries,
+      existingOccurrences,
+      categoryAssignments,
+      recurrenceDecisions: { [editedIdentity]: { action: 'apply-source' } },
+    });
+    expect(applySource.rows.find((row) => row.rowKey === editedIdentity)).toMatchObject({
+      classification: 'update',
+      planned: { event: { title: 'Managed weekly event' } },
+    });
+
+    const detach = preview(initialSource, {
+      existingEvents: [editedEvent, existingEvents[1]!],
+      existingSeries,
+      existingOccurrences,
+      categoryAssignments,
+      recurrenceDecisions: { [editedIdentity]: { action: 'detach' } },
+    });
+    expect(detach.rows.find((row) => row.rowKey === editedIdentity)).toMatchObject({
+      classification: 'update',
+      planned: {
+        event: { id: editedEvent.id, importIdentityKey: undefined },
+        occurrence: { managementStatus: 'detached', relatedManualEventId: editedEvent.id },
+      },
+    });
+
+    const deletedEvent = existingEvents[1]!;
+    const deletedOccurrence = existingOccurrences.find(
+      (value) => value.eventId === deletedEvent.id,
+    )!;
+    const deleted = preview(initialSource, {
+      existingEvents: [existingEvents[0]!],
+      existingSeries,
+      existingOccurrences,
+      categoryAssignments,
+    });
+    expect(
+      deleted.rows.find((row) => row.rowKey === deletedOccurrence.occurrenceIdentityKey),
+    ).toMatchObject({
+      classification: 'review',
+    });
+
+    const suppressed = preview(initialSource, {
+      existingEvents: [existingEvents[0]!],
+      existingSeries,
+      existingOccurrences,
+      categoryAssignments,
+      recurrenceDecisions: {
+        [deletedOccurrence.occurrenceIdentityKey]: { action: 'suppress' },
+      },
+    });
+    expect(
+      suppressed.rows.find((row) => row.rowKey === deletedOccurrence.occurrenceIdentityKey),
+    ).toMatchObject({
+      classification: 'update',
+      planned: { occurrence: { managementStatus: 'suppressed', eventId: undefined } },
+    });
+
+    const shortenedSource = await source(
+      'UID:managed-series',
+      'SUMMARY:Managed weekly event',
+      'DTSTART;VALUE=DATE:20260903',
+      'RRULE:FREQ=WEEKLY;COUNT=1;BYDAY=TH',
+    );
+    const removed = preview(shortenedSource, {
+      existingEvents,
+      existingSeries,
+      existingOccurrences,
+      categoryAssignments,
+    });
+    expect(removed.summary).toMatchObject({ removeCount: 1, updateCount: 1, skipCount: 0 });
+    expect(removed.rows.find((row) => row.classification === 'remove')).toMatchObject({
+      planned: { eventMutation: 'delete', existingEvent: { id: deletedEvent.id } },
+    });
+  });
+
+  it('persists a suppression when a reviewed recurring occurrence is skipped as a probable duplicate', async () => {
+    const manual = calendarEventSchema.parse({
+      id: 'manual-recurring-duplicate',
+      title: 'Recurring family meeting',
+      startDate: '2026-09-03',
+      endDate: '2026-09-03',
+      category: 'Calendar',
+      schoolYearId: schoolYear.id,
+    });
+    const recurringSource = await source(
+      'UID:duplicate-series',
+      'SUMMARY:Recurring family meeting',
+      'DTSTART;VALUE=DATE:20260903',
+      'RRULE:FREQ=WEEKLY;COUNT=1',
+    );
+    const unresolved = preview(recurringSource, { existingEvents: [manual] });
+    expect(unresolved.rows[0]).toMatchObject({ classification: 'review' });
+
+    const skipped = preview(recurringSource, {
+      existingEvents: [manual],
+      duplicateDecisions: { [unresolved.rows[0]!.rowKey]: { action: 'skip' } },
+    });
+    expect(skipped.rows[0]).toMatchObject({
+      classification: 'update',
+      planned: {
+        eventMutation: 'none',
+        series: { externalKey: 'duplicate-series' },
+        occurrence: { managementStatus: 'suppressed', sourceStatus: 'active' },
       },
     });
   });

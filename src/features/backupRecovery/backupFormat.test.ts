@@ -63,7 +63,7 @@ describe('Classroom backup format', () => {
     expect(preview.validRecordCount).toBe(1);
     expect(preview.quarantineCount).toBe(0);
     expect(preview.validTables.tasks).toEqual([task('task-1')]);
-    expect(preview.tableSummaries).toHaveLength(30);
+    expect(preview.tableSummaries).toHaveLength(32);
   });
 
   it('restores a schema v10 backup with the new Student and roster tables empty', () => {
@@ -203,7 +203,32 @@ describe('Classroom backup format', () => {
     expect(preview.warnings.join(' ')).toMatch(/without guessed ownership or provenance/);
   });
 
-  it('round-trips Calendar Event ownership, canonical type assignment, and import provenance on DB v15', () => {
+  it('restores a schema v15 backup with recurrence ownership tables empty', () => {
+    const current = createBackupEnvelope(emptyBackupTables(), {
+      backupId: 'legacy-v15-backup',
+      exportedAt: now,
+    });
+    const legacyTables = { ...current.tables } as Record<string, unknown[]>;
+    const legacyCounts = { ...current.tableCounts } as Record<string, number>;
+    delete legacyTables.calendarEventImportSeries;
+    delete legacyTables.calendarEventImportOccurrences;
+    delete legacyCounts.calendarEventImportSeries;
+    delete legacyCounts.calendarEventImportOccurrences;
+    const legacyEnvelope = {
+      ...current,
+      databaseSchemaVersion: 15,
+      tables: legacyTables,
+      tableCounts: legacyCounts,
+    } as unknown as ClassroomBackupEnvelope;
+
+    const preview = buildRestorePreview(resign(legacyEnvelope));
+
+    expect(preview.validTables.calendarEventImportSeries).toEqual([]);
+    expect(preview.validTables.calendarEventImportOccurrences).toEqual([]);
+    expect(preview.warnings.join(' ')).toMatch(/predates ICS recurrence ownership/);
+  });
+
+  it('round-trips Calendar recurrence ownership, canonical type assignment, and import provenance on DB v16', () => {
     const tables = emptyBackupTables();
     tables.schoolYears.push({
       id: 'year-1',
@@ -262,19 +287,60 @@ describe('Classroom backup format', () => {
       committedAt: now,
     });
 
+    tables.calendarEventImportSeries.push({
+      id: 'series-1',
+      schoolYearId: 'year-1',
+      externalSource: 'ics',
+      externalKey: 'district-series@example.test',
+      seriesIdentityKey:
+        'calendar-event-series\u0000ics\u0000year-1\u0000district-series@example.test',
+      masterFingerprint: 'fnv1a32:11111111',
+      calendarTimeZoneFingerprint: 'fnv1a32:22222222',
+      recurrenceEngineVersion: 'classroom-rfc5545-v1+ical.js-2.2.1',
+      lastImportRunId: 'calendar-import-1',
+      createdAt: now,
+      updatedAt: now,
+    });
+    tables.calendarEventImportOccurrences.push({
+      id: 'occurrence-1',
+      seriesId: 'series-1',
+      schoolYearId: 'year-1',
+      occurrenceKey: 'date\u00002026-08-28\u0000',
+      occurrenceIdentityKey:
+        'calendar-event-series\u0000ics\u0000year-1\u0000district-series@example.test\u0000date\u00002026-08-28\u0000',
+      sourceStatus: 'active',
+      managementStatus: 'materialized',
+      eventId: 'calendar-event-1',
+      sourceOccurrenceFingerprint: 'fnv1a32:33333333',
+      lastImportedEventFingerprint: 'fnv1a32:44444444',
+      lastImportedCategoryValueId: 'event-type-pd',
+      lastImportRunId: 'calendar-import-1',
+      createdAt: now,
+      updatedAt: now,
+    });
+
     const envelope = createBackupEnvelope(tables, {
       backupId: 'calendar-foundation-backup',
       exportedAt: now,
     });
     const preview = buildRestorePreview(serializeBackupEnvelope(envelope));
 
-    expect(envelope.databaseSchemaVersion).toBe(15);
+    expect(envelope.databaseSchemaVersion).toBe(16);
     expect(preview.quarantineCount).toBe(0);
     expect(preview.validTables.calendarEvents[0]).toMatchObject({
       schoolYearId: 'year-1',
       location: 'Main campus',
       timeZone: 'America/New_York',
       lastImportRunId: 'calendar-import-1',
+    });
+    expect(preview.validTables.calendarEventImportSeries[0]).toMatchObject({
+      id: 'series-1',
+      recurrenceEngineVersion: 'classroom-rfc5545-v1+ical.js-2.2.1',
+    });
+    expect(preview.validTables.calendarEventImportOccurrences[0]).toMatchObject({
+      id: 'occurrence-1',
+      eventId: 'calendar-event-1',
+      managementStatus: 'materialized',
     });
     expect(preview.validTables.categoryAssignments[0]).toMatchObject({
       familyId: 'calendar-event-type',
@@ -512,7 +578,7 @@ describe('Classroom backup format', () => {
     });
     const preview = buildRestorePreview(serializeBackupEnvelope(envelope));
 
-    expect(envelope.databaseSchemaVersion).toBe(15);
+    expect(envelope.databaseSchemaVersion).toBe(16);
     expect(preview.quarantineCount).toBe(0);
     expect(familyIds(preview.validTables.categoryValues)).toEqual(['language-level', 'subject']);
     expect(familyIds(preview.validTables.categoryAssignments)).toEqual([
