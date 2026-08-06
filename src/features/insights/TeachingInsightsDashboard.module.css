@@ -1,0 +1,463 @@
+.page,
+.section,
+.contractNote,
+.pageHeader > *,
+.sectionHeader > *,
+.ratioPanel > *,
+.splitLayout > *,
+.tableScroller {
+  min-width: 0;
+}
+
+.page {
+  display: grid;
+  gap: 20px;
+}
+
+.pageHeader {
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+
+.schoolYearControl {
+  min-width: min(100%, 260px);
+  display: grid;
+  gap: 7px;
+  color: var(--heading);
+  font-weight: 800;
+}
+
+.schoolYearControl select {
+  width: 100%;
+}
+
+.schoolYearControl small {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.contractNote {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.45fr) minmax(280px, 1.2fr) minmax(250px, 0.75fr);
+  gap: 18px;
+  align-items: start;
+  padding: 20px;
+  border-color: var(--border-strong, var(--border));
+  background: var(--surface-soft);
+}
+
+.contractNote h2,
+.contractNote p,
+.sectionHeader h2,
+.sectionHeader p {
+  margin: 0;
+}
+
+.contractNote > p,
+.sectionHeader > span,
+.interpretationNote,
+.emptyText {
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.kicker,
+.sectionHeader p {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.contractNote h2,
+.sectionHeader h2 {
+  margin-top: 4px;
+  color: var(--heading);
+}
+
+.contractNote dl,
+.ratioPanel dl,
+.summaryList,
+.inlineDefinitionList {
+  margin: 0;
+}
+
+.contractNote dl {
+  display: grid;
+  gap: 9px;
+}
+
+.contractNote dl div,
+.summaryList div,
+.inlineDefinitionList div {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.contractNote dt,
+.ratioPanel dt,
+.summaryList dt,
+.inlineDefinitionList dt {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.contractNote dd,
+.ratioPanel dd,
+.summaryList dd,
+.inlineDefinitionList dd {
+  margin: 0;
+  color: var(--heading);
+  font-weight: 800;
+  text-align: right;
+}
+
+.contractNote dd {
+  text-transform: capitalize;
+}
+
+.section {
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+}
+
+.sectionHeader {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.55fr) minmax(280px, 1fr);
+  gap: 18px;
+  align-items: end;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.sectionHeader > span {
+  font-size: 14px;
+}
+
+.metricGrid,
+.compactGrid,
+.contextKindGrid,
+.reviewSummary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metricCard,
+.compactGrid article,
+.contextKindGrid article {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  padding: 15px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.metricCard > span,
+.compactGrid span,
+.contextKindGrid span,
+.ratioPanel > div > span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.metricCard strong,
+.compactGrid strong,
+.contextKindGrid strong,
+.ratioPanel > div > strong {
+  overflow-wrap: anywhere;
+  color: var(--heading);
+  font-size: 1.55rem;
+  line-height: 1.05;
+}
+
+.metricCard small,
+.contextKindGrid small,
+.ratioPanel small {
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.disclosure {
+  min-width: 0;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 14px;
+}
+
+.disclosure summary {
+  width: fit-content;
+  color: var(--heading);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.disclosure[open] summary {
+  margin-bottom: 14px;
+}
+
+.tableScroller {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 13px;
+}
+
+.tableScroller:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent-strong) 32%, transparent);
+  outline-offset: 3px;
+}
+
+.tableScroller table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.tableScroller th,
+.tableScroller td {
+  padding: 12px 13px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-secondary);
+  text-align: left;
+  vertical-align: top;
+}
+
+.tableScroller thead th {
+  color: var(--heading);
+  background: var(--surface-soft);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+}
+
+.tableScroller tbody th {
+  color: var(--heading);
+}
+
+.tableScroller tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.tableScroller a,
+.sourceList a {
+  color: var(--accent-strong);
+  font-weight: 800;
+}
+
+.tableScroller :global(.status-badge) {
+  margin-left: 7px;
+}
+
+.ratioPanel {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.6fr) minmax(420px, 1.4fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.ratioPanel > div:first-child {
+  display: grid;
+  gap: 7px;
+  align-content: center;
+  padding: 18px;
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: 15px;
+  background: var(--surface-warm);
+}
+
+.ratioPanel > div > strong {
+  font-size: 2rem;
+}
+
+.ratioPanel dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ratioPanel dl div {
+  display: grid;
+  gap: 5px;
+  padding: 13px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+}
+
+.ratioPanel dd {
+  text-align: left;
+}
+
+.interpretationNote {
+  margin: 0;
+  color: var(--text-muted);
+  padding: 12px 14px;
+  border-left: 4px solid var(--border-strong, var(--border));
+  background: var(--surface-soft);
+  font-size: 13px;
+}
+
+.compactGrid article {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.compactGrid strong {
+  font-size: 1.2rem;
+}
+
+.contextKindGrid article {
+  background: var(--surface-card);
+}
+
+.contextKindGrid strong {
+  font-size: 1.15rem;
+}
+
+.splitLayout {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+.summaryList {
+  display: grid;
+  gap: 10px;
+}
+
+.summaryList div,
+.inlineDefinitionList div {
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.summaryList div:last-child,
+.inlineDefinitionList div:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.sourceList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sourceList li {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 11px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 11px;
+}
+
+.sourceList span {
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.inlineDefinitionList {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.inlineDefinitionList div {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 11px;
+}
+
+.inlineDefinitionList dd {
+  text-align: left;
+}
+
+.reviewSummary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.reviewClear {
+  margin: 0;
+  padding: 15px;
+  border: 1px solid #76927a;
+  border-radius: 13px;
+  color: #294f32;
+  background: #eef6ef;
+  font-weight: 750;
+}
+
+.tableScroller code {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.emptyText {
+  margin: 0;
+}
+
+@media (max-width: 980px) {
+  .contractNote,
+  .sectionHeader,
+  .ratioPanel,
+  .splitLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .contractNote dl,
+  .inlineDefinitionList {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .pageHeader {
+    display: grid;
+  }
+
+  .schoolYearControl {
+    width: 100%;
+  }
+
+  .metricGrid,
+  .contextKindGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .ratioPanel dl,
+  .compactGrid,
+  .inlineDefinitionList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .section,
+  .contractNote {
+    padding: 17px;
+  }
+
+  .contractNote dl,
+  .ratioPanel dl,
+  .compactGrid,
+  .inlineDefinitionList,
+  .reviewSummary {
+    grid-template-columns: 1fr;
+  }
+}

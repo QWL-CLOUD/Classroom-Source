@@ -48,7 +48,7 @@ const primaryNavigationLinks = [
 const collapsibleNavigationGroups: Array<{
   id: NavigationGroupId;
   label: string;
-  links: Array<{ to: string; label: string; icon: typeof Library; status?: 'planned' }>;
+  links: Array<{ to: string; label: string; icon: typeof Library }>;
 }> = [
   {
     id: 'resources',
@@ -63,7 +63,7 @@ const collapsibleNavigationGroups: Array<{
   {
     id: 'reflect',
     label: 'Reflect',
-    links: [{ to: '/insights', label: 'Teaching Insights', icon: Sparkles, status: 'planned' }],
+    links: [{ to: '/insights', label: 'Teaching Insights', icon: Sparkles }],
   },
   {
     id: 'settingsData',
@@ -192,12 +192,10 @@ export function AppShell() {
     to,
     label,
     icon: Icon,
-    status,
   }: {
     to: string;
     label: string;
     icon: typeof Library;
-    status?: 'planned';
   }) {
     return (
       <NavLink
@@ -210,7 +208,6 @@ export function AppShell() {
       >
         <Icon size={19} aria-hidden="true" />
         <span className={styles.navLinkLabel}>{label}</span>
-        {status === 'planned' ? <span className={styles.navStatus}>Planned</span> : null}
       </NavLink>
     );
   }

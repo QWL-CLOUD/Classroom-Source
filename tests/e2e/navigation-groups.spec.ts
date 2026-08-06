@@ -22,7 +22,12 @@ test('navigation prioritizes daily work and preserves collapsible group choices'
 
   await reflect.click();
   await expect(reflect).toHaveAttribute('aria-expanded', 'true');
-  await expect(navigation.getByRole('link', { name: 'Teaching Insights' })).toBeVisible();
+  const teachingInsightsLink = navigation.getByRole('link', {
+    name: 'Teaching Insights',
+    exact: true,
+  });
+  await expect(teachingInsightsLink).toBeVisible();
+  await expect(teachingInsightsLink).not.toContainText('Planned');
   await page.reload();
   await expect(navigation.getByRole('button', { name: 'Reflect' })).toHaveAttribute(
     'aria-expanded',
@@ -45,7 +50,9 @@ test('navigation prioritizes daily work and preserves collapsible group choices'
     'aria-expanded',
     'true',
   );
-  await expect(navigation.getByRole('link', { name: 'Teaching Insights' })).toBeVisible();
+  await expect(
+    navigation.getByRole('link', { name: 'Teaching Insights', exact: true }),
+  ).toBeVisible();
   await expect(page.locator('main').getByText('Reflect', { exact: true })).toBeVisible();
 });
 
