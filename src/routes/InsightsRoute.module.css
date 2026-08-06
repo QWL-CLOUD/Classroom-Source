@@ -1,0 +1,24 @@
+.state {
+  display: grid;
+  gap: 12px;
+  padding: 24px;
+}
+
+.state h1,
+.state h2,
+.state p {
+  margin: 0;
+}
+
+.state p {
+  max-width: 720px;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}

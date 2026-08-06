@@ -1,11 +1,53 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Download } from '@playwright/test';
+import { expect, test, type Download, type Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
 async function downloadedJson(download: Download) {
   const path = await download.path();
   expect(path).not.toBeNull();
   return JSON.parse(await readFile(path!, 'utf8')) as Record<string, unknown>;
+}
+
+async function seedInsightsSchoolYear(page: Page): Promise<void> {
+  await page.goto('./#/settings');
+  await expect(page.getByRole('region', { name: 'School year editor' })).toBeVisible();
+  await page.waitForFunction(
+    () =>
+      new Promise<boolean>((resolve) => {
+        const request = indexedDB.open('classroom-v20');
+        request.onerror = () => resolve(false);
+        request.onsuccess = () => {
+          const ready = request.result.version >= 16;
+          request.result.close();
+          resolve(ready);
+        };
+      }),
+  );
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('classroom-v20');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction(['schoolYears'], 'readwrite');
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error);
+        transaction.oncomplete = () => resolve();
+        transaction.objectStore('schoolYears').put({
+          id: 'pilot-insights-year',
+          label: 'Pilot Insights 2026–2027',
+          startsOn: '2026-01-01',
+          endsOn: '2027-12-31',
+          active: true,
+          lifecycleState: 'active',
+        });
+      });
+    } finally {
+      database.close();
+    }
+  });
 }
 
 test('personal pilot setup persists and produces privacy-safe diagnostics and backup', async ({
@@ -90,14 +132,23 @@ test('personal pilot core routes remain usable without horizontal overflow on mo
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  await seedInsightsSchoolYear(page);
 
-  for (const route of ['today?date=2026-08-05', 'calendar?date=2026-08-05', 'system-health']) {
+  for (const route of [
+    'today?date=2026-08-05',
+    'calendar?date=2026-08-05',
+    'system-health',
+    'insights?schoolYear=pilot-insights-year',
+  ]) {
     await page.goto(`./#/${route}`);
     await expect(page.locator('main')).toBeVisible();
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
     ).toBe(true);
   }
+
+  await expect(page.getByRole('heading', { level: 1, name: 'Teaching Insights' })).toBeVisible();
+  await expect(page.getByText('Read-only and descriptive', { exact: true })).toBeVisible();
 
   const menu = page.getByRole('button', { name: 'Open navigation' });
   await expect(menu).toBeVisible();
