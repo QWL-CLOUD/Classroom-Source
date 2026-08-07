@@ -235,7 +235,7 @@ export function WeekRoute() {
       <div className={`card ${styles.controls}`}>
         <label>
           <span>View</span>
-          <select className="select" value={weekView} onChange={changeView}>
+          <select aria-label="View" className="select" value={weekView} onChange={changeView}>
             <option value="teaching">Schedule</option>
             <option value="calendar">Events</option>
             <option value="personal">Personal</option>

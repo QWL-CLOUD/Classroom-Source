@@ -511,9 +511,12 @@
   color: #9b4b20;
 }
 
-.schoolYear[data-status='loading'],
-.topbarSchoolYear[data-status='loading'] {
+.schoolYear[data-status='loading'] {
   color: var(--text-on-dark-muted);
+}
+
+.topbarSchoolYear[data-status='loading'] {
+  color: var(--text-muted);
 }
 
 .navLinkLabel {
