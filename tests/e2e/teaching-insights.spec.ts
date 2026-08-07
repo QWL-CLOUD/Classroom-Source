@@ -590,6 +590,46 @@ test('School Year selection is URL-backed and preserves an explicit historical e
   await expect(selector.locator('option:checked')).toHaveText(/Insights 2025/);
 });
 
+test('Teaching Insights keeps Standards and Content inside the page at intermediate desktop widths', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await seedInsights(page);
+
+  for (const width of [1024, 1180, 1280, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+
+    const standards = page.getByRole('region', {
+      name: 'Explicit planning alignment',
+      exact: true,
+    });
+    const content = page.getByRole('region', {
+      name: 'Planning content links',
+      exact: true,
+    });
+
+    await expect(standards).toBeVisible();
+    await expect(content).toBeVisible();
+
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+    ).toBe(true);
+
+    for (const section of [standards, content]) {
+      const box = await section.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(-1);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(width + 1);
+
+      const dimensions = await section.evaluate((element) => ({
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+      }));
+      expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+    }
+  }
+});
+
 test('Teaching Insights stays responsive, keyboard reachable, and axe-clean at 390px', async ({
   page,
 }) => {

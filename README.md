@@ -13,11 +13,14 @@ This repository is the React + TypeScript source rebuild of Classroom. The legac
 ## Current status
 
 - App version: `20.0.0-pilot.1`
-- Database schema: v16
-- Portable backup schema: v16
+- Database schema: v17
+- Portable backup schema: v17
 - Personal-pilot closure: runtime recovery, privacy-safe System Health diagnostics, recurrence-safe
   School Year deletion, and Chromium/WebKit readiness
-- Teaching Insights remains explicitly planned and is not part of the personal pilot
+- Teaching Insights v2: read-only, source-linked teaching metrics with explicit data-contract
+  boundaries and source drill-down
+- Teaching Reflection: persistent completed-Session reflections with Task-based Next Steps;
+  reflection narrative remains teacher-authored and is not analyzed or scored
 
 The current pilot includes:
 
@@ -26,6 +29,9 @@ The current pilot includes:
 - Lesson Plans, Lesson Flow, Lesson Series, Session occurrences, and occurrence-first planning
 - Library Activities, Resources, Assessments, Lesson Templates, Standards, and managed categories
 - Canonical Assessment Evidence linked to stable Student records
+- Read-only Teaching Insights with teaching activity, planning completion, Evidence coverage,
+  context distribution, Standards/Content links, Reflection coverage, Next Step status, and Needs Review
+- Session-linked Teaching Reflection with teacher-authored narrative and ordinary Task-based Next Steps
 - Canonical Import Center for rosters, Standards, Activities, Resources, Assessments, and Calendar
   Events
 - CSV/XLSX templates and reviewed import workflows
@@ -53,6 +59,7 @@ application assets are available offline; no service worker or PWA cache is incl
 - `#/learners`
 - `#/planning/edit`
 - `#/planning/session`
+- `#/insights`
 - `#/library`
 - `#/templates`
 - `#/standards`
@@ -91,7 +98,7 @@ See [`docs/testing.md`](docs/testing.md) and
 
 ## Recovery and diagnostics
 
-- **Backup & Recovery** exports the complete portable v16 user dataset and validates restores before
+- **Backup & Recovery** exports the complete portable v17 user dataset and validates restores before
   atomic replacement.
 - **System Health** reports the app/database version, active School Year count, browser storage
   status, and compact workspace counts.
