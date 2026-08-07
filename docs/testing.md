@@ -23,7 +23,9 @@ transaction tests.
 ## Playwright projects
 
 - **Chromium:** runs the complete E2E suite, including navigation, planning, Calendar, imports,
-  Backup/Restore, lifecycle guards, responsive behavior, and accessibility checks.
+  Backup/Restore, lifecycle guards, responsive behavior, and accessibility checks. Teaching Insights
+  has explicit page- and card-overflow regression coverage at 390px and intermediate/desktop widths
+  (1024px, 1180px, 1280px, and 1440px), including its nested Standards and Content comparison cards.
 - **WebKit pilot:** runs only `personal-pilot-readiness.spec.ts`. It protects the Safari-relevant
   personal-pilot path without duplicating every historical Chromium scenario.
 

@@ -226,3 +226,27 @@ and occurrence metadata.
 
 Portable backup v16 includes both recurrence tables. Supported v10–v15 backups restore them empty.
 The Personal Pilot Closure does not change the database or backup schema beyond v16.
+
+## Database v17: Teaching Reflection and Next Steps
+
+Schema v17 adds `teachingReflections` as a persistent teacher-authored domain linked one-to-one with
+a completed `SessionOccurrence`. A `TeachingReflectionRecord` owns its Session, School Year,
+planning context, Lesson Plan, and occurrence-date identifiers; retained context, Lesson Plan, and
+Session snapshots; optional `whatWorked`, `whatToAdjust`, and `additionalNotes` narrative fields;
+active or archived lifecycle state; and timestamps. At least one narrative field is required. A
+unique `sessionOccurrenceId` index ensures that a Session has at most one Teaching Reflection.
+
+Creating a Reflection atomically writes the Reflection, the Session `reflectionId`, and the global
+edit-history command. Undo and redo restore both sides of that link. Reflection narrative is teacher
+interpretation: Teaching Insights may count Reflection presence, coverage, retained source state, and
+linked Task lifecycle facts, but it does not analyze narrative, score teaching quality, infer learner
+mastery, rank learners, or generate AI advice.
+
+Actionable Next Steps reuse the existing Task domain with
+`linkedEntityType = "teaching-reflection"` and the Reflection ID. Those Tasks keep their existing
+lifecycle, reminders, categories, Agenda placement, and persistent Undo/Redo behavior. Archiving a
+Reflection does not cancel or delete its existing Tasks.
+
+Portable backup v17 contains 33 tables, including `teachingReflections`. Legacy v16 and earlier
+backups restore the Reflection table empty with an explicit compatibility warning. School Years
+containing retained Reflections cannot be permanently deleted.
