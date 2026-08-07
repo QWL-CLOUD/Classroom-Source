@@ -11,6 +11,10 @@ import {
 } from '@/domain/models/entities';
 import { parsePlanningReturnTarget } from '@/features/planning/planningNavigation';
 import {
+  buildTeachingReviewHref,
+  parseTeachingReviewReturnState,
+} from '@/features/teachingReview/teachingReviewNavigation';
+import {
   TeachingReflectionEditor,
   type TeachingReflectionCreateSource,
 } from '@/features/teachingReflections/TeachingReflectionEditor';
@@ -90,6 +94,7 @@ export function TeachingReflectionRoute() {
   const [searchParams] = useSearchParams();
   const sessionOccurrenceId = searchParams.get('session');
   const returnTo = parsePlanningReturnTarget(searchParams.get('return'));
+  const reviewReturn = parseTeachingReviewReturnState(searchParams);
 
   const snapshot = useLiveQuery(async (): Promise<TeachingReflectionRouteSnapshot | null> => {
     if (!sessionOccurrenceId) return null;
@@ -126,9 +131,17 @@ export function TeachingReflectionRoute() {
         {snapshot?.sessionAvailable ? (
           <a
             className="button"
-            href={buildTeachingReflectionSessionHref(sessionOccurrenceId, returnTo)}
+            href={buildTeachingReflectionSessionHref(
+              sessionOccurrenceId,
+              returnTo,
+              reviewReturn ?? undefined,
+            )}
           >
             <ArrowLeft aria-hidden="true" size={17} /> Back to Session
+          </a>
+        ) : returnTo === 'review' ? (
+          <a className="button" href={buildTeachingReviewHref(reviewReturn ?? {})}>
+            <ArrowLeft aria-hidden="true" size={17} /> Back to Teaching Review
           </a>
         ) : (
           <a className="button" href="#/insights">
@@ -149,6 +162,7 @@ export function TeachingReflectionRoute() {
         }
         sessionOccurrenceId={sessionOccurrenceId}
         returnTo={returnTo}
+        reviewReturn={reviewReturn ?? undefined}
         detail={snapshot.kind === 'existing' ? snapshot.detail : undefined}
         createSource={snapshot.kind === 'create' ? snapshot.source : undefined}
       />

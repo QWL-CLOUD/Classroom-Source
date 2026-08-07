@@ -24,7 +24,7 @@ export function navigationGroupForPath(pathname: string): NavigationGroupId | un
     pathname.startsWith('/categories')
   )
     return 'resources';
-  if (pathname.startsWith('/insights')) return 'reflect';
+  if (pathname.startsWith('/insights') || pathname.startsWith('/teaching-review')) return 'reflect';
   if (
     pathname.startsWith('/import') ||
     pathname.startsWith('/migration') ||

@@ -26,6 +26,10 @@ transaction tests.
   Backup/Restore, lifecycle guards, responsive behavior, and accessibility checks. Teaching Insights
   has explicit page- and card-overflow regression coverage at 390px and intermediate/desktop widths
   (1024px, 1180px, 1280px, and 1440px), including its nested Standards and Content comparison cards.
+  Teaching Review E2E coverage verifies URL-backed School Year and review-period selection, queue
+  semantics, source drill-down/return state, exact Standard/Library/Task focus, Reflection-linked
+  Task filtering, period preservation through source returns, no hidden Evidence-gap queue, 390px
+  page containment, and automated accessibility.
 - **WebKit pilot:** runs only `personal-pilot-readiness.spec.ts`. It protects the Safari-relevant
   personal-pilot path without duplicating every historical Chromium scenario.
 

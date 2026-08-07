@@ -235,9 +235,9 @@ function sourceHref(
   }
   if (entityType === 'context') return `#/learners?context=${encodeURIComponent(id)}`;
   if (entityType === 'student') return `#/learners?student=${encodeURIComponent(id)}`;
-  if (entityType === 'standard') return '#/standards';
-  if (entityType === 'library-item') return '#/library';
-  if (entityType === 'task') return '#/tasks';
+  if (entityType === 'standard') return `#/standards?standard=${encodeURIComponent(id)}`;
+  if (entityType === 'library-item') return `#/library?item=${encodeURIComponent(id)}`;
+  if (entityType === 'task') return `#/tasks?task=${encodeURIComponent(id)}`;
   return undefined;
 }
 

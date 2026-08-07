@@ -41,6 +41,10 @@ import {
   type PlanningReturnTarget,
 } from '@/features/planning/planningNavigation';
 import {
+  parseTeachingReviewReturnState,
+  type TeachingReviewReturnState,
+} from '@/features/teachingReview/teachingReviewNavigation';
+import {
   createLessonContentEditorValues,
   createSessionEditorValues,
   resolveSessionLessonContent,
@@ -81,11 +85,13 @@ function SessionEditorForm({
   snapshot,
   initialDate,
   returnTo,
+  reviewReturn,
   service = planningMutationService,
 }: {
   snapshot: SessionEditorSnapshot;
   initialDate: string;
   returnTo: PlanningReturnTarget;
+  reviewReturn?: TeachingReviewReturnState;
   service?: PlanningMutationService;
 }) {
   const { context, plan, session, scheduleBlocks, libraryItems, reflection } = snapshot;
@@ -162,6 +168,13 @@ function SessionEditorForm({
   if (!context || !plan) return null;
   const selectedContext = context;
   const selectedPlan = plan;
+  const resolvedReviewReturn: TeachingReviewReturnState | undefined =
+    returnTo === 'review'
+      ? {
+          ...reviewReturn,
+          schoolYearId: reviewReturn?.schoolYearId ?? selectedContext.schoolYearId,
+        }
+      : undefined;
   const inheritedContent = resolveSessionLessonContent(selectedPlan).content;
 
   function returnHref(options: {
@@ -175,6 +188,7 @@ function SessionEditorForm({
       contextId: selectedContext.id,
       learnerView: options.learnerView,
       focusSessionId: options.sessionId,
+      reviewReturn: resolvedReviewReturn,
     });
   }
 
@@ -363,7 +377,9 @@ function SessionEditorForm({
           <ArrowLeft aria-hidden="true" size={17} />
           {returnTo === 'learners'
             ? 'Back to Learners'
-            : `Back to ${returnTo === 'today' ? 'Today' : returnTo === 'week' ? 'Week' : 'Calendar'}`}
+            : returnTo === 'review'
+              ? 'Back to Teaching Review'
+              : `Back to ${returnTo === 'today' ? 'Today' : returnTo === 'week' ? 'Week' : 'Calendar'}`}
         </a>
       </div>
 
@@ -617,7 +633,10 @@ function SessionEditorForm({
               </p>
             </div>
             {reflection || session.deliveryState === 'completed' ? (
-              <a className="button" href={buildTeachingReflectionHref(session.id, returnTo)}>
+              <a
+                className="button"
+                href={buildTeachingReflectionHref(session.id, returnTo, resolvedReviewReturn)}
+              >
                 <NotebookPen aria-hidden="true" size={17} />
                 {reflection ? 'View reflection' : 'Add reflection'}
               </a>
@@ -716,6 +735,7 @@ export function SessionEditorRoute() {
   const requestedDate = searchParams.get('date');
   const initialDate = parseLocalDate(requestedDate) ? requestedDate! : todayLocalDate();
   const returnTo = parsePlanningReturnTarget(searchParams.get('return'));
+  const reviewReturn = parseTeachingReviewReturnState(searchParams);
 
   const snapshot = useLiveQuery(async (): Promise<SessionEditorSnapshot> => {
     const sessionValue = sessionId
@@ -788,6 +808,7 @@ export function SessionEditorRoute() {
         snapshot={snapshot}
         initialDate={initialDate}
         returnTo={returnTo}
+        reviewReturn={reviewReturn ?? undefined}
       />
     </section>
   );

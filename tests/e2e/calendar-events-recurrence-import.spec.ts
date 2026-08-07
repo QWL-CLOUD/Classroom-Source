@@ -179,7 +179,7 @@ async function chooseFile(page: Page, name: string, buffer: Buffer): Promise<voi
     mimeType: 'text/calendar',
     buffer,
   });
-  await page.getByRole('button', { name: 'Generate reviewed preview' }).click();
+  await page.getByRole('button', { name: 'Generate reviewed preview', exact: true }).click();
 }
 
 async function commitPreview(page: Page): Promise<void> {
@@ -394,7 +394,7 @@ test('manual edits and deletions open explicit recurrence review, while unsuppor
     }
   });
 
-  await page.getByRole('button', { name: 'Generate reviewed preview' }).click();
+  await page.getByRole('button', { name: 'Generate reviewed preview', exact: true }).click();
   await expect(
     page.getByLabel('Calendar Event import preview').getByText('Review', { exact: true }),
   ).toHaveCount(2);
@@ -420,7 +420,7 @@ test('manual edits and deletions open explicit recurrence review, while unsuppor
       ].join('\r\n'),
     ),
   });
-  await page.getByRole('button', { name: 'Generate reviewed preview' }).click();
+  await page.getByRole('button', { name: 'Generate reviewed preview', exact: true }).click();
   await expect(
     page.getByLabel('Calendar Event import preview').getByText('Blocked', { exact: true }),
   ).toBeVisible();

@@ -1,5 +1,6 @@
 import {
   Archive,
+  ArrowLeft,
   BookCheck,
   BookOpen,
   CalendarDays,
@@ -31,6 +32,10 @@ import {
   type NavigationGroupId,
 } from '@/app/navigationGroups';
 import { buildShellNavigationHref } from '@/app/workspaceNavigation';
+import {
+  buildTeachingReviewHref,
+  parseTeachingReviewReturnState,
+} from '@/features/teachingReview/teachingReviewNavigation';
 import { useEditHistory } from '@/features/editing/useEditHistory';
 import { presentActiveSchoolYear } from '@/features/schoolYears/schoolYearPresentation';
 import { useActiveSchoolYear } from '@/features/schoolYears/useActiveSchoolYear';
@@ -63,7 +68,10 @@ const collapsibleNavigationGroups: Array<{
   {
     id: 'reflect',
     label: 'Reflect',
-    links: [{ to: '/insights', label: 'Teaching Insights', icon: Sparkles }],
+    links: [
+      { to: '/insights', label: 'Teaching Insights', icon: Sparkles },
+      { to: '/teaching-review', label: 'Teaching Review', icon: ClipboardCheck },
+    ],
   },
   {
     id: 'settingsData',
@@ -106,6 +114,9 @@ function getRoutePresentation(pathname: string): { title: string; layout: Conten
   if (pathname.startsWith('/insights')) {
     return { title: 'Teaching Insights', layout: 'standard' };
   }
+  if (pathname.startsWith('/teaching-review')) {
+    return { title: 'Teaching Review', layout: 'standard' };
+  }
   if (pathname.startsWith('/import')) return { title: 'Import Center', layout: 'standard' };
   if (pathname.startsWith('/migration')) return { title: 'Migration', layout: 'reading' };
   if (pathname.startsWith('/export')) return { title: 'Export & Backup', layout: 'reading' };
@@ -133,6 +144,10 @@ export function AppShell() {
   const mobileCloseButtonRef = useRef<HTMLButtonElement>(null);
   const presentation = getRoutePresentation(location.pathname);
   const schoolYearContext = presentActiveSchoolYear(activeSchoolYearState);
+  const reviewReturnState =
+    location.pathname === '/teaching-review'
+      ? null
+      : parseTeachingReviewReturnState(new URLSearchParams(location.search));
 
   useEffect(() => {
     document.title = `${presentation.title} · Classroom`;
@@ -397,6 +412,14 @@ export function AppShell() {
             data-content-layout={presentation.layout}
             tabIndex={-1}
           >
+            {reviewReturnState ? (
+              <aside className={styles.reviewReturnBar} aria-label="Teaching Review return">
+                <Link className="button" to={buildTeachingReviewHref(reviewReturnState).slice(1)}>
+                  <ArrowLeft size={17} aria-hidden="true" /> Back to Teaching Review
+                </Link>
+                <span>Source workspace opened from a read-only Teaching Review queue.</span>
+              </aside>
+            ) : null}
             <Outlet />
           </main>
         </div>

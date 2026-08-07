@@ -17,6 +17,7 @@ test('navigation prioritizes daily work and preserves collapsible group choices'
   await expect(navigation.getByRole('link', { name: 'Library', exact: true })).toBeVisible();
   await expect(reflect).toHaveAttribute('aria-expanded', 'false');
   await expect(navigation.getByRole('link', { name: 'Teaching Insights' })).toBeHidden();
+  await expect(navigation.getByRole('link', { name: 'Teaching Review' })).toBeHidden();
   await expect(settingsData).toHaveAttribute('aria-expanded', 'false');
   await expect(navigation.getByRole('link', { name: 'Import Center' })).toBeHidden();
 
@@ -27,6 +28,9 @@ test('navigation prioritizes daily work and preserves collapsible group choices'
     exact: true,
   });
   await expect(teachingInsightsLink).toBeVisible();
+  await expect(
+    navigation.getByRole('link', { name: 'Teaching Review', exact: true }),
+  ).toBeVisible();
   await expect(teachingInsightsLink).not.toContainText('Planned');
   await page.reload();
   await expect(navigation.getByRole('button', { name: 'Reflect' })).toHaveAttribute(
@@ -54,6 +58,15 @@ test('navigation prioritizes daily work and preserves collapsible group choices'
     navigation.getByRole('link', { name: 'Teaching Insights', exact: true }),
   ).toBeVisible();
   await expect(page.locator('main').getByText('Reflect', { exact: true })).toBeVisible();
+
+  await page.goto('./#/teaching-review');
+  await expect(navigation.getByRole('button', { name: 'Reflect' })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+  await expect(
+    navigation.getByRole('link', { name: 'Teaching Review', exact: true }),
+  ).toBeVisible();
 });
 
 test('mobile drawer keeps the same hierarchy and opens the active route group', async ({

@@ -52,6 +52,11 @@ import {
   type PlanningReturnTarget,
 } from '@/features/planning/planningNavigation';
 import {
+  appendTeachingReviewReturnParams,
+  parseTeachingReviewReturnState,
+  type TeachingReviewReturnState,
+} from '@/features/teachingReview/teachingReviewNavigation';
+import {
   createLessonPlanEditorValues,
   toLessonPlanEditorValues,
   type LessonPlanEditorValues,
@@ -112,12 +117,14 @@ function PlanningEditorForm({
   snapshot,
   initialDate,
   returnTo,
+  reviewReturn,
   service = planningMutationService,
   onChangeContext,
 }: {
   snapshot: PlanningEditorSnapshot;
   initialDate: string;
   returnTo: PlanningReturnTarget;
+  reviewReturn?: TeachingReviewReturnState;
   service?: PlanningMutationService;
   onChangeContext?: () => void;
 }) {
@@ -166,6 +173,13 @@ function PlanningEditorForm({
   const learnerReturnDate = learnerView === 'upcoming' ? returnDate : undefined;
   if (!context) return null;
   const selectedContext = context;
+  const resolvedReviewReturn: TeachingReviewReturnState | undefined =
+    returnTo === 'review'
+      ? {
+          ...reviewReturn,
+          schoolYearId: reviewReturn?.schoolYearId ?? selectedContext.schoolYearId,
+        }
+      : undefined;
   const surfaceDate = activeSession?.date ?? planningOccurrence?.date ?? initialDate;
   const occurrenceFocusId = planningOccurrence
     ? `schedule-block:${planningOccurrence.block.id}:${planningOccurrence.date}`
@@ -177,6 +191,7 @@ function PlanningEditorForm({
           returnTo,
           date: surfaceDate,
           contextId: selectedContext.id,
+          reviewReturn: resolvedReviewReturn,
           focusSessionId: activeSession?.id,
           focusOccurrenceId: occurrenceFocusId,
         });
@@ -293,6 +308,9 @@ function PlanningEditorForm({
             return: returnTo,
             block: planningOccurrence.block.id,
           });
+          if (returnTo === 'review') {
+            appendTeachingReviewReturnParams(params, resolvedReviewReturn ?? {});
+          }
           window.location.hash = `#/planning/edit?${params.toString()}`;
           return;
         }
@@ -301,6 +319,7 @@ function PlanningEditorForm({
           date: result.session.date,
           contextId: selectedContext.id,
           learnerView: 'upcoming',
+          reviewReturn: resolvedReviewReturn,
           focusOccurrenceId: occurrenceFocusId,
           focusSessionId: result.session.id,
         });
@@ -315,6 +334,7 @@ function PlanningEditorForm({
           planId: saved.id,
           date: initialDate,
           returnTo,
+          reviewReturn: resolvedReviewReturn,
         });
       } else if (returnTo === 'learners') {
         window.location.hash = learnerHref(selectedContext.id, learnerView, learnerReturnDate);
@@ -323,6 +343,7 @@ function PlanningEditorForm({
           returnTo,
           date: surfaceDate,
           contextId: selectedContext.id,
+          reviewReturn: resolvedReviewReturn,
           focusSessionId: activeSession?.id,
           focusOccurrenceId: occurrenceFocusId,
         });
@@ -350,6 +371,7 @@ function PlanningEditorForm({
               returnTo,
               date: surfaceDate,
               contextId: selectedContext.id,
+              reviewReturn: resolvedReviewReturn,
               focusOccurrenceId: occurrenceFocusId,
             });
     } catch (cause) {
@@ -370,7 +392,9 @@ function PlanningEditorForm({
           <ArrowLeft aria-hidden="true" size={17} />
           {returnTo === 'learners'
             ? 'Back to Learners'
-            : `Back to ${returnTo === 'today' ? 'Today' : returnTo === 'week' ? 'Week' : 'Calendar'}`}
+            : returnTo === 'review'
+              ? 'Back to Teaching Review'
+              : `Back to ${returnTo === 'today' ? 'Today' : returnTo === 'week' ? 'Week' : 'Calendar'}`}
         </a>
       </div>
 
@@ -630,7 +654,14 @@ function PlanningEditorForm({
         ) : activeSession ? (
           <a
             className="button"
-            href={`#/planning/session?session=${encodeURIComponent(activeSession.id)}&date=${surfaceDate}${returnTo === 'learners' ? '' : `&return=${returnTo}`}`}
+            href={(() => {
+              const params = new URLSearchParams({ session: activeSession.id, date: surfaceDate });
+              if (returnTo !== 'learners') params.set('return', returnTo);
+              if (returnTo === 'review') {
+                appendTeachingReviewReturnParams(params, resolvedReviewReturn ?? {});
+              }
+              return `#/planning/session?${params.toString()}`;
+            })()}
           >
             <CalendarPlus aria-hidden="true" size={17} /> Manage session
           </a>
@@ -770,6 +801,7 @@ export function PlanningEditorRoute() {
   const requestedDate = searchParams.get('date');
   const initialDate = parseLocalDate(requestedDate) ? requestedDate! : todayLocalDate();
   const returnTo = parsePlanningReturnTarget(searchParams.get('return'));
+  const reviewReturn = parseTeachingReviewReturnState(searchParams);
 
   const snapshot = useLiveQuery(async (): Promise<PlanningEditorSnapshot> => {
     const activeSchoolYearIds = new Set(
@@ -938,6 +970,13 @@ export function PlanningEditorRoute() {
       returnTo,
       date: initialDate,
       contextId: snapshot.context?.id ?? '',
+      reviewReturn:
+        returnTo === 'review'
+          ? {
+              ...(reviewReturn ?? {}),
+              schoolYearId: reviewReturn?.schoolYearId ?? snapshot.context?.schoolYearId,
+            }
+          : undefined,
       focusOccurrenceId: `schedule-block:${requestedBlockId}:${initialDate}`,
     });
     return (
@@ -945,7 +984,14 @@ export function PlanningEditorRoute() {
         <h1>Schedule occurrence unavailable</h1>
         <p>{snapshot.planningOccurrenceError}</p>
         <a className="button" href={backHref}>
-          Back to {returnTo === 'today' ? 'Today' : returnTo === 'week' ? 'Week' : 'Calendar'}
+          Back to{' '}
+          {returnTo === 'review'
+            ? 'Teaching Review'
+            : returnTo === 'today'
+              ? 'Today'
+              : returnTo === 'week'
+                ? 'Week'
+                : 'Calendar'}
         </a>
       </div>
     );
@@ -1034,6 +1080,7 @@ export function PlanningEditorRoute() {
           snapshot={snapshot}
           initialDate={initialDate}
           returnTo={returnTo}
+          reviewReturn={reviewReturn ?? undefined}
           onChangeContext={snapshot.planningOccurrence ? changeContext : undefined}
         />
       )}

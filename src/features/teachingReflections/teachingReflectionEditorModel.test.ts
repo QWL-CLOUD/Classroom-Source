@@ -86,4 +86,19 @@ describe('teachingReflectionEditorModel', () => {
       'saved plan snapshot',
     );
   });
+
+  it('preserves Teaching Review return state across Reflection and Session links', () => {
+    const reviewReturn = {
+      schoolYearId: 'year-1',
+      queue: 'awaiting-reflection' as const,
+      focus: 'session:session',
+      period: { preset: 'this-week' as const },
+    };
+    expect(buildTeachingReflectionHref('session', 'review', reviewReturn)).toBe(
+      '#/planning/session/reflection?session=session&return=review&schoolYear=year-1&reviewQueue=awaiting-reflection&reviewFocus=session%3Asession&reviewPeriod=this-week',
+    );
+    expect(buildTeachingReflectionSessionHref('session', 'review', reviewReturn)).toBe(
+      '#/planning/session?session=session&return=review&schoolYear=year-1&reviewQueue=awaiting-reflection&reviewFocus=session%3Asession&reviewPeriod=this-week',
+    );
+  });
 });

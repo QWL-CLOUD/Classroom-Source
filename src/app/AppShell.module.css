@@ -340,7 +340,31 @@
   max-width: none;
 }
 
+.reviewReturnBar {
+  width: 100%;
+  margin: 0 auto 16px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  color: var(--text-muted);
+  background: var(--surface-card);
+  font-size: 13px;
+}
+
+.reviewReturnBar :global(.button) {
+  flex: 0 0 auto;
+}
+
 @media (max-width: 880px) {
+  .reviewReturnBar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .shell,
   .shell[data-sidebar-collapsed='true'] {
     grid-template-columns: minmax(0, 1fr);
@@ -487,9 +511,12 @@
   color: #9b4b20;
 }
 
-.schoolYear[data-status='loading'],
-.topbarSchoolYear[data-status='loading'] {
+.schoolYear[data-status='loading'] {
   color: var(--text-on-dark-muted);
+}
+
+.topbarSchoolYear[data-status='loading'] {
+  color: var(--text-muted);
 }
 
 .navLinkLabel {

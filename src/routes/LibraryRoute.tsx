@@ -32,6 +32,7 @@ import {
   type LibraryClassificationSelections,
 } from '@/features/libraryCatalog/libraryClassificationFacets';
 import { buildImportCenterHref } from '@/features/importCenter/importRouteState';
+import { preserveTeachingReviewReturnParams } from '@/features/teachingReview/teachingReviewNavigation';
 import { libraryCatalogMutationService } from '@/features/libraryCatalog/libraryCatalogMutationService';
 import {
   buildLibraryCatalogItemViews,
@@ -64,7 +65,9 @@ function typeIcon(type: LibraryCatalogType): ReactNode {
 
 export function LibraryRoute() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const catalogType = parseLibraryRouteState(searchParams).catalogType;
+  const routeState = parseLibraryRouteState(searchParams);
+  const catalogType = routeState.catalogType;
+  const requestedItemId = routeState.itemId;
   const data = useLiveQuery(async () => {
     const [itemValues, assignments, categoryValues] = await Promise.all([
       classroomDb.libraryItems.toArray(),
@@ -107,7 +110,22 @@ export function LibraryRoute() {
     [baseFilters, classificationSelections, data?.categoryValues, data?.views],
   );
   const visible = facetModel.visibleItems;
-  const selected = selectVisibleLibraryCatalogItem(visible, selectedId);
+  const selected = requestedItemId
+    ? (visible.find((item) => item.id === requestedItemId) ?? null)
+    : selectVisibleLibraryCatalogItem(visible, selectedId);
+
+  useEffect(() => {
+    if (!requestedItemId || !data || selectedId === requestedItemId) return;
+    const requested = data.views.find((item) => item.id === requestedItemId);
+    if (!requested) return;
+    setQuery('');
+    setStatus('all');
+    setTag('');
+    setClassificationSelections({});
+    setSelectedId(requested.id);
+    setCreating(false);
+    setEditing(false);
+  }, [data, requestedItemId, selectedId]);
 
   useEffect(() => {
     if (creating) return;
@@ -141,7 +159,11 @@ export function LibraryRoute() {
   }
 
   function selectCatalogType(nextType: 'all' | LibraryCatalogType): void {
-    setSearchParams(buildLibraryRouteSearch(nextType));
+    const next = preserveTeachingReviewReturnParams(
+      searchParams,
+      buildLibraryRouteSearch(nextType),
+    );
+    setSearchParams(next);
   }
 
   function clearFilters(): void {
@@ -196,6 +218,9 @@ export function LibraryRoute() {
             className="button button-primary"
             type="button"
             onClick={() => {
+              const next = new URLSearchParams(searchParams);
+              next.delete('item');
+              setSearchParams(next);
               setCreating(true);
               setEditing(false);
               setError(null);
@@ -348,6 +373,9 @@ export function LibraryRoute() {
                 libraryCatalogMutationService.create(values, categorySelections),
               );
               if (!created) return;
+              const next = new URLSearchParams(searchParams);
+              next.set('item', created.id);
+              setSearchParams(next);
               setSelectedId(created.id);
               setCreating(false);
             }}
@@ -384,6 +412,9 @@ export function LibraryRoute() {
                     className={styles.itemButton}
                     data-selected={selected?.id === item.id}
                     onClick={() => {
+                      const next = new URLSearchParams(searchParams);
+                      next.set('item', item.id);
+                      setSearchParams(next);
                       setSelectedId(item.id);
                       setEditing(false);
                     }}

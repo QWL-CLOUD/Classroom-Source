@@ -200,7 +200,7 @@ test('Week composes recurring blocks and dated events without duplicate renderin
   await expect(page.getByText('Synthetic hidden block')).toHaveCount(0);
   await expect(page.getByText('Quarantined week item')).toHaveCount(0);
 
-  await page.getByLabel('View').selectOption('everything');
+  await page.getByLabel('View', { exact: true }).selectOption('everything');
 
   const wednesdayEverything = page.getByRole('article', {
     name: 'Wednesday, July 15, 2026, 5 items',
@@ -218,16 +218,16 @@ test('Week composes recurring blocks and dated events without duplicate renderin
     'Synthetic summer institute',
   );
 
-  await page.getByLabel('View').selectOption('calendar');
+  await page.getByLabel('View', { exact: true }).selectOption('calendar');
   await expect(page.getByText('Synthetic Grade 3 day', { exact: true })).toHaveCount(0);
   await expect(page.getByText('Synthetic personal appointment')).toHaveCount(0);
   await expect(page.getByText('Synthetic school holiday')).toBeVisible();
 
-  await page.getByLabel('View').selectOption('personal');
+  await page.getByLabel('View', { exact: true }).selectOption('personal');
   await expect(page.getByText('Synthetic personal appointment')).toBeVisible();
   await expect(page.getByText('Synthetic school holiday')).toHaveCount(0);
 
-  await page.getByLabel('View').selectOption('everything');
+  await page.getByLabel('View', { exact: true }).selectOption('everything');
   const accessibilityResults = await new AxeBuilder({ page }).analyze();
   expect(
     accessibilityResults.violations,

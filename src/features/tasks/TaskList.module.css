@@ -3,6 +3,32 @@
   gap: 24px;
 }
 
+.focusNotice {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.focusNotice > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.focusNotice strong {
+  color: var(--heading);
+}
+
+.focusNotice span {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 .createPanel {
   max-width: 980px;
   padding: 24px;
@@ -148,6 +174,11 @@
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--surface-card);
+}
+
+.taskCard[data-focused='true'] {
+  border-color: var(--accent-strong);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-strong) 14%, transparent);
 }
 
 .taskHeading {
@@ -456,5 +487,12 @@
   .primaryTaskActions,
   .primaryTaskActions > * {
     width: 100%;
+  }
+}
+
+@media (max-width: 640px) {
+  .focusNotice {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }

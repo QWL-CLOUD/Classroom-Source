@@ -569,6 +569,227 @@ test('Teaching Insights reports source-linked first-release metrics without unsu
   await expect(page.getByRole('heading', { level: 1, name: 'Edit plan' })).toBeVisible();
 });
 
+test('Teaching Review turns Insights facts into source-linked read-only follow-up queues', async ({
+  page,
+}) => {
+  await seedInsights(page);
+
+  const openReview = page.getByRole('link', { name: 'Open Teaching Review', exact: true });
+  await expect(openReview).toHaveAttribute(
+    'href',
+    '#/teaching-review?schoolYear=insights-current-year',
+  );
+  await openReview.click();
+
+  await expect(page.getByRole('heading', { level: 1, name: 'Teaching Review' })).toBeVisible();
+  await expect(page).toHaveURL(/teaching-review\?schoolYear=insights-current-year/);
+
+  const overview = page.getByRole('region', {
+    name: 'What may need teacher attention',
+    exact: true,
+  });
+  await expect(metricCard(overview, 'Awaiting Reflection')).toContainText('1');
+  await expect(metricCard(overview, 'Past still Scheduled')).toContainText('1');
+  await expect(metricCard(overview, 'Open Next Steps')).toContainText('2');
+  await expect(metricCard(overview, 'Record Issues')).toContainText('0');
+
+  const awaiting = page.getByRole('region', { name: 'Awaiting Reflection', exact: true });
+  await expect(awaiting).toContainText('Vocabulary Practice');
+  await expect(awaiting).toContainText('Archived Reflection');
+  await expect(awaiting.getByRole('link', { name: 'Review Reflection' })).toHaveAttribute(
+    'href',
+    '#/planning/session/reflection?session=insights-session-vocabulary&return=review&schoolYear=insights-current-year&reviewQueue=awaiting-reflection&reviewFocus=session%3Ainsights-session-vocabulary',
+  );
+  await expect(awaiting.getByRole('link', { name: 'Open Session' })).toHaveAttribute(
+    'href',
+    '#/planning/session?session=insights-session-vocabulary&return=review&schoolYear=insights-current-year&reviewQueue=awaiting-reflection&reviewFocus=session%3Ainsights-session-vocabulary',
+  );
+
+  const pastScheduled = page.getByRole('region', {
+    name: 'Past still Scheduled',
+    exact: true,
+  });
+  await expect(pastScheduled).toContainText('Reading Workshop');
+  await expect(pastScheduled.getByRole('link', { name: 'Open Session' })).toHaveAttribute(
+    'href',
+    '#/planning/session?session=insights-session-past-scheduled&return=review&schoolYear=insights-current-year&reviewQueue=past-still-scheduled&reviewFocus=session%3Ainsights-session-past-scheduled',
+  );
+
+  const nextSteps = page.getByRole('region', { name: 'Open Next Steps', exact: true });
+  await expect(nextSteps).toContainText('Reading Workshop');
+  await expect(nextSteps).toContainText('2 open Next Steps');
+  await expect(nextSteps.getByRole('link', { name: 'Open Reflection' })).toHaveAttribute(
+    'href',
+    '#/planning/session/reflection?session=insights-session-reading&return=review&schoolYear=insights-current-year&reviewQueue=open-next-steps&reviewFocus=teaching-reflection%3Ainsights-reflection-reading',
+  );
+  await expect(nextSteps.getByRole('link', { name: 'Open Tasks' })).toHaveAttribute(
+    'href',
+    '#/tasks?reflection=insights-reflection-reading&return=review&schoolYear=insights-current-year&reviewQueue=open-next-steps&reviewFocus=teaching-reflection%3Ainsights-reflection-reading',
+  );
+
+  await awaiting.getByRole('link', { name: 'Open Session' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Session' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Back to Teaching Review' }).last()).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Teaching Review' }).last().click();
+  await expect(page).toHaveURL(
+    /teaching-review\?schoolYear=insights-current-year&queue=awaiting-reflection&focus=session%3Ainsights-session-vocabulary/,
+  );
+  await expect(
+    page.locator('#teaching-review-focus-awaiting-reflection-session-insights-session-vocabulary'),
+  ).toBeFocused();
+
+  await pastScheduled.getByRole('link', { name: 'Open Session' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Session' })).toBeVisible();
+  await page.getByRole('button', { name: 'Mark complete' }).click();
+  await expect(page).toHaveURL(
+    /teaching-review\?schoolYear=insights-current-year&queue=past-still-scheduled&focus=session%3Ainsights-session-past-scheduled/,
+  );
+  await expect(page.locator('#teaching-review-queue-past-still-scheduled')).toBeFocused();
+  await expect(
+    page.getByRole('region', { name: 'Past still Scheduled', exact: true }),
+  ).toContainText('No past Sessions remain marked Scheduled.');
+
+  await nextSteps.getByRole('link', { name: 'Open Tasks' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Tasks' })).toBeVisible();
+  await expect(page.getByText('Reflection Next Steps', { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('article', { name: 'Prepare a shorter partner routine task' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('article', { name: 'Request a new reading passage task' }),
+  ).toBeVisible();
+  await expect(page.getByRole('article', { name: 'Print vocabulary cards task' })).toHaveCount(0);
+  await page.getByRole('link', { name: 'Back to Teaching Review' }).click();
+  await expect(page).toHaveURL(
+    /teaching-review\?schoolYear=insights-current-year&queue=open-next-steps&focus=teaching-reflection%3Ainsights-reflection-reading/,
+  );
+
+  const recordIssues = page.getByRole('region', { name: 'Record Issues', exact: true });
+  await expect(recordIssues).toContainText('No additional record-integrity issues were found.');
+  await expect(page.getByText(/Evidence gap/i)).toHaveCount(0);
+
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(accessibility.violations).toEqual([]);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+
+  const selector = page.getByRole('combobox', { name: 'School Year', exact: true });
+  await selector.selectOption('insights-historical-year');
+  await expect(page).toHaveURL(/teaching-review\?schoolYear=insights-historical-year/);
+  await expect(metricCard(overview, 'Awaiting Reflection')).toContainText('0');
+  await expect(metricCard(overview, 'Past still Scheduled')).toContainText('0');
+  await expect(metricCard(overview, 'Open Next Steps')).toContainText('0');
+
+  await page.reload();
+  await expect(selector).toHaveValue('insights-historical-year');
+});
+
+test('Teaching Review period filters date-bound queues and survives source return', async ({
+  page,
+}) => {
+  await seedInsights(page);
+  await page.goto('./#/teaching-review?schoolYear=insights-current-year');
+
+  const overview = page.getByRole('region', {
+    name: 'What may need teacher attention',
+    exact: true,
+  });
+  const periodSelector = page.getByRole('combobox', { name: 'Period', exact: true });
+
+  await periodSelector.selectOption('this-week');
+  await expect(page).toHaveURL(
+    /teaching-review\?schoolYear=insights-current-year&period=this-week/,
+  );
+  await expect(metricCard(overview, 'Awaiting Reflection')).toContainText('1');
+  await expect(metricCard(overview, 'Past still Scheduled')).toContainText('0');
+  await expect(metricCard(overview, 'Open Next Steps')).toContainText('2');
+  await expect(metricCard(overview, 'Record Issues')).toContainText('0');
+  await expect(
+    page.getByRole('region', { name: 'Past still Scheduled', exact: true }),
+  ).toContainText('No past Sessions remain marked Scheduled.');
+
+  const awaiting = page.getByRole('region', { name: 'Awaiting Reflection', exact: true });
+  await expect(awaiting.getByRole('link', { name: 'Open Session' })).toHaveAttribute(
+    'href',
+    /reviewPeriod=this-week/,
+  );
+  await awaiting.getByRole('link', { name: 'Open Session' }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Session' })).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Teaching Review' }).last().click();
+  await expect(page).toHaveURL(/period=this-week/);
+  await expect(periodSelector).toHaveValue('this-week');
+
+  await periodSelector.selectOption('last-week');
+  await expect(page).toHaveURL(/period=last-week/);
+  await expect(metricCard(overview, 'Awaiting Reflection')).toContainText('0');
+  await expect(metricCard(overview, 'Past still Scheduled')).toContainText('1');
+  await expect(metricCard(overview, 'Open Next Steps')).toContainText('0');
+
+  const lastWeekPast = page.getByRole('region', { name: 'Past still Scheduled', exact: true });
+  await lastWeekPast.getByRole('link', { name: 'Open Session' }).click();
+  await page.getByRole('button', { name: 'Mark complete' }).click();
+  await expect(page).toHaveURL(/period=last-week/);
+  await expect(page).toHaveURL(/queue=past-still-scheduled/);
+  await expect(metricCard(overview, 'Past still Scheduled')).toContainText('0');
+
+  await periodSelector.selectOption('custom');
+  await page.getByLabel('From', { exact: true }).fill('2026-08-04');
+  await page.getByLabel('To', { exact: true }).fill('2026-08-04');
+  await page.getByRole('button', { name: 'Apply range' }).click();
+  await expect(page).toHaveURL(/period=custom/);
+  await expect(page).toHaveURL(/from=2026-08-04/);
+  await expect(page).toHaveURL(/to=2026-08-04/);
+  await expect(metricCard(overview, 'Awaiting Reflection')).toContainText('1');
+  await expect(metricCard(overview, 'Past still Scheduled')).toContainText('0');
+  await expect(metricCard(overview, 'Open Next Steps')).toContainText('0');
+
+  await page.reload();
+  await expect(periodSelector).toHaveValue('custom');
+  await expect(page.getByLabel('From', { exact: true })).toHaveValue('2026-08-04');
+  await expect(page.getByLabel('To', { exact: true })).toHaveValue('2026-08-04');
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+  ).toBe(true);
+  const accessibility = await new AxeBuilder({ page }).analyze();
+  expect(accessibility.violations).toEqual([]);
+});
+
+test('Teaching Review deep links select exact Standard, Library item, and Task records', async ({
+  page,
+}) => {
+  await seedInsights(page);
+
+  await page.goto(
+    './#/standards?standard=insights-standard&return=review&schoolYear=insights-current-year&reviewQueue=record-issues&reviewFocus=standard%3Ainsights-standard',
+  );
+  await expect(page.getByRole('heading', { level: 1, name: 'Standards' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Standard details' })).toContainText('ELA.4.R.1');
+  await expect(page.getByRole('link', { name: 'Back to Teaching Review' })).toBeVisible();
+
+  await page.goto(
+    './#/library?item=insights-resource&return=review&schoolYear=insights-current-year&reviewQueue=record-issues&reviewFocus=library-item%3Ainsights-resource',
+  );
+  await expect(page.getByRole('heading', { level: 1, name: 'Library' })).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'Reading Passage Library item details' }),
+  ).toContainText('Reading Passage');
+
+  await page.goto(
+    './#/tasks?task=insights-next-step-active&return=review&schoolYear=insights-current-year&reviewQueue=open-next-steps&reviewFocus=task%3Ainsights-next-step-active',
+  );
+  await expect(page.getByText('Focused Task', { exact: true })).toBeVisible();
+  const focusedTask = page.getByRole('article', { name: 'Prepare a shorter partner routine task' });
+  await expect(focusedTask).toHaveAttribute('data-focused', 'true');
+  await expect(
+    page.getByRole('article', { name: 'Request a new reading passage task' }),
+  ).toHaveCount(0);
+});
+
 test('School Year selection is URL-backed and preserves an explicit historical empty state', async ({
   page,
 }) => {

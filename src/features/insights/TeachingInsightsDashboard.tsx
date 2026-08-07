@@ -164,6 +164,12 @@ export function TeachingInsightsDashboard({
             ))}
           </select>
           <small>As of {formatLongDate(view.schoolYear.asOfDate)}</small>
+          <a
+            className="button"
+            href={`#/teaching-review?schoolYear=${encodeURIComponent(view.schoolYear.id)}`}
+          >
+            Open Teaching Review
+          </a>
         </div>
       </header>
 

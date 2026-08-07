@@ -68,4 +68,38 @@ describe('planning navigation', () => {
     expect(parsePlanningReturnTarget('unknown')).toBe('learners');
     expect(parsePlanningReturnTarget(null)).toBe('learners');
   });
+
+  it('returns review-origin planning workflows to the exact Review period and queue', () => {
+    const reviewReturn = {
+      schoolYearId: 'year-1',
+      queue: 'awaiting-reflection' as const,
+      focus: 'session:session-1',
+      period: { preset: 'this-week' as const },
+    };
+    expect(parsePlanningReturnTarget('review')).toBe('review');
+    expect(
+      buildPlanningSurfaceHref({
+        returnTo: 'review',
+        date: '2026-07-17',
+        contextId: 'context',
+        reviewReturn,
+      }),
+    ).toBe(
+      '#/teaching-review?schoolYear=year-1&queue=awaiting-reflection&focus=session%3Asession-1&period=this-week',
+    );
+    expect(
+      buildSessionEditorHref({
+        planId: 'plan',
+        returnTo: 'review',
+        reviewReturn: {
+          schoolYearId: 'year-1',
+          queue: 'record-issues',
+          focus: 'lesson-plan:plan',
+          period: { preset: 'custom', from: '2026-08-01', to: '2026-08-07' },
+        },
+      }),
+    ).toBe(
+      '#/planning/session?plan=plan&return=review&schoolYear=year-1&reviewQueue=record-issues&reviewFocus=lesson-plan%3Aplan&reviewPeriod=custom&reviewFrom=2026-08-01&reviewTo=2026-08-07',
+    );
+  });
 });

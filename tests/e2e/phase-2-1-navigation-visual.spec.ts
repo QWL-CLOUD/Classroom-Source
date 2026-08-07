@@ -117,14 +117,14 @@ test('Phase 2.1 preserves Week view and focus while keeping time labels readable
     './#/week?date=2026-07-15&view=everything&focus=session-occurrence%3Aphase-21-session',
   );
 
-  await expect(page.getByLabel('View')).toHaveValue('everything');
+  await expect(page.getByLabel('View', { exact: true })).toHaveValue('everything');
   const focusedSession = page.locator('[data-week-item="session-occurrence:phase-21-session"]');
   await expect(focusedSession).toBeVisible();
   await expect(focusedSession).toHaveAttribute('aria-current', 'true');
   await expect(focusedSession.getByText('Synthetic learner session')).toBeVisible();
 
   await page.reload();
-  await expect(page.getByLabel('View')).toHaveValue('everything');
+  await expect(page.getByLabel('View', { exact: true })).toHaveValue('everything');
   await expect(focusedSession).toHaveAttribute('aria-current', 'true');
   await expect(focusedSession).toBeFocused();
   const weekGrid = page.getByRole('region', { name: /Week of/ });
@@ -148,7 +148,7 @@ test('Phase 2.1 preserves Week view and focus while keeping time labels readable
     .poll(() => weekGrid.evaluate((element) => element.scrollLeft))
     .toBeGreaterThan(manualScrollLeft - 10);
 
-  await page.getByLabel('View').selectOption('teaching');
+  await page.getByLabel('View', { exact: true }).selectOption('teaching');
   await expect(page).toHaveURL(/view=schedule$/);
   await expect(page.getByText('Synthetic arrival')).toBeVisible();
   await expect(page.getByText('Synthetic staff event')).toHaveCount(0);
@@ -158,17 +158,17 @@ test('Phase 2.1 preserves Week view and focus while keeping time labels readable
   await expect(arrivalTime).toBeVisible();
   expect(await arrivalTime.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
 
-  await page.getByLabel('View').selectOption('calendar');
+  await page.getByLabel('View', { exact: true }).selectOption('calendar');
   await expect(page).toHaveURL(/view=events$/);
   await expect(page.getByText('Synthetic staff event')).toBeVisible();
   await expect(page.getByText('Synthetic personal appointment')).toHaveCount(0);
 
-  await page.getByLabel('View').selectOption('personal');
+  await page.getByLabel('View', { exact: true }).selectOption('personal');
   await expect(page).toHaveURL(/view=personal$/);
   await expect(page.getByText('Synthetic personal appointment')).toBeVisible();
   await expect(page.getByText('Synthetic staff event')).toHaveCount(0);
 
-  await page.getByLabel('View').selectOption('everything');
+  await page.getByLabel('View', { exact: true }).selectOption('everything');
   const accessibilityResults = await new AxeBuilder({ page }).analyze();
   expect(
     accessibilityResults.violations,
