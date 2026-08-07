@@ -1,6 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
+import { AssessmentEvidenceEditorPanel } from '@/features/assessmentEvidence/AssessmentEvidenceEditorPanel';
+import { assessmentEvidenceMutationService } from '@/features/assessmentEvidence/assessmentEvidenceMutationService';
 import { LearnerProgressDashboard } from '@/features/learnerProgress/LearnerProgressDashboard';
 import {
   appendLearnerProgressPeriodParams,
@@ -16,11 +18,17 @@ import {
   type LearnerProgressStatusFilter,
 } from '@/features/learnerProgress/learnerProgressReadModel';
 import {
+  appendLearnerProgressEditor,
   appendLearnerProgressFilters,
   appendLearnerProgressMode,
   parseLearnerProgressRouteState,
 } from '@/features/learnerProgress/learnerProgressRouteState';
+import {
+  decorateLearnerProgressSourceHref,
+  type LearnerProgressReturnState,
+} from '@/features/learnerProgress/learnerProgressNavigation';
 import { useLearnerProgress } from '@/features/learnerProgress/useLearnerProgress';
+import { parseTeachingReviewReturnState } from '@/features/teachingReview/teachingReviewNavigation';
 
 import styles from './InsightsRoute.module.css';
 
@@ -29,7 +37,10 @@ export function LearnerProgressRoute() {
   const requestedSchoolYearId = searchParams.get('schoolYear') ?? undefined;
   const periodState = parseLearnerProgressPeriodState(searchParams);
   const routeState = parseLearnerProgressRouteState(searchParams);
+  const parentReviewReturn = parseTeachingReviewReturnState(searchParams) ?? undefined;
   const state = useLearnerProgress(requestedSchoolYearId);
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const [mutationMessage, setMutationMessage] = useState<string | null>(null);
   const selectedSchoolYear = state.status === 'ready' ? state.data.selectedSchoolYear : null;
   const effectivePeriod = selectedSchoolYear
     ? clampLearnerProgressPeriodToSchoolYear(periodState, selectedSchoolYear)
@@ -58,6 +69,7 @@ export function LearnerProgressRoute() {
     next.delete('context');
     next.delete('standard');
     next.delete('evidence');
+    next.delete('edit');
     setSearchParams(next, { replace: true });
   }, [requestedSchoolYearId, searchParams, setSearchParams, state]);
 
@@ -77,6 +89,7 @@ export function LearnerProgressRoute() {
       target ? clampLearnerProgressPeriodToSchoolYear(effectivePeriod, target) : effectivePeriod,
     );
     appendLearnerProgressMode(next, routeState.mode);
+    appendLearnerProgressEditor(next, null);
     update(next);
   }
 
@@ -84,18 +97,21 @@ export function LearnerProgressRoute() {
     const next = new URLSearchParams(searchParams);
     appendLearnerProgressPeriodParams(next, period);
     next.delete('evidence');
+    appendLearnerProgressEditor(next, null);
     update(next);
   }
 
   function selectMode(mode: LearnerProgressMode): void {
     const next = new URLSearchParams(searchParams);
     appendLearnerProgressMode(next, mode);
+    appendLearnerProgressEditor(next, null);
     update(next);
   }
 
   function selectScope(id?: string): void {
     const next = new URLSearchParams(searchParams);
     appendLearnerProgressMode(next, routeState.mode, id);
+    appendLearnerProgressEditor(next, null);
     update(next);
   }
 
@@ -103,6 +119,7 @@ export function LearnerProgressRoute() {
     const next = new URLSearchParams(searchParams);
     appendLearnerProgressFilters(next, status, routeState.kind);
     next.delete('evidence');
+    appendLearnerProgressEditor(next, null);
     update(next);
   }
 
@@ -110,6 +127,7 @@ export function LearnerProgressRoute() {
     const next = new URLSearchParams(searchParams);
     appendLearnerProgressFilters(next, routeState.status, kind);
     next.delete('evidence');
+    appendLearnerProgressEditor(next, null);
     update(next);
   }
 
@@ -117,7 +135,67 @@ export function LearnerProgressRoute() {
     const next = new URLSearchParams(searchParams);
     if (id) next.set('evidence', id);
     else next.delete('evidence');
+    appendLearnerProgressEditor(next, null);
+    setMutationError(null);
+    setMutationMessage(null);
     update(next);
+  }
+
+  function openCreateEvidence(): void {
+    const next = new URLSearchParams(searchParams);
+    appendLearnerProgressEditor(next, 'new');
+    setMutationError(null);
+    setMutationMessage(null);
+    update(next);
+  }
+
+  function openEditEvidence(id: string): void {
+    const next = new URLSearchParams(searchParams);
+    next.set('evidence', id);
+    appendLearnerProgressEditor(next, id);
+    setMutationError(null);
+    setMutationMessage(null);
+    update(next);
+  }
+
+  function closeEvidenceEditor(): void {
+    const next = new URLSearchParams(searchParams);
+    appendLearnerProgressEditor(next, null);
+    setMutationError(null);
+    update(next);
+  }
+
+  function showSavedEvidence(id: string): void {
+    const next = new URLSearchParams(searchParams);
+    next.set('evidence', id);
+    appendLearnerProgressFilters(next, 'all', 'all');
+    appendLearnerProgressEditor(next, null);
+    setMutationError(null);
+    setMutationMessage('Evidence saved. Global Undo is available in the top bar.');
+    update(next);
+  }
+
+  async function changeEvidenceStatus(id: string, action: 'archive' | 'restore'): Promise<void> {
+    setMutationError(null);
+    setMutationMessage(null);
+    try {
+      if (action === 'archive') await assessmentEvidenceMutationService.archive(id);
+      else await assessmentEvidenceMutationService.restore(id);
+      const next = new URLSearchParams(searchParams);
+      next.set('evidence', id);
+      appendLearnerProgressFilters(next, 'all', routeState.kind);
+      appendLearnerProgressEditor(next, null);
+      setMutationMessage(
+        action === 'archive'
+          ? 'Evidence archived. Global Undo is available in the top bar.'
+          : 'Evidence restored. Global Undo is available in the top bar.',
+      );
+      update(next);
+    } catch (cause) {
+      setMutationError(
+        cause instanceof Error ? cause.message : 'Evidence lifecycle could not be updated.',
+      );
+    }
   }
 
   if (state.status === 'loading') {
@@ -178,6 +256,30 @@ export function LearnerProgressRoute() {
     kind: routeState.kind,
     period: resolvedPeriod,
   });
+  const progressReturn: LearnerProgressReturnState = {
+    schoolYearId: view.schoolYear.id,
+    mode: routeState.mode,
+    selectedId: routeState.selectedId,
+    evidenceId: view.selectedEvidence?.id ?? routeState.evidenceId,
+    status: routeState.status,
+    kind: routeState.kind,
+    period: effectivePeriod,
+    parentReview: parentReviewReturn,
+  };
+  const editorRecord =
+    routeState.editor && routeState.editor !== 'new'
+      ? state.data.snapshot.evidence.find((record) => record.id === routeState.editor)
+      : undefined;
+  const editorDefaults = {
+    studentId: routeState.mode === 'learners' ? routeState.selectedId : undefined,
+    contextId: routeState.mode === 'contexts' ? routeState.selectedId : undefined,
+    standardId: routeState.mode === 'standards' ? routeState.selectedId : undefined,
+    occurredOn:
+      state.data.asOfDate >= view.schoolYear.startsOn &&
+      state.data.asOfDate <= view.schoolYear.endsOn
+        ? state.data.asOfDate
+        : view.schoolYear.startsOn,
+  };
 
   return (
     <LearnerProgressDashboard
@@ -194,6 +296,54 @@ export function LearnerProgressRoute() {
       onStatusFilterChange={selectStatus}
       onKindFilterChange={selectKind}
       onEvidenceChange={selectEvidence}
+      onCreateEvidence={openCreateEvidence}
+      onEditEvidence={openEditEvidence}
+      onArchiveEvidence={(id) => void changeEvidenceStatus(id, 'archive')}
+      onRestoreEvidence={(id) => void changeEvidenceStatus(id, 'restore')}
+      decorateSourceHref={(href) => decorateLearnerProgressSourceHref(href, progressReturn)}
+      feedbackPanel={
+        mutationError || mutationMessage ? (
+          <>
+            {mutationError ? (
+              <section className={`card ${styles.state}`} role="alert">
+                <strong>Evidence update failed</strong>
+                <p>{mutationError}</p>
+              </section>
+            ) : null}
+            {mutationMessage ? (
+              <section className={`card ${styles.state}`} role="status">
+                <p>{mutationMessage}</p>
+              </section>
+            ) : null}
+          </>
+        ) : null
+      }
+      editorPanel={
+        routeState.editor ? (
+          routeState.editor === 'new' || editorRecord ? (
+            <AssessmentEvidenceEditorPanel
+              key={
+                routeState.editor === 'new'
+                  ? 'new-evidence'
+                  : `${editorRecord!.id}-${editorRecord!.updatedAt}`
+              }
+              snapshot={state.data.snapshot}
+              existing={editorRecord}
+              defaults={editorDefaults}
+              onSaved={(record) => showSavedEvidence(record.id)}
+              onCancel={closeEvidenceEditor}
+            />
+          ) : (
+            <section className={`card ${styles.state}`} role="alert">
+              <strong>Evidence record unavailable</strong>
+              <p>The requested Evidence record no longer exists.</p>
+              <button className="button" type="button" onClick={closeEvidenceEditor}>
+                Close editor
+              </button>
+            </section>
+          )
+        ) : null
+      }
     />
   );
 }

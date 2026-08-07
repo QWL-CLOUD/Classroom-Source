@@ -201,6 +201,24 @@ describe('Assessment Evidence domain and persistence', () => {
     });
   });
 
+  it('rejects create and update dates outside the selected School Year without writing', async () => {
+    ids = ['evidence-outside', 'log-outside'];
+    await expect(mutation.create({ ...scoreValues(), occurredOn: '2026-07-01' })).rejects.toThrow(
+      /inside the selected School Year/,
+    );
+    expect(await database.assessmentEvidence.get('evidence-outside')).toBeUndefined();
+
+    ids = ['evidence-1', 'log-create'];
+    await mutation.create(scoreValues());
+    ids = ['log-update'];
+    await expect(
+      mutation.update('evidence-1', { ...scoreValues(), occurredOn: '2027-07-01' }),
+    ).rejects.toThrow(/inside the selected School Year/);
+    expect(await database.assessmentEvidence.get('evidence-1')).toMatchObject({
+      occurredOn: '2026-09-01',
+    });
+  });
+
   it('archives and restores evidence without changing ownership or source links', async () => {
     ids = ['evidence-1', 'log-create'];
     await mutation.create(scoreValues());

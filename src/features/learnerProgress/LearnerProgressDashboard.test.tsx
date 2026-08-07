@@ -91,4 +91,75 @@ describe('LearnerProgressDashboard', () => {
     expect(screen.getByText('3 / 4')).toBeVisible();
     expect(screen.getByText(/No Evidence in this scope does not mean failure/)).toBeVisible();
   });
+
+  it('surfaces the Evidence editor as the active inspector instead of stacking below detail', () => {
+    render(
+      <LearnerProgressDashboard
+        schoolYears={[view.schoolYear]}
+        view={{ ...view, selectedEvidence: view.evidence[0] }}
+        period={{ preset: 'school-year' }}
+        resolvedPeriod={{
+          preset: 'school-year',
+          startsOn: '2026-07-01',
+          endsOn: '2027-06-30',
+          label: 'Jul 1, 2026–Jun 30, 2027',
+          overlapsSchoolYear: true,
+        }}
+        statusFilter="active"
+        kindFilter="all"
+        onSchoolYearChange={noop}
+        onPeriodChange={noop}
+        onModeChange={noop}
+        onScopeChange={noop}
+        onStatusFilterChange={noop}
+        onKindFilterChange={noop}
+        onEvidenceChange={noop}
+        editorPanel={
+          <section
+            id="assessment-evidence-editor"
+            aria-labelledby="test-evidence-editor-heading"
+            tabIndex={-1}
+          >
+            <h2 id="test-evidence-editor-heading">Add Evidence</h2>
+          </section>
+        }
+      />,
+    );
+
+    const editor = screen.getByRole('region', { name: 'Add Evidence' });
+    expect(editor).toBeVisible();
+    expect(screen.queryByRole('article', { name: 'Reading check' })).not.toBeInTheDocument();
+  });
+
+  it('keeps exact Evidence detail visible when feedback is shown without an editor', () => {
+    render(
+      <LearnerProgressDashboard
+        schoolYears={[view.schoolYear]}
+        view={{ ...view, selectedEvidence: view.evidence[0] }}
+        period={{ preset: 'school-year' }}
+        resolvedPeriod={{
+          preset: 'school-year',
+          startsOn: '2026-07-01',
+          endsOn: '2027-06-30',
+          label: 'Jul 1, 2026–Jun 30, 2027',
+          overlapsSchoolYear: true,
+        }}
+        statusFilter="all"
+        kindFilter="all"
+        onSchoolYearChange={noop}
+        onPeriodChange={noop}
+        onModeChange={noop}
+        onScopeChange={noop}
+        onStatusFilterChange={noop}
+        onKindFilterChange={noop}
+        onEvidenceChange={noop}
+        feedbackPanel={<section role="status">Evidence saved</section>}
+      />,
+    );
+
+    expect(screen.getByRole('status')).toHaveTextContent('Evidence saved');
+    const detail = screen.getByRole('article', { name: 'Reading check' });
+    expect(detail).toBeVisible();
+    expect(detail).toHaveTextContent('3 / 4');
+  });
 });

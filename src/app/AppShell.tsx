@@ -34,6 +34,10 @@ import {
 } from '@/app/navigationGroups';
 import { buildShellNavigationHref } from '@/app/workspaceNavigation';
 import {
+  buildLearnerProgressHref,
+  parseLearnerProgressReturnState,
+} from '@/features/learnerProgress/learnerProgressNavigation';
+import {
   buildTeachingReviewHref,
   parseTeachingReviewReturnState,
 } from '@/features/teachingReview/teachingReviewNavigation';
@@ -149,10 +153,13 @@ export function AppShell() {
   const mobileCloseButtonRef = useRef<HTMLButtonElement>(null);
   const presentation = getRoutePresentation(location.pathname);
   const schoolYearContext = presentActiveSchoolYear(activeSchoolYearState);
+  const currentSearch = new URLSearchParams(location.search);
   const reviewReturnState =
-    location.pathname === '/teaching-review'
+    location.pathname === '/teaching-review' ? null : parseTeachingReviewReturnState(currentSearch);
+  const progressReturnState =
+    location.pathname === '/learner-progress'
       ? null
-      : parseTeachingReviewReturnState(new URLSearchParams(location.search));
+      : parseLearnerProgressReturnState(currentSearch);
 
   useEffect(() => {
     document.title = `${presentation.title} · Classroom`;
@@ -423,6 +430,19 @@ export function AppShell() {
                   <ArrowLeft size={17} aria-hidden="true" /> Back to Teaching Review
                 </Link>
                 <span>Source workspace opened from a read-only Teaching Review queue.</span>
+              </aside>
+            ) : null}
+            {progressReturnState ? (
+              <aside className={styles.reviewReturnBar} aria-label="Learner Progress return">
+                <Link
+                  className="button"
+                  to={buildLearnerProgressHref(progressReturnState).slice(1)}
+                >
+                  <ArrowLeft size={17} aria-hidden="true" /> Back to Learner Progress
+                </Link>
+                <span>
+                  Source workspace opened from a source-traceable Learner Progress record.
+                </span>
               </aside>
             ) : null}
             <Outlet />

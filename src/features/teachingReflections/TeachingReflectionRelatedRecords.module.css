@@ -281,3 +281,9 @@
     grid-template-columns: 1fr;
   }
 }
+
+.cardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

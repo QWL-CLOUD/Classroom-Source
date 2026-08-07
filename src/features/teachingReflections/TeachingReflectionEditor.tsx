@@ -10,6 +10,7 @@ import type {
   TeachingReflectionRecord,
 } from '@/domain/models/entities';
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
+import type { LearnerProgressReturnState } from '@/features/learnerProgress/learnerProgressNavigation';
 import type { PlanningReturnTarget } from '@/features/planning/planningNavigation';
 import type { TeachingReviewReturnState } from '@/features/teachingReview/teachingReviewNavigation';
 import { formatLongDate } from '@/shared/dates/localDate';
@@ -53,6 +54,7 @@ interface TeachingReflectionEditorProps {
   sessionOccurrenceId: string;
   returnTo: PlanningReturnTarget;
   reviewReturn?: TeachingReviewReturnState;
+  progressReturn?: LearnerProgressReturnState;
   detail?: TeachingReflectionDetailReadModel;
   createSource?: TeachingReflectionCreateSource;
   service?: TeachingReflectionEditorActions;
@@ -82,6 +84,7 @@ export function TeachingReflectionEditor({
   sessionOccurrenceId,
   returnTo,
   reviewReturn,
+  progressReturn,
   detail,
   createSource,
   service = teachingReflectionMutationService,
@@ -206,7 +209,12 @@ export function TeachingReflectionEditor({
         </div>
         <a
           className="button"
-          href={buildTeachingReflectionSessionHref(sessionOccurrenceId, returnTo, reviewReturn)}
+          href={buildTeachingReflectionSessionHref(
+            sessionOccurrenceId,
+            returnTo,
+            reviewReturn,
+            progressReturn,
+          )}
         >
           <ArrowLeft aria-hidden="true" size={17} />
           Back to Session

@@ -214,11 +214,11 @@ test('Learner Progress reviews exact recorded Evidence across learner, Context, 
   await expect(detail.getByText('3 / 4')).toBeVisible();
   await expect(detail.getByRole('link', { name: 'Alice Chen' })).toHaveAttribute(
     'href',
-    '#/learners?student=progress-alice',
+    /#\/learners\?student=progress-alice&return=progress/,
   );
   await expect(detail.getByRole('link', { name: /ELA\.4\.R\.1/ })).toHaveAttribute(
     'href',
-    '#/standards?standard=progress-standard',
+    /#\/standards\?standard=progress-standard&return=progress/,
   );
 
   await page.getByLabel('Period').selectOption('custom');
@@ -268,4 +268,68 @@ test('Learner Progress preserves historical source snapshots and stays contained
       .map((violation) => `${violation.id}: ${violation.help}`)
       .join('\n'),
   ).toEqual([]);
+});
+
+test('Learner Progress creates, edits, archives, restores, and returns from exact Evidence sources', async ({
+  page,
+}) => {
+  await seedLearnerProgress(page);
+
+  const scopePanel = page.getByRole('complementary', { name: 'Select a source scope' });
+  await scopePanel.getByRole('button', { name: /Alice Chen/ }).click();
+  await page.getByRole('button', { name: 'Add Evidence' }).click();
+  await expect(page.getByRole('heading', { name: 'Add Evidence' })).toBeVisible();
+
+  await page.getByLabel('Evidence date').fill('2026-08-07');
+  await page.getByLabel('Title').fill('Teacher conference note');
+  await page.getByLabel('Context · optional').selectOption('progress-class');
+  await page.getByLabel('Lesson Plan · optional').selectOption('progress-plan');
+  await page.getByLabel('Session · optional').selectOption('progress-session');
+  await page.getByLabel('Library Assessment · optional').selectOption('progress-assessment');
+  await page.getByLabel('Linked Standards').selectOption('progress-standard');
+  await page.getByLabel('Teacher observation').fill('Explained the strategy with text evidence.');
+  await page.getByRole('button', { name: 'Add Evidence' }).last().click();
+
+  await expect(
+    page.getByRole('region', { name: 'Learner Progress' }).getByRole('status'),
+  ).toContainText('Evidence saved');
+  await expect(
+    page.getByRole('heading', { name: 'Teacher conference note', exact: true }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/evidence=/);
+  const createdDetail = page.getByRole('article', { name: 'Teacher conference note' });
+  await expect(createdDetail).toBeVisible();
+
+  await createdDetail.getByRole('button', { name: 'Edit Evidence' }).click();
+  await expect(page.getByRole('heading', { name: 'Edit Evidence' })).toBeVisible();
+  await page.getByLabel('Title').fill('Teacher conference observation');
+  await page.getByRole('button', { name: 'Save Evidence' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Teacher conference observation', exact: true }),
+  ).toBeVisible();
+
+  const updatedDetail = page.getByRole('article', { name: 'Teacher conference observation' });
+  await updatedDetail.getByRole('button', { name: 'Archive Evidence' }).click();
+  await expect(
+    page.getByRole('region', { name: 'Learner Progress' }).getByRole('status'),
+  ).toContainText('Evidence archived');
+  await expect(
+    page.getByRole('article', { name: 'Teacher conference observation' }).getByText('Archived'),
+  ).toBeVisible();
+
+  await page
+    .getByRole('article', { name: 'Teacher conference observation' })
+    .getByRole('button', { name: 'Restore Evidence' })
+    .click();
+  await expect(
+    page.getByRole('region', { name: 'Learner Progress' }).getByRole('status'),
+  ).toContainText('Evidence restored');
+
+  const learnerLink = page
+    .getByRole('article', { name: 'Teacher conference observation' })
+    .getByRole('link', { name: 'Alice Chen' });
+  await learnerLink.click();
+  await expect(page.getByRole('link', { name: 'Back to Learner Progress' })).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Learner Progress' }).click();
+  await expect(page.getByRole('article', { name: 'Teacher conference observation' })).toBeVisible();
 });

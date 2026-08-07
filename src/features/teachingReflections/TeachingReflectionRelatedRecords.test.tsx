@@ -186,6 +186,10 @@ describe('TeachingReflectionRelatedRecords', () => {
       'href',
       '#/learners?directory=students&student=student',
     );
+    expect(screen.getByRole('link', { name: 'Open Evidence' })).toHaveAttribute(
+      'href',
+      '#/learner-progress?schoolYear=year&student=student&evidence=evidence',
+    );
   });
 
   it('creates a context-locked Next Step with scheduled and due values', async () => {

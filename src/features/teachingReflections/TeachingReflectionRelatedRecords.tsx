@@ -269,14 +269,24 @@ export function TeachingReflectionRelatedRecords({
                         </span>
                       ) : null}
                     </div>
-                    {item.student ? (
+                    <div className={styles.cardActions}>
                       <a
                         className="button"
-                        href={`#/learners?directory=students&student=${encodeURIComponent(item.student.id)}`}
+                        href={`#/learner-progress?schoolYear=${encodeURIComponent(detail.reflection.schoolYearId)}${
+                          item.student ? `&student=${encodeURIComponent(item.student.id)}` : ''
+                        }&evidence=${encodeURIComponent(record.id)}`}
                       >
-                        Open learner record
+                        Open Evidence
                       </a>
-                    ) : null}
+                      {item.student ? (
+                        <a
+                          className="button"
+                          href={`#/learners?directory=students&student=${encodeURIComponent(item.student.id)}`}
+                        >
+                          Open learner record
+                        </a>
+                      ) : null}
+                    </div>
                   </article>
                 </li>
               );

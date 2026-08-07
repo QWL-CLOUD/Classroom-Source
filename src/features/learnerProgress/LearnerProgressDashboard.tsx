@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type FormEvent, type ReactNode } from 'react';
 
 import type { SchoolYear } from '@/domain/models/entities';
 import { formatLongDate, formatShortDate, parseLocalDate } from '@/shared/dates/localDate';
@@ -32,6 +32,13 @@ interface LearnerProgressDashboardProps {
   onStatusFilterChange: (status: LearnerProgressStatusFilter) => void;
   onKindFilterChange: (kind: LearnerProgressKindFilter) => void;
   onEvidenceChange: (id?: string) => void;
+  onCreateEvidence?: () => void;
+  onEditEvidence?: (id: string) => void;
+  onArchiveEvidence?: (id: string) => void;
+  onRestoreEvidence?: (id: string) => void;
+  decorateSourceHref?: (href: string) => string;
+  feedbackPanel?: ReactNode;
+  editorPanel?: ReactNode;
 }
 
 const modeLabels: Record<LearnerProgressMode, string> = {
@@ -61,11 +68,21 @@ function sourceStatusLabel(source: LearnerProgressSource): string | null {
   return null;
 }
 
-function SourceValue({ source }: { source: LearnerProgressSource }) {
+function SourceValue({
+  source,
+  decorateHref,
+}: {
+  source: LearnerProgressSource;
+  decorateHref?: (href: string) => string;
+}) {
   const status = sourceStatusLabel(source);
   return (
     <span className={styles.sourceValue}>
-      {source.href ? <a href={source.href}>{source.label}</a> : <span>{source.label}</span>}
+      {source.href ? (
+        <a href={decorateHref ? decorateHref(source.href) : source.href}>{source.label}</a>
+      ) : (
+        <span>{source.label}</span>
+      )}
       {status ? <span className={styles.sourceStatus}>{status}</span> : null}
     </span>
   );
@@ -108,9 +125,17 @@ function EvidenceCard({
 function EvidenceDetail({
   item,
   onClose,
+  onEdit,
+  onArchive,
+  onRestore,
+  decorateSourceHref,
 }: {
   item: LearnerProgressEvidenceItem;
   onClose: () => void;
+  onEdit?: () => void;
+  onArchive?: () => void;
+  onRestore?: () => void;
+  decorateSourceHref?: (href: string) => string;
 }) {
   return (
     <article
@@ -130,9 +155,26 @@ function EvidenceDetail({
         </div>
         <div className={styles.detailActions}>
           <strong>{item.valueLabel}</strong>
-          <button type="button" className="button" onClick={onClose}>
-            Close detail
-          </button>
+          <div className={styles.detailButtons}>
+            {onEdit ? (
+              <button type="button" className="button" onClick={onEdit}>
+                Edit Evidence
+              </button>
+            ) : null}
+            {item.status === 'active' && onArchive ? (
+              <button type="button" className="button" onClick={onArchive}>
+                Archive Evidence
+              </button>
+            ) : null}
+            {item.status === 'archived' && onRestore ? (
+              <button type="button" className="button" onClick={onRestore}>
+                Restore Evidence
+              </button>
+            ) : null}
+            <button type="button" className="button" onClick={onClose}>
+              Close detail
+            </button>
+          </div>
         </div>
       </header>
 
@@ -154,24 +196,48 @@ function EvidenceDetail({
         <div>
           <dt>Learner</dt>
           <dd>
-            <SourceValue source={item.student} />
+            <SourceValue source={item.student} decorateHref={decorateSourceHref} />
           </dd>
         </div>
         <div>
           <dt>Context</dt>
-          <dd>{item.context ? <SourceValue source={item.context} /> : 'Not linked'}</dd>
+          <dd>
+            {item.context ? (
+              <SourceValue source={item.context} decorateHref={decorateSourceHref} />
+            ) : (
+              'Not linked'
+            )}
+          </dd>
         </div>
         <div>
           <dt>Lesson Plan</dt>
-          <dd>{item.lessonPlan ? <SourceValue source={item.lessonPlan} /> : 'Not linked'}</dd>
+          <dd>
+            {item.lessonPlan ? (
+              <SourceValue source={item.lessonPlan} decorateHref={decorateSourceHref} />
+            ) : (
+              'Not linked'
+            )}
+          </dd>
         </div>
         <div>
           <dt>Session</dt>
-          <dd>{item.session ? <SourceValue source={item.session} /> : 'Not linked'}</dd>
+          <dd>
+            {item.session ? (
+              <SourceValue source={item.session} decorateHref={decorateSourceHref} />
+            ) : (
+              'Not linked'
+            )}
+          </dd>
         </div>
         <div>
           <dt>Assessment</dt>
-          <dd>{item.assessment ? <SourceValue source={item.assessment} /> : 'Not linked'}</dd>
+          <dd>
+            {item.assessment ? (
+              <SourceValue source={item.assessment} decorateHref={decorateSourceHref} />
+            ) : (
+              'Not linked'
+            )}
+          </dd>
         </div>
       </dl>
 
@@ -183,7 +249,7 @@ function EvidenceDetail({
           <ul>
             {item.standards.map((standard, index) => (
               <li key={`${standard.entityId ?? 'missing'}-${index}`}>
-                <SourceValue source={standard} />
+                <SourceValue source={standard} decorateHref={decorateSourceHref} />
               </li>
             ))}
           </ul>
@@ -207,6 +273,13 @@ export function LearnerProgressDashboard({
   onStatusFilterChange,
   onKindFilterChange,
   onEvidenceChange,
+  onCreateEvidence,
+  onEditEvidence,
+  onArchiveEvidence,
+  onRestoreEvidence,
+  decorateSourceHref,
+  feedbackPanel,
+  editorPanel,
 }: LearnerProgressDashboardProps) {
   const [customFrom, setCustomFrom] = useState(
     period.preset === 'custom'
@@ -219,8 +292,20 @@ export function LearnerProgressDashboard({
       : (resolvedPeriod.endsOn ?? view.schoolYear.endsOn),
   );
 
+  const editorOpen = Boolean(editorPanel);
+
   useEffect(() => {
-    if (!view.selectedEvidence) return;
+    if (!editorOpen) return;
+    const frame = window.requestAnimationFrame(() => {
+      const editor = document.getElementById('assessment-evidence-editor');
+      editor?.focus({ preventScroll: true });
+      editor?.scrollIntoView?.({ block: 'nearest' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [editorOpen]);
+
+  useEffect(() => {
+    if (!view.selectedEvidence || editorOpen) return;
     const frame = window.requestAnimationFrame(() => {
       const target = document.getElementById(
         `learner-progress-evidence-${view.selectedEvidence?.id}`,
@@ -229,7 +314,7 @@ export function LearnerProgressDashboard({
       target?.scrollIntoView?.({ block: 'nearest' });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [view.selectedEvidence]);
+  }, [editorOpen, view.selectedEvidence]);
 
   useEffect(() => {
     if (period.preset === 'custom') {
@@ -301,6 +386,11 @@ export function LearnerProgressDashboard({
             <small>As of {formatLongDate(view.asOfDate)}</small>
           </div>
           <div className={styles.headerLinks}>
+            {onCreateEvidence ? (
+              <button className="button button-primary" type="button" onClick={onCreateEvidence}>
+                Add Evidence
+              </button>
+            ) : null}
             <a
               className="button"
               href={`#/insights?schoolYear=${encodeURIComponent(view.schoolYear.id)}`}
@@ -521,42 +611,70 @@ export function LearnerProgressDashboard({
             </div>
           </section>
 
-          <section
-            className={`card ${styles.timeline}`}
-            aria-labelledby="learner-progress-timeline"
-          >
-            <header>
-              <h2 id="learner-progress-timeline">Evidence timeline</h2>
-              <p>Newest recorded Evidence appears first.</p>
-            </header>
-            {view.evidence.length === 0 ? (
-              <div className={styles.emptyState} role="status">
-                <strong>No recorded Evidence in this scope.</strong>
-                <span>
-                  Change the learner/source, period, lifecycle, or Evidence kind to review another
-                  scope.
-                </span>
-              </div>
-            ) : (
-              <ul className={styles.evidenceList}>
-                {view.evidence.map((item) => (
-                  <EvidenceCard
-                    key={item.id}
-                    item={item}
-                    selected={view.selectedEvidence?.id === item.id}
-                    onSelect={() => onEvidenceChange(item.id)}
-                  />
-                ))}
-              </ul>
-            )}
-          </section>
+          {feedbackPanel}
 
-          {view.selectedEvidence ? (
-            <EvidenceDetail
-              item={view.selectedEvidence}
-              onClose={() => onEvidenceChange(undefined)}
-            />
-          ) : null}
+          <div
+            className={`${styles.evidenceWorkspace} ${
+              editorPanel || view.selectedEvidence ? styles.evidenceWorkspaceWithInspector : ''
+            }`}
+          >
+            <section
+              className={`card ${styles.timeline}`}
+              aria-labelledby="learner-progress-timeline"
+            >
+              <header>
+                <h2 id="learner-progress-timeline">Evidence timeline</h2>
+                <p>Newest recorded Evidence appears first.</p>
+              </header>
+              {view.evidence.length === 0 ? (
+                <div className={styles.emptyState} role="status">
+                  <strong>No recorded Evidence in this scope.</strong>
+                  <span>
+                    Change the learner/source, period, lifecycle, or Evidence kind to review another
+                    scope.
+                  </span>
+                </div>
+              ) : (
+                <ul className={styles.evidenceList}>
+                  {view.evidence.map((item) => (
+                    <EvidenceCard
+                      key={item.id}
+                      item={item}
+                      selected={view.selectedEvidence?.id === item.id}
+                      onSelect={() => onEvidenceChange(item.id)}
+                    />
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            {editorPanel ? (
+              <div className={`${styles.inspectorSlot} ${styles.editorSlot}`}>{editorPanel}</div>
+            ) : view.selectedEvidence ? (
+              <div className={styles.inspectorSlot}>
+                <EvidenceDetail
+                  item={view.selectedEvidence}
+                  onClose={() => onEvidenceChange(undefined)}
+                  onEdit={
+                    view.selectedEvidence.status === 'active' && onEditEvidence
+                      ? () => onEditEvidence(view.selectedEvidence!.id)
+                      : undefined
+                  }
+                  onArchive={
+                    onArchiveEvidence
+                      ? () => onArchiveEvidence(view.selectedEvidence!.id)
+                      : undefined
+                  }
+                  onRestore={
+                    onRestoreEvidence
+                      ? () => onRestoreEvidence(view.selectedEvidence!.id)
+                      : undefined
+                  }
+                  decorateSourceHref={decorateSourceHref}
+                />
+              </div>
+            ) : null}
+          </div>
         </div>
       </section>
     </section>

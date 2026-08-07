@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  appendLearnerProgressEditor,
   appendLearnerProgressFilters,
   appendLearnerProgressMode,
   parseLearnerProgressRouteState,
@@ -14,6 +15,7 @@ describe('Learner Progress route state', () => {
       evidenceId: undefined,
       status: 'active',
       kind: 'all',
+      editor: null,
     });
   });
 
@@ -30,6 +32,7 @@ describe('Learner Progress route state', () => {
       evidenceId: 'evidence-1',
       status: 'all',
       kind: 'observation',
+      editor: null,
     });
   });
 
@@ -37,6 +40,14 @@ describe('Learner Progress route state', () => {
     const params = new URLSearchParams('student=student-1&evidence=evidence-1');
     appendLearnerProgressMode(params, 'standards', 'standard-1');
     expect(params.toString()).toBe('view=standards&standard=standard-1');
+  });
+
+  it('stores editor state independently from exact Evidence selection', () => {
+    const params = new URLSearchParams('evidence=evidence-1');
+    appendLearnerProgressEditor(params, 'evidence-1');
+    expect(params.toString()).toBe('evidence=evidence-1&edit=evidence-1');
+    appendLearnerProgressEditor(params, null);
+    expect(params.toString()).toBe('evidence=evidence-1');
   });
 
   it('keeps default filters out of the URL', () => {

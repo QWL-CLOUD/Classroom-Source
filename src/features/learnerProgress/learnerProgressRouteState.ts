@@ -10,6 +10,7 @@ export interface LearnerProgressRouteState {
   evidenceId?: string;
   status: LearnerProgressStatusFilter;
   kind: LearnerProgressKindFilter;
+  editor: 'new' | string | null;
 }
 
 function clean(value: string | null): string | undefined {
@@ -41,6 +42,7 @@ export function parseLearnerProgressRouteState(search: URLSearchParams): Learner
     evidenceId: clean(search.get('evidence')),
     status,
     kind,
+    editor: clean(search.get('edit')) ?? null,
   };
 }
 
@@ -74,5 +76,14 @@ export function appendLearnerProgressFilters(
 
   if (kind === 'all') params.delete('kind');
   else params.set('kind', kind);
+  return params;
+}
+
+export function appendLearnerProgressEditor(
+  params: URLSearchParams,
+  editor: 'new' | string | null,
+): URLSearchParams {
+  if (editor) params.set('edit', editor);
+  else params.delete('edit');
   return params;
 }

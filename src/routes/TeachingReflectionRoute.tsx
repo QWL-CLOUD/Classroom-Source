@@ -9,6 +9,10 @@ import {
   schoolYearSchema,
   sessionOccurrenceSchema,
 } from '@/domain/models/entities';
+import {
+  buildLearnerProgressHref,
+  parseLearnerProgressReturnState,
+} from '@/features/learnerProgress/learnerProgressNavigation';
 import { parsePlanningReturnTarget } from '@/features/planning/planningNavigation';
 import {
   buildTeachingReviewHref,
@@ -95,6 +99,7 @@ export function TeachingReflectionRoute() {
   const sessionOccurrenceId = searchParams.get('session');
   const returnTo = parsePlanningReturnTarget(searchParams.get('return'));
   const reviewReturn = parseTeachingReviewReturnState(searchParams);
+  const progressReturn = parseLearnerProgressReturnState(searchParams);
 
   const snapshot = useLiveQuery(async (): Promise<TeachingReflectionRouteSnapshot | null> => {
     if (!sessionOccurrenceId) return null;
@@ -135,6 +140,7 @@ export function TeachingReflectionRoute() {
               sessionOccurrenceId,
               returnTo,
               reviewReturn ?? undefined,
+              progressReturn ?? undefined,
             )}
           >
             <ArrowLeft aria-hidden="true" size={17} /> Back to Session
@@ -142,6 +148,10 @@ export function TeachingReflectionRoute() {
         ) : returnTo === 'review' ? (
           <a className="button" href={buildTeachingReviewHref(reviewReturn ?? {})}>
             <ArrowLeft aria-hidden="true" size={17} /> Back to Teaching Review
+          </a>
+        ) : returnTo === 'progress' ? (
+          <a className="button" href={buildLearnerProgressHref(progressReturn ?? {})}>
+            <ArrowLeft aria-hidden="true" size={17} /> Back to Learner Progress
           </a>
         ) : (
           <a className="button" href="#/insights">
@@ -163,6 +173,7 @@ export function TeachingReflectionRoute() {
         sessionOccurrenceId={sessionOccurrenceId}
         returnTo={returnTo}
         reviewReturn={reviewReturn ?? undefined}
+        progressReturn={progressReturn ?? undefined}
         detail={snapshot.kind === 'existing' ? snapshot.detail : undefined}
         createSource={snapshot.kind === 'create' ? snapshot.source : undefined}
       />

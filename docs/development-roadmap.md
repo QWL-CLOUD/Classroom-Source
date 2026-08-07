@@ -182,7 +182,7 @@ Audit decision:
 - do not convert heterogeneous scores, proficiency records, or teacher observations into mastery,
   grades, rank, or black-box growth scores.
 
-## Phase 4D-1 — Learner Progress Read Model & Workspace Foundation — current
+## Phase 4D-1 — Learner Progress Read Model & Workspace Foundation — complete
 
 Goal: expose canonical Assessment Evidence through a read-only, source-traceable learner review
 workspace before opening the existing Evidence mutation domain in UI.
@@ -201,24 +201,51 @@ Scope:
 - retained historical snapshots remain readable but are not presented as current clickable sources;
 - responsive/mobile/accessibility regression coverage.
 
-Explicitly deferred to 4D-2/4D-3:
+Completed checkpoint boundaries:
 
-- Evidence create/edit/archive/restore UI;
-- `return=progress` source-workspace navigation;
-- exact Teaching Review Evidence-issue drill-down;
-- current-retained-roster coverage UX;
+- Evidence create/edit/archive/restore UI remains outside 4D-1;
+- `return=progress` source-workspace navigation remains outside 4D-1;
+- exact Teaching Review Evidence-issue drill-down remains outside 4D-1;
+- current-retained-roster coverage UX remains outside 4D-1;
 - expected-Evidence / true gap semantics;
 - mastery, grades, ranking, automatic progress scores, or AI interpretation.
 
 DB schema v17, Portable Backup v17, Teaching Insights contract v2, Teaching Review contract v1,
 and app version `20.0.0-pilot.1` remain unchanged.
 
-## Phase 4D-2 — Evidence Record Workflow & Precise Source Navigation — planned
+## Phase 4D-2 — Evidence Record Workflow & Precise Source Navigation — current
 
-Expose the existing Evidence mutation service through teacher-controlled Add/Edit/Archive/Restore
-workflows and add explicit return-to-progress navigation. Keep historical source snapshots readable
-and prevent new Evidence dates from being written outside the selected School Year without rewriting
-legacy records automatically.
+Goal: expose the existing Evidence mutation domain without changing its persistence model, and make
+Learner Progress a safe two-way navigation layer for exact source records.
+
+Scope:
+
+- Add/Edit Evidence directly through the existing `AssessmentEvidenceMutationService`;
+- Archive/Restore continue to use the existing global Undo/Redo command history;
+- Score, Proficiency, and Observation remain distinct teacher-entered Evidence kinds;
+- optional Context, Lesson Plan, Session, Library Assessment, and multi-Standard links are editable;
+- unchanged historical missing-source links preserve retained source snapshots rather than forcing
+  destructive cleanup;
+- create/update enforce that `occurredOn` falls inside the selected School Year while legacy malformed
+  rows remain readable and lifecycle-manageable;
+- URL-backed `edit=new|<evidenceId>` editor state remains separate from exact `evidence=<id>` detail;
+- `return=progress` preserves School Year, period, view, selected source, exact Evidence, lifecycle,
+  and kind filters through source workspaces;
+- Planning, Session, and Teaching Reflection workflows preserve Learner Progress origin through save,
+  mutation, and return paths;
+- nested Teaching Review → Learner Progress → source navigation retains both return contracts;
+- Teaching Review Assessment Evidence integrity issues open the exact Learner Progress Evidence;
+- Teaching Reflection related Evidence rows open the exact Learner Progress Evidence record.
+
+Retained boundaries:
+
+- no DB/Backup migration;
+- no automatic Evidence creation;
+- no current-roster requirement for historical Context-linked Evidence;
+- no mastery, grades, ranking, growth score, AI interpretation, or true Evidence-gap inference.
+
+DB schema v17, Portable Backup v17, Learner Progress contract v1, Teaching Insights contract v2,
+Teaching Review contract v1, and app version `20.0.0-pilot.1` remain unchanged.
 
 ## Phase 4D-3 — Evidence Review Coverage & UX Closure — planned
 

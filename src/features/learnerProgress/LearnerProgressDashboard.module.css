@@ -255,6 +255,48 @@
   gap: 16px;
 }
 
+.evidenceWorkspace {
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+
+.evidenceWorkspaceWithInspector {
+  grid-template-columns: minmax(300px, 0.82fr) minmax(420px, 1.18fr);
+}
+
+.inspectorSlot {
+  width: 100%;
+  min-width: 0;
+}
+
+.inspectorSlot > * {
+  width: 100%;
+  min-width: 0;
+}
+
+.inspectorSlot .detailHeader {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.inspectorSlot .detailHeader > div:first-child {
+  min-width: 0;
+}
+
+.inspectorSlot .detailHeader h2 {
+  overflow-wrap: anywhere;
+}
+
+.inspectorSlot .detailActions {
+  min-width: 0;
+  justify-items: start;
+}
+
+.inspectorSlot .detailButtons {
+  justify-content: flex-start;
+}
+
 .summary,
 .timeline,
 .detail {
@@ -501,6 +543,16 @@
   }
 }
 
+@media (max-width: 1080px) {
+  .evidenceWorkspaceWithInspector {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .editorSlot {
+    grid-row: 1;
+  }
+}
+
 @media (max-width: 860px) {
   .workspace {
     grid-template-columns: minmax(0, 1fr);
@@ -552,5 +604,23 @@
 
   .evidenceBadges {
     justify-content: flex-start;
+  }
+}
+
+.detailButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .detailButtons {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .detailButtons button {
+    flex: 1 1 100%;
   }
 }

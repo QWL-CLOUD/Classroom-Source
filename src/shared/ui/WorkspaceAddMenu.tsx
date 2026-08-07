@@ -9,7 +9,7 @@ import styles from './WorkspaceAddMenu.module.css';
 
 interface WorkspaceAddMenuProps {
   date: string;
-  returnTo: Exclude<PlanningReturnTarget, 'learners'>;
+  returnTo: Exclude<PlanningReturnTarget, 'learners' | 'progress'>;
   label?: string;
   compact?: boolean;
   includeWorkspaceItems?: boolean;

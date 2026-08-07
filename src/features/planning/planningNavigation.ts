@@ -1,11 +1,23 @@
 import {
+  appendLearnerProgressReturnParams,
+  buildLearnerProgressHref,
+  type LearnerProgressReturnState,
+} from '@/features/learnerProgress/learnerProgressNavigation';
+import {
   appendTeachingReviewReturnParams,
   buildTeachingReviewHref,
   type TeachingReviewReturnState,
 } from '@/features/teachingReview/teachingReviewNavigation';
 import { buildWeekHref } from '@/features/week/weekNavigation';
 
-export const planningReturnTargets = ['learners', 'today', 'week', 'calendar', 'review'] as const;
+export const planningReturnTargets = [
+  'learners',
+  'today',
+  'week',
+  'calendar',
+  'review',
+  'progress',
+] as const;
 
 export type PlanningReturnTarget = (typeof planningReturnTargets)[number];
 
@@ -17,7 +29,7 @@ export function parsePlanningReturnTarget(value: string | null): PlanningReturnT
 
 export function buildPlanningEntryHref(options: {
   date: string;
-  returnTo: Exclude<PlanningReturnTarget, 'learners'>;
+  returnTo: Exclude<PlanningReturnTarget, 'learners' | 'progress'>;
   contextId?: string;
   scheduleBlockId?: string;
 }): string {
@@ -32,12 +44,16 @@ export function buildSessionEditorHref(options: {
   date?: string;
   returnTo?: PlanningReturnTarget;
   reviewReturn?: TeachingReviewReturnState;
+  progressReturn?: LearnerProgressReturnState;
 }): string {
   const params = new URLSearchParams({ plan: options.planId });
   if (options.date) params.set('date', options.date);
   if (options.returnTo && options.returnTo !== 'learners') params.set('return', options.returnTo);
   if (options.returnTo === 'review' && options.reviewReturn) {
     appendTeachingReviewReturnParams(params, options.reviewReturn);
+  }
+  if (options.returnTo === 'progress' && options.progressReturn) {
+    appendLearnerProgressReturnParams(params, options.progressReturn);
   }
   return `#/planning/session?${params.toString()}`;
 }
@@ -50,9 +66,13 @@ export function buildPlanningSurfaceHref(options: {
   focusSessionId?: string;
   focusOccurrenceId?: string;
   reviewReturn?: TeachingReviewReturnState;
+  progressReturn?: LearnerProgressReturnState;
 }): string {
   if (options.returnTo === 'review') {
     return buildTeachingReviewHref(options.reviewReturn ?? {});
+  }
+  if (options.returnTo === 'progress') {
+    return buildLearnerProgressHref(options.progressReturn ?? {});
   }
   if (options.returnTo === 'today') return `#/today?date=${options.date}`;
   if (options.returnTo === 'calendar') return `#/calendar?date=${options.date}`;

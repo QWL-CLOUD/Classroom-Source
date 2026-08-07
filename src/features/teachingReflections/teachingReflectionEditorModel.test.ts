@@ -101,4 +101,24 @@ describe('teachingReflectionEditorModel', () => {
       '#/planning/session?session=session&return=review&schoolYear=year-1&reviewQueue=awaiting-reflection&reviewFocus=session%3Asession&reviewPeriod=this-week',
     );
   });
+
+  it('preserves Learner Progress return state across Reflection and Session links', () => {
+    const progressReturn = {
+      schoolYearId: 'year-1',
+      mode: 'learners' as const,
+      selectedId: 'student-1',
+      evidenceId: 'evidence-1',
+      status: 'all' as const,
+      kind: 'observation' as const,
+      period: { preset: 'this-week' as const },
+    };
+    expect(buildTeachingReflectionHref('session', 'progress', undefined, progressReturn)).toBe(
+      '#/planning/session/reflection?session=session&return=progress&progressSchoolYear=year-1&progressView=learners&progressSelected=student-1&progressEvidence=evidence-1&progressStatus=all&progressKind=observation&progressPeriod=this-week',
+    );
+    expect(
+      buildTeachingReflectionSessionHref('session', 'progress', undefined, progressReturn),
+    ).toBe(
+      '#/planning/session?session=session&return=progress&progressSchoolYear=year-1&progressView=learners&progressSelected=student-1&progressEvidence=evidence-1&progressStatus=all&progressKind=observation&progressPeriod=this-week',
+    );
+  });
 });

@@ -40,6 +40,12 @@ import {
 } from '@/domain/models/entities';
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
 import { CategoryAssignmentFields } from '@/features/categories/CategoryAssignmentFields';
+import {
+  appendLearnerProgressReturnParams,
+  buildLearnerProgressHref,
+  parseLearnerProgressReturnState,
+  type LearnerProgressReturnState,
+} from '@/features/learnerProgress/learnerProgressNavigation';
 import { useCategorySelectionDraft } from '@/features/categories/useCategorySelectionDraft';
 import { LessonTemplateApplyPanel } from '@/features/lessonTemplates/LessonTemplateApplyPanel';
 import { applyLessonTemplateToPlanEditorValues } from '@/features/lessonTemplates/lessonTemplateApplication';
@@ -53,6 +59,7 @@ import {
 } from '@/features/planning/planningNavigation';
 import {
   appendTeachingReviewReturnParams,
+  buildTeachingReviewHref,
   parseTeachingReviewReturnState,
   type TeachingReviewReturnState,
 } from '@/features/teachingReview/teachingReviewNavigation';
@@ -118,6 +125,7 @@ function PlanningEditorForm({
   initialDate,
   returnTo,
   reviewReturn,
+  progressReturn,
   service = planningMutationService,
   onChangeContext,
 }: {
@@ -125,6 +133,7 @@ function PlanningEditorForm({
   initialDate: string;
   returnTo: PlanningReturnTarget;
   reviewReturn?: TeachingReviewReturnState;
+  progressReturn?: LearnerProgressReturnState;
   service?: PlanningMutationService;
   onChangeContext?: () => void;
 }) {
@@ -180,6 +189,13 @@ function PlanningEditorForm({
           schoolYearId: reviewReturn?.schoolYearId ?? selectedContext.schoolYearId,
         }
       : undefined;
+  const resolvedProgressReturn: LearnerProgressReturnState | undefined =
+    returnTo === 'progress'
+      ? {
+          ...progressReturn,
+          schoolYearId: progressReturn?.schoolYearId ?? selectedContext.schoolYearId,
+        }
+      : undefined;
   const surfaceDate = activeSession?.date ?? planningOccurrence?.date ?? initialDate;
   const occurrenceFocusId = planningOccurrence
     ? `schedule-block:${planningOccurrence.block.id}:${planningOccurrence.date}`
@@ -192,6 +208,7 @@ function PlanningEditorForm({
           date: surfaceDate,
           contextId: selectedContext.id,
           reviewReturn: resolvedReviewReturn,
+          progressReturn: resolvedProgressReturn,
           focusSessionId: activeSession?.id,
           focusOccurrenceId: occurrenceFocusId,
         });
@@ -311,6 +328,9 @@ function PlanningEditorForm({
           if (returnTo === 'review') {
             appendTeachingReviewReturnParams(params, resolvedReviewReturn ?? {});
           }
+          if (returnTo === 'progress') {
+            appendLearnerProgressReturnParams(params, resolvedProgressReturn ?? {});
+          }
           window.location.hash = `#/planning/edit?${params.toString()}`;
           return;
         }
@@ -320,6 +340,7 @@ function PlanningEditorForm({
           contextId: selectedContext.id,
           learnerView: 'upcoming',
           reviewReturn: resolvedReviewReturn,
+          progressReturn: resolvedProgressReturn,
           focusOccurrenceId: occurrenceFocusId,
           focusSessionId: result.session.id,
         });
@@ -335,6 +356,7 @@ function PlanningEditorForm({
           date: initialDate,
           returnTo,
           reviewReturn: resolvedReviewReturn,
+          progressReturn: resolvedProgressReturn,
         });
       } else if (returnTo === 'learners') {
         window.location.hash = learnerHref(selectedContext.id, learnerView, learnerReturnDate);
@@ -344,6 +366,7 @@ function PlanningEditorForm({
           date: surfaceDate,
           contextId: selectedContext.id,
           reviewReturn: resolvedReviewReturn,
+          progressReturn: resolvedProgressReturn,
           focusSessionId: activeSession?.id,
           focusOccurrenceId: occurrenceFocusId,
         });
@@ -372,6 +395,7 @@ function PlanningEditorForm({
               date: surfaceDate,
               contextId: selectedContext.id,
               reviewReturn: resolvedReviewReturn,
+              progressReturn: resolvedProgressReturn,
               focusOccurrenceId: occurrenceFocusId,
             });
     } catch (cause) {
@@ -394,7 +418,9 @@ function PlanningEditorForm({
             ? 'Back to Learners'
             : returnTo === 'review'
               ? 'Back to Teaching Review'
-              : `Back to ${returnTo === 'today' ? 'Today' : returnTo === 'week' ? 'Week' : 'Calendar'}`}
+              : returnTo === 'progress'
+                ? 'Back to Learner Progress'
+                : `Back to ${returnTo === 'today' ? 'Today' : returnTo === 'week' ? 'Week' : 'Calendar'}`}
         </a>
       </div>
 
@@ -660,6 +686,9 @@ function PlanningEditorForm({
               if (returnTo === 'review') {
                 appendTeachingReviewReturnParams(params, resolvedReviewReturn ?? {});
               }
+              if (returnTo === 'progress') {
+                appendLearnerProgressReturnParams(params, resolvedProgressReturn ?? {});
+              }
               return `#/planning/session?${params.toString()}`;
             })()}
           >
@@ -802,6 +831,7 @@ export function PlanningEditorRoute() {
   const initialDate = parseLocalDate(requestedDate) ? requestedDate! : todayLocalDate();
   const returnTo = parsePlanningReturnTarget(searchParams.get('return'));
   const reviewReturn = parseTeachingReviewReturnState(searchParams);
+  const progressReturn = parseLearnerProgressReturnState(searchParams);
 
   const snapshot = useLiveQuery(async (): Promise<PlanningEditorSnapshot> => {
     const activeSchoolYearIds = new Set(
@@ -958,8 +988,21 @@ export function PlanningEditorRoute() {
       <div className={`card ${styles.errorPanel}`} role="alert">
         <h1>Planning item unavailable</h1>
         <p>The requested learner context or lesson plan could not be found.</p>
-        <a className="button" href="#/learners">
-          Back to Learners
+        <a
+          className="button"
+          href={
+            returnTo === 'review'
+              ? buildTeachingReviewHref(reviewReturn ?? {})
+              : returnTo === 'progress'
+                ? buildLearnerProgressHref(progressReturn ?? {})
+                : '#/learners'
+          }
+        >
+          {returnTo === 'review'
+            ? 'Back to Teaching Review'
+            : returnTo === 'progress'
+              ? 'Back to Learner Progress'
+              : 'Back to Learners'}
         </a>
       </div>
     );
@@ -977,6 +1020,13 @@ export function PlanningEditorRoute() {
               schoolYearId: reviewReturn?.schoolYearId ?? snapshot.context?.schoolYearId,
             }
           : undefined,
+      progressReturn:
+        returnTo === 'progress'
+          ? {
+              ...(progressReturn ?? {}),
+              schoolYearId: progressReturn?.schoolYearId ?? snapshot.context?.schoolYearId,
+            }
+          : undefined,
       focusOccurrenceId: `schedule-block:${requestedBlockId}:${initialDate}`,
     });
     return (
@@ -987,11 +1037,13 @@ export function PlanningEditorRoute() {
           Back to{' '}
           {returnTo === 'review'
             ? 'Teaching Review'
-            : returnTo === 'today'
-              ? 'Today'
-              : returnTo === 'week'
-                ? 'Week'
-                : 'Calendar'}
+            : returnTo === 'progress'
+              ? 'Learner Progress'
+              : returnTo === 'today'
+                ? 'Today'
+                : returnTo === 'week'
+                  ? 'Week'
+                  : 'Calendar'}
         </a>
       </div>
     );
@@ -1081,6 +1133,7 @@ export function PlanningEditorRoute() {
           initialDate={initialDate}
           returnTo={returnTo}
           reviewReturn={reviewReturn ?? undefined}
+          progressReturn={progressReturn ?? undefined}
           onChangeContext={snapshot.planningOccurrence ? changeContext : undefined}
         />
       )}
