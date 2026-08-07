@@ -40,6 +40,7 @@ describe('navigation group preferences', () => {
     expect(navigationGroupForPath('/categories')).toBe('resources');
     expect(navigationGroupForPath('/insights')).toBe('reflect');
     expect(navigationGroupForPath('/teaching-review')).toBe('reflect');
+    expect(navigationGroupForPath('/learner-progress')).toBe('reflect');
     expect(navigationGroupForPath('/migration')).toBe('settingsData');
     expect(navigationGroupForPath('/system-health')).toBe('settingsData');
   });

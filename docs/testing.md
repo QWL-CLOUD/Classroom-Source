@@ -29,7 +29,9 @@ transaction tests.
   Teaching Review E2E coverage verifies URL-backed School Year and review-period selection, queue
   semantics, source drill-down/return state, exact Standard/Library/Task focus, Reflection-linked
   Task filtering, period preservation through source returns, no hidden Evidence-gap queue, 390px
-  page containment, and automated accessibility.
+  page containment, and automated accessibility. Learner Progress E2E coverage verifies read-only
+  Student/Context/Standard Evidence views, URL-backed period/lifecycle/kind state, exact Evidence
+  selection, retained historical source snapshots, mobile containment, and automated accessibility.
 - **WebKit pilot:** runs only `personal-pilot-readiness.spec.ts`. It protects the Safari-relevant
   personal-pilot path without duplicating every historical Chromium scenario.
 

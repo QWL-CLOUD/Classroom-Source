@@ -1,4 +1,5 @@
 import {
+  Activity,
   Archive,
   ArrowLeft,
   BookCheck,
@@ -71,6 +72,7 @@ const collapsibleNavigationGroups: Array<{
     links: [
       { to: '/insights', label: 'Teaching Insights', icon: Sparkles },
       { to: '/teaching-review', label: 'Teaching Review', icon: ClipboardCheck },
+      { to: '/learner-progress', label: 'Learner Progress', icon: Activity },
     ],
   },
   {
@@ -116,6 +118,9 @@ function getRoutePresentation(pathname: string): { title: string; layout: Conten
   }
   if (pathname.startsWith('/teaching-review')) {
     return { title: 'Teaching Review', layout: 'standard' };
+  }
+  if (pathname.startsWith('/learner-progress')) {
+    return { title: 'Learner Progress', layout: 'standard' };
   }
   if (pathname.startsWith('/import')) return { title: 'Import Center', layout: 'standard' };
   if (pathname.startsWith('/migration')) return { title: 'Migration', layout: 'reading' };
