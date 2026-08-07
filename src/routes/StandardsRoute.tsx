@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { classroomDb } from '@/data/db/ClassroomDatabase';
 import {
@@ -56,6 +56,8 @@ function uniqueSorted(values: readonly (string | undefined)[]): string[] {
 }
 
 export function StandardsRoute() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedStandardId = searchParams.get('standard')?.trim() || undefined;
   const data = useLiveQuery(async () => {
     const [
       standardValues,
@@ -137,8 +139,24 @@ export function StandardsRoute() {
       }),
     [data?.views, frameworkKey, gradeBand, query, status, subject],
   );
-  const selected =
-    (data?.views ?? []).find((standard) => standard.id === selectedId) ?? visible[0] ?? null;
+  const selected = requestedStandardId
+    ? ((data?.views ?? []).find((standard) => standard.id === requestedStandardId) ?? null)
+    : ((data?.views ?? []).find((standard) => standard.id === selectedId) ?? visible[0] ?? null);
+
+  useEffect(() => {
+    if (!requestedStandardId || !data || selectedId === requestedStandardId) return;
+    const requested = data.views.find((standard) => standard.id === requestedStandardId);
+    if (!requested) return;
+    setQuery('');
+    setStatus('all');
+    setFrameworkKey('');
+    setSubject('');
+    setGradeBand('');
+    setSelectedId(requested.id);
+    setCreating(false);
+    setEditing(false);
+    setWorkspaceView('catalog');
+  }, [data, requestedStandardId, selectedId]);
 
   useEffect(() => {
     if (creating || workspaceView !== 'catalog') return;
@@ -171,6 +189,9 @@ export function StandardsRoute() {
 
   function openStandard(standardId: string): void {
     resetCatalogFilters();
+    const next = new URLSearchParams(searchParams);
+    next.set('standard', standardId);
+    setSearchParams(next);
     setSelectedId(standardId);
     setCreating(false);
     setEditing(false);
@@ -182,6 +203,9 @@ export function StandardsRoute() {
     group: StandardCoverageGroup,
   ): void {
     resetCatalogFilters();
+    const next = new URLSearchParams(searchParams);
+    next.delete('standard');
+    setSearchParams(next);
     if (dimension === 'framework') setFrameworkKey(group.frameworkKey ?? '');
     if (dimension === 'subject') setSubject(group.subject || notSpecifiedFilter);
     if (dimension === 'grade-band') setGradeBand(group.gradeBand || notSpecifiedFilter);
@@ -232,6 +256,9 @@ export function StandardsRoute() {
               className="button button-primary"
               type="button"
               onClick={() => {
+                const next = new URLSearchParams(searchParams);
+                next.delete('standard');
+                setSearchParams(next);
                 setCreating(true);
                 setEditing(false);
                 setError(null);
@@ -350,6 +377,9 @@ export function StandardsRoute() {
                 onSubmit={async (values) => {
                   const created = await run(() => standardMutationService.create(values));
                   if (!created) return;
+                  const next = new URLSearchParams(searchParams);
+                  next.set('standard', created.id);
+                  setSearchParams(next);
                   setSelectedId(created.id);
                   setCreating(false);
                 }}
@@ -382,6 +412,9 @@ export function StandardsRoute() {
                         className={styles.itemButton}
                         data-selected={selected?.id === standard.id}
                         onClick={() => {
+                          const next = new URLSearchParams(searchParams);
+                          next.set('standard', standard.id);
+                          setSearchParams(next);
                           setSelectedId(standard.id);
                           setEditing(false);
                         }}

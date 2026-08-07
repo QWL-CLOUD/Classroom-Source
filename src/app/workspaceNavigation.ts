@@ -9,12 +9,21 @@ const contextAwareRoutes = new Set([
   '/learners',
 ]);
 
+const schoolYearAwareRoutes = new Set(['/insights', '/teaching-review']);
+
 const workspaceContextKeys = ['context', 'status', 'planning'] as const;
 
 export function buildShellNavigationHref(to: string, currentSearch: string): string {
+  const current = new URLSearchParams(currentSearch);
+
+  if (schoolYearAwareRoutes.has(to)) {
+    const schoolYearId = current.get('schoolYear')?.trim();
+    if (!schoolYearId) return to;
+    return `${to}?schoolYear=${encodeURIComponent(schoolYearId)}`;
+  }
+
   if (!contextAwareRoutes.has(to)) return to;
 
-  const current = new URLSearchParams(currentSearch);
   const next = new URLSearchParams();
   const date = current.get('date');
 

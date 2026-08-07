@@ -248,6 +248,7 @@ describe('TeachingInsightsReadService', () => {
       schoolYears: [],
       selectedSchoolYear: null,
       asOfDate: '2026-08-05',
+      sessionDatesById: {},
       view: null,
     });
   });

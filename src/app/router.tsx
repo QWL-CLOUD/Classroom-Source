@@ -17,6 +17,7 @@ import { ScheduleBlockEditorRoute } from '@/routes/ScheduleBlockEditorRoute';
 import { ScheduleOccurrenceEditorRoute } from '@/routes/ScheduleOccurrenceEditorRoute';
 import { SessionEditorRoute } from '@/routes/SessionEditorRoute';
 import { TeachingReflectionRoute } from '@/routes/TeachingReflectionRoute';
+import { TeachingReviewRoute } from '@/routes/TeachingReviewRoute';
 import { SettingsRoute } from '@/routes/SettingsRoute';
 import { SchoolYearRolloverRoute } from '@/routes/SchoolYearRolloverRoute';
 import { StandardsRoute } from '@/routes/StandardsRoute';
@@ -52,6 +53,7 @@ export const router = createHashRouter([
       { path: 'standards', element: <StandardsRoute /> },
       { path: 'categories', element: <CategoriesRoute /> },
       { path: 'insights', element: <InsightsRoute /> },
+      { path: 'teaching-review', element: <TeachingReviewRoute /> },
       { path: 'import', element: <ImportRoute /> },
       { path: 'migration', element: <MigrationRoute /> },
       { path: 'export', element: <ExportRoute /> },

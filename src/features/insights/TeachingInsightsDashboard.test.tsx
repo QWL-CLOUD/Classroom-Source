@@ -203,6 +203,10 @@ describe('TeachingInsightsDashboard', () => {
     );
 
     expect(screen.getByRole('heading', { level: 1, name: 'Teaching Insights' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Open Teaching Review' })).toHaveAttribute(
+      'href',
+      '#/teaching-review?schoolYear=current',
+    );
     expect(screen.getByText('Completed Sessions')).toBeVisible();
     expect(screen.getByText('67%')).toBeVisible();
     expect(screen.getByText('Current retained roster coverage')).toBeVisible();

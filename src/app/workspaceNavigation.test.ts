@@ -31,6 +31,18 @@ describe('buildShellNavigationHref', () => {
     );
   });
 
+  it('preserves School Year selection between Reflect routes', () => {
+    expect(
+      buildShellNavigationHref(
+        '/teaching-review',
+        '?schoolYear=year-2025&date=2026-07-20&context=class-a',
+      ),
+    ).toBe('/teaching-review?schoolYear=year-2025');
+    expect(buildShellNavigationHref('/insights', '?schoolYear=year-2025')).toBe(
+      '/insights?schoolYear=year-2025',
+    );
+  });
+
   it('does not append workspace context to system routes', () => {
     expect(buildShellNavigationHref('/settings', '?date=2026-07-20&context=class-a')).toBe(
       '/settings',

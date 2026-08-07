@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   Ban,
   CalendarClock,
@@ -36,6 +36,9 @@ interface TaskListProps {
   selectedDate?: string;
   compact?: boolean;
   defaultScheduledDate?: string;
+  focusTaskId?: string;
+  linkedReflectionId?: string;
+  clearFocusHref?: string;
 }
 
 interface TaskEditorProps {
@@ -315,19 +318,31 @@ function TaskCard({
   source,
   busy,
   onRun,
+  focused = false,
 }: {
   task: Task;
   contexts: LearnerContext[];
   source?: TeachingReflectionTaskSourcePresentation;
   busy: boolean;
   onRun: (action: () => Promise<unknown>) => Promise<void>;
+  focused?: boolean;
 }) {
+  const cardRef = useRef<HTMLElement>(null);
   const [editing, setEditing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const context = task.contextId ? contexts.find((item) => item.id === task.contextId) : undefined;
   const scheduledTime = formatMinute(task.scheduledMinute);
   const dueTime = formatMinute(task.dueMinute);
+
+  useEffect(() => {
+    if (!focused) return;
+    const frame = window.requestAnimationFrame(() => {
+      cardRef.current?.focus({ preventScroll: true });
+      cardRef.current?.scrollIntoView({ block: 'center' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focused]);
 
   async function run(action: () => Promise<unknown>): Promise<void> {
     setError(null);
@@ -339,7 +354,14 @@ function TaskCard({
   }
 
   return (
-    <article className={styles.taskCard} aria-label={`${task.title} task`}>
+    <article
+      ref={cardRef}
+      className={styles.taskCard}
+      aria-label={`${task.title} task`}
+      data-task-id={task.id}
+      data-focused={focused || undefined}
+      tabIndex={focused ? -1 : undefined}
+    >
       {editing ? (
         <TaskEditor
           contexts={contexts}
@@ -625,7 +647,14 @@ function TodayTaskList({ selectedDate }: { selectedDate: string }) {
   );
 }
 
-export function TaskList({ selectedDate, compact = false, defaultScheduledDate }: TaskListProps) {
+export function TaskList({
+  selectedDate,
+  compact = false,
+  defaultScheduledDate,
+  focusTaskId,
+  linkedReflectionId,
+  clearFocusHref,
+}: TaskListProps) {
   const [creating, setCreating] = useState(false);
   const newTaskButtonRef = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
@@ -636,11 +665,7 @@ export function TaskList({ selectedDate, compact = false, defaultScheduledDate }
       classroomDb.learnerContexts.toArray(),
       classroomDb.teachingReflections.toArray(),
     ]);
-    return {
-      model: buildTaskWorkspaceReadModel(tasks),
-      contexts,
-      teachingReflections,
-    };
+    return { tasks, contexts, teachingReflections };
   }, []);
 
   const contexts = useMemo(
@@ -651,6 +676,21 @@ export function TaskList({ selectedDate, compact = false, defaultScheduledDate }
       ),
     [data?.contexts],
   );
+
+  const visibleTasks = useMemo(() => {
+    const tasks = data?.tasks ?? [];
+    if (focusTaskId) return tasks.filter((task) => task.id === focusTaskId);
+    if (linkedReflectionId) {
+      return tasks.filter(
+        (task) =>
+          task.linkedEntityType === TEACHING_REFLECTION_TASK_LINK_TYPE &&
+          task.linkedEntityId === linkedReflectionId,
+      );
+    }
+    return tasks;
+  }, [data?.tasks, focusTaskId, linkedReflectionId]);
+  const model = useMemo(() => buildTaskWorkspaceReadModel(visibleTasks), [visibleTasks]);
+  const focusMode = focusTaskId ? 'task' : linkedReflectionId ? 'reflection' : null;
 
   if (compact && selectedDate) return <TodayTaskList selectedDate={selectedDate} />;
 
@@ -676,23 +716,43 @@ export function TaskList({ selectedDate, compact = false, defaultScheduledDate }
 
   return (
     <div className={styles.workspace}>
-      <div className={styles.workspaceToolbar}>
-        <button
-          ref={newTaskButtonRef}
-          className="button button-primary"
-          type="button"
-          onClick={() => {
-            if (creating) closeCreatePanel();
-            else setCreating(true);
-          }}
-          aria-expanded={creating}
-          aria-controls="new-task-panel"
-        >
-          <Plus size={17} aria-hidden="true" /> {creating ? 'Close new task' : 'New task'}
-        </button>
-      </div>
+      {!focusMode ? (
+        <div className={styles.workspaceToolbar}>
+          <button
+            ref={newTaskButtonRef}
+            className="button button-primary"
+            type="button"
+            onClick={() => {
+              if (creating) closeCreatePanel();
+              else setCreating(true);
+            }}
+            aria-expanded={creating}
+            aria-controls="new-task-panel"
+          >
+            <Plus size={17} aria-hidden="true" /> {creating ? 'Close new task' : 'New task'}
+          </button>
+        </div>
+      ) : null}
 
-      {creating ? (
+      {focusMode ? (
+        <section className={styles.focusNotice} role="status">
+          <div>
+            <strong>{focusMode === 'task' ? 'Focused Task' : 'Reflection Next Steps'}</strong>
+            <span>
+              {focusMode === 'task'
+                ? 'Showing only the requested Task record.'
+                : 'Showing Tasks linked to the selected Teaching Reflection.'}
+            </span>
+          </div>
+          {clearFocusHref ? (
+            <a className="button button-quiet" href={clearFocusHref}>
+              Show all Tasks
+            </a>
+          ) : null}
+        </section>
+      ) : null}
+
+      {creating && !focusMode ? (
         <section
           id="new-task-panel"
           className={styles.createPanel}
@@ -726,14 +786,18 @@ export function TaskList({ selectedDate, compact = false, defaultScheduledDate }
 
       {!data ? (
         <p className={styles.message}>Loading tasks…</p>
-      ) : data.model.total === 0 ? (
+      ) : model.total === 0 ? (
         <section className={styles.emptyState}>
-          <h2>No tasks yet</h2>
-          <p>Use New task above when you are ready. Scheduled tasks will appear on Today.</p>
+          <h2>{focusMode ? 'Requested Tasks unavailable' : 'No tasks yet'}</h2>
+          <p>
+            {focusMode
+              ? 'No retained Task matches this deep link. Show all Tasks or return to Teaching Review.'
+              : 'Use New task above when you are ready. Scheduled tasks will appear on Today.'}
+          </p>
         </section>
       ) : (
         <div className={styles.sections} aria-label="Task lifecycle sections">
-          {data.model.sections.map((section) => (
+          {model.sections.map((section) => (
             <section
               key={section.status}
               className={styles.section}
@@ -758,6 +822,7 @@ export function TaskList({ selectedDate, compact = false, defaultScheduledDate }
                       )}
                       busy={busy}
                       onRun={run}
+                      focused={task.id === focusTaskId}
                     />
                   ))}
                 </div>

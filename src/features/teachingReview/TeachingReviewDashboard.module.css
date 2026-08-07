@@ -1,0 +1,429 @@
+.page {
+  min-width: 0;
+  display: grid;
+  gap: 20px;
+}
+
+.pageHeader {
+  align-items: flex-start;
+}
+
+.headerActions {
+  width: min(100%, 290px);
+  display: grid;
+  gap: 10px;
+}
+
+.schoolYearControl {
+  display: grid;
+  gap: 7px;
+  color: var(--heading);
+  font-weight: 800;
+}
+
+.schoolYearControl select {
+  width: 100%;
+}
+
+.schoolYearControl small {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.contractNote {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.5fr) minmax(320px, 1.2fr) minmax(220px, 0.65fr);
+  gap: 18px;
+  align-items: start;
+  padding: 20px;
+  border-color: var(--border-strong, var(--border));
+  background: var(--surface-soft);
+}
+
+.contractNote h2,
+.contractNote p,
+.sectionHeading h2,
+.sectionHeading p,
+.queueHeading h2,
+.queueHeading p {
+  margin: 0;
+}
+
+.contractNote > p,
+.sectionHeading > p,
+.queueHeading > p {
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.kicker {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.contractNote h2,
+.sectionHeading h2,
+.queueHeading h2 {
+  margin-top: 4px;
+  color: var(--heading);
+}
+
+.contractNote dl {
+  margin: 0;
+  display: grid;
+  gap: 9px;
+}
+
+.contractNote dl div {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.contractNote dt {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.contractNote dd {
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--heading);
+  font-weight: 800;
+  text-align: right;
+  text-transform: capitalize;
+}
+
+.summarySection,
+.queueSection {
+  min-width: 0;
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+}
+
+.sectionHeading,
+.queueHeading {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(220px, 0.55fr) minmax(320px, 1fr);
+  gap: 18px;
+  align-items: end;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.sectionHeading > p,
+.queueHeading > p {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.metricCard {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  padding: 15px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.metricCard > span {
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.metricCard strong {
+  overflow-wrap: anywhere;
+  color: var(--heading);
+  font-size: 1.55rem;
+  line-height: 1.05;
+}
+
+.metricCard small {
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.queueList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.queueItem {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 13px;
+  background: var(--surface-soft);
+}
+
+.itemBody {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.itemBody strong,
+.itemBody span {
+  overflow-wrap: anywhere;
+}
+
+.itemBody strong {
+  color: var(--heading);
+}
+
+.itemBody > span {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.itemTitleRow {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.itemActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.itemActions a:not([class~='button']),
+.tableScroller a {
+  color: var(--accent-strong);
+  font-weight: 800;
+}
+
+.clearState {
+  margin: 0;
+  padding: 15px;
+  border: 1px solid #76927a;
+  border-radius: 13px;
+  color: #294f32;
+  background: #eef6ef;
+  font-weight: 750;
+}
+
+.tableScroller {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 13px;
+}
+
+.tableScroller:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent-strong) 32%, transparent);
+  outline-offset: 3px;
+}
+
+.tableScroller table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.tableScroller th,
+.tableScroller td {
+  padding: 12px 13px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-secondary);
+  text-align: left;
+  vertical-align: top;
+}
+
+.tableScroller thead th {
+  color: var(--heading);
+  background: var(--surface-soft);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+}
+
+.tableScroller tbody th {
+  color: var(--heading);
+}
+
+.tableScroller tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.tableScroller code {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+@media (max-width: 1200px) {
+  .contractNote,
+  .sectionHeading,
+  .queueHeading {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .metricGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .pageHeader {
+    display: grid;
+  }
+
+  .headerActions {
+    width: 100%;
+  }
+
+  .queueItem {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .itemActions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .contractNote,
+  .summarySection,
+  .queueSection {
+    padding: 17px;
+  }
+
+  .metricGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .contractNote dl div {
+    display: grid;
+    gap: 3px;
+  }
+
+  .contractNote dd {
+    text-align: left;
+  }
+}
+
+.queueSection:focus,
+.queueItem:focus,
+.tableScroller tr:focus {
+  outline: 3px solid color-mix(in srgb, var(--accent-strong) 28%, transparent);
+  outline-offset: 3px;
+}
+
+.periodSection {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(260px, 0.7fr);
+  gap: 20px;
+  align-items: start;
+  padding: 22px;
+}
+
+.periodSection h2,
+.periodSection p {
+  margin: 0;
+}
+
+.periodSection > div:first-child {
+  display: grid;
+  gap: 7px;
+}
+
+.periodSection > div:first-child > p:not(.kicker):not(.periodWarning) {
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.periodControls {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+}
+
+.periodControls > label,
+.customPeriodForm label {
+  display: grid;
+  gap: 6px;
+  color: var(--heading);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.periodControls small {
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.customPeriodForm {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: end;
+  margin-top: 4px;
+}
+
+.customPeriodForm button,
+.customPeriodForm small {
+  grid-column: 1 / -1;
+}
+
+.periodWarning {
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: 11px;
+  color: var(--text-secondary);
+  background: var(--surface-soft);
+  font-weight: 700;
+}
+
+@media (max-width: 1200px) {
+  .periodSection {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .periodSection {
+    padding: 17px;
+  }
+
+  .customPeriodForm {
+    grid-template-columns: 1fr;
+  }
+}

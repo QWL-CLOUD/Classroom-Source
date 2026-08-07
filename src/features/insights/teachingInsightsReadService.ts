@@ -33,6 +33,7 @@ export interface TeachingInsightsReadResult {
   schoolYears: SchoolYear[];
   selectedSchoolYear: SchoolYear | null;
   asOfDate: string;
+  sessionDatesById: Readonly<Record<string, string>>;
   view: TeachingInsightsView | null;
 }
 
@@ -180,6 +181,7 @@ export class TeachingInsightsReadService {
             schoolYears,
             selectedSchoolYear: null,
             asOfDate,
+            sessionDatesById: {},
             view: null,
           };
         }
@@ -206,6 +208,9 @@ export class TeachingInsightsReadService {
           schoolYears,
           selectedSchoolYear,
           asOfDate,
+          sessionDatesById: Object.fromEntries(
+            snapshot.sessionOccurrences.map((session) => [session.id, session.date]),
+          ),
           view: buildTeachingInsightsView(snapshot),
         };
       },

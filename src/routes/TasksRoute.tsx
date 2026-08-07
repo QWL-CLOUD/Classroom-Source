@@ -6,6 +6,13 @@ import { formatLongDate, parseLocalDate } from '@/shared/dates/localDate';
 export function TasksRoute() {
   const [searchParams] = useSearchParams();
   const requestedDate = searchParams.get('date');
+  const focusTaskId = searchParams.get('task')?.trim() || undefined;
+  const linkedReflectionId = searchParams.get('reflection')?.trim() || undefined;
+  const clearFocusParams = new URLSearchParams(searchParams);
+  clearFocusParams.delete('task');
+  clearFocusParams.delete('reflection');
+  const clearFocusQuery = clearFocusParams.toString();
+  const clearFocusHref = clearFocusQuery ? `#/tasks?${clearFocusQuery}` : '#/tasks';
   const defaultScheduledDate = parseLocalDate(requestedDate) ? requestedDate! : undefined;
 
   return (
@@ -23,7 +30,12 @@ export function TasksRoute() {
           </p>
         </div>
       </header>
-      <TaskList defaultScheduledDate={defaultScheduledDate} />
+      <TaskList
+        defaultScheduledDate={defaultScheduledDate}
+        focusTaskId={focusTaskId}
+        linkedReflectionId={focusTaskId ? undefined : linkedReflectionId}
+        clearFocusHref={focusTaskId || linkedReflectionId ? clearFocusHref : undefined}
+      />
     </section>
   );
 }

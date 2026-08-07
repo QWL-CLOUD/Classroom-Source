@@ -2,7 +2,7 @@
 
 Recovered and corrected after Phase 4A-2.
 
-Baseline for this roadmap: `main @ b7202ae` (Phase 4A-2 merged).
+Current implementation baseline: `main @ d3884351` (Phase 4A-2.1 merged).
 
 ## Product boundary
 
@@ -50,7 +50,7 @@ This phase pulled forward the core capability originally planned for Phase 4C:
 - Reflection coverage and Task-state facts in Teaching Insights;
 - Reflection narrative remains outside analytics.
 
-## Phase 4A-2.1 — Teaching Insights UI & Recovery Closure — current
+## Phase 4A-2.1 — Teaching Insights UI & Recovery Closure — complete
 
 Goal: close responsive/UI and repository-recovery gaps without changing analytics or persistence.
 
@@ -75,26 +75,89 @@ Acceptance:
 - manual desktop review confirms readable Standards/Content cards;
 - no private user data is added to the repository.
 
-## Phase 4B — Teaching Review & Drill-down
+## Phase 4B-0 — Teaching Review & Drill-down Audit — complete
 
-Goal: turn descriptive facts into a teacher-controlled review workflow without making Insights an
-editing surface.
+The audit established two boundaries:
 
-First-release candidates:
+- `Needs Review` remains a data/workflow-integrity surface rather than becoming a catch-all teacher
+  review queue.
+- Teaching Review is a separate read-only workflow derived from Teaching Insights facts. It may
+  navigate into writable source workflows, but it does not own those mutations.
 
-- selected-period / weekly Teaching Review;
-- drill down from Needs Review to exact source records;
-- review completed Sessions without Reflection;
-- review supported Evidence gaps/incomplete links;
-- return to Session, Reflection, Evidence, Planning, Standards, Content, or Tasks;
-- explicit follow-up through existing source workflows.
+The audit also found that Session, Reflection, Plan, Context, and Student sources already have useful
+deep links, while Standards, Library, Tasks, and Assessment Evidence still need more precise
+record-level navigation contracts.
 
-Constraints:
+## Phase 4B-1 — Teaching Review Queue Foundation — complete
 
-- no hidden review-state model in the first release unless pilot use proves it necessary;
-- no automatic mutation;
-- no implicit Task creation;
-- Insights remains read-only.
+Goal: establish the first formal Teaching Review workspace without persistence or new inference.
+
+First-release queues:
+
+- completed Sessions without an active Reflection;
+- Past still Scheduled Sessions;
+- Reflection sources with open Next Step Tasks;
+- remaining Teaching Insights record-integrity issues.
+
+Important semantics:
+
+- a Session with an archived Reflection is routed to that retained Reflection for review/restore;
+  Classroom does not try to create a second Reflection;
+- completed teaching without Assessment Evidence is not automatically treated as a review problem;
+- open Next Steps are grouped by Reflection source while Task editing remains in Tasks;
+- no reviewed/dismissed state is persisted.
+
+Architecture:
+
+`TeachingInsightsView -> TeachingReviewReadModel -> Teaching Review workspace`
+
+DB schema v17, Portable Backup v17, Insights contract v2, and app version
+`20.0.0-pilot.1` are retained.
+
+## Phase 4B-2 — Precise Drill-down & Return Navigation — complete
+
+Goal: make Teaching Review a trustworthy navigation layer rather than a list of broad workspace
+links.
+
+Scope:
+
+- Standard, Library item, and Task deep links select the exact retained record;
+- Reflection-linked Next Steps open a filtered Tasks view for that Reflection;
+- Review-origin source URLs carry the School Year, queue, and source focus explicitly;
+- AppShell shows a consistent Back to Teaching Review return bar for Review-origin workspaces;
+- Session, Planning, and Teaching Reflection workflows understand `return=review`, so explicit
+  mutations return to the originating Review queue instead of Learners;
+- Teaching Review restores focus to the originating record when it still exists and falls back to
+  the queue heading when the source issue has been resolved.
+
+Assessment Evidence remains intentionally outside this phase because it still lacks a dedicated
+review workspace; exact Evidence navigation belongs with Phase 4D rather than creating a temporary
+4B-only surface.
+
+DB schema v17, Portable Backup v17, Insights contract v2, Teaching Review contract v1, and app
+version `20.0.0-pilot.1` remain unchanged.
+
+## Phase 4B-3 — Period Review & UX Closure — current
+
+Goal: close the first Teaching Review workflow with explicit, URL-backed teaching periods and
+responsive/readability safeguards without adding reviewed/dismissed persistence.
+
+Scope:
+
+- School Year, This Week, Last Week, and Custom review periods;
+- Monday-based week semantics using the existing local-date utilities;
+- Custom ranges are validated and clipped to the selected School Year;
+- Awaiting Reflection, Past still Scheduled, and Open Next Steps are filtered by the originating
+  Session/Reflection date;
+- Record Issues remain School Year-wide because many integrity records do not have a meaningful
+  occurrence date;
+- Review period survives source drill-down, Back to Teaching Review, and Session/Planning/Reflection
+  mutation returns;
+- changing School Year preserves/clips a compatible custom range and clears stale row focus;
+- mobile and intermediate-width layouts keep period controls and review queues page-contained.
+
+DB schema v17, Portable Backup v17, Teaching Insights contract v2, Teaching Review contract v1,
+and app version `20.0.0-pilot.1` remain unchanged.
 
 ## Phase 4C — Reflection & Next Actions
 

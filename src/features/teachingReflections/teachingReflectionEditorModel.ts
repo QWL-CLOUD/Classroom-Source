@@ -1,5 +1,9 @@
 import type { TeachingReflectionRecord } from '@/domain/models/entities';
 import type { PlanningReturnTarget } from '@/features/planning/planningNavigation';
+import {
+  appendTeachingReviewReturnParams,
+  type TeachingReviewReturnState,
+} from '@/features/teachingReview/teachingReviewNavigation';
 
 import {
   teachingReflectionValuesSchema,
@@ -40,18 +44,22 @@ export function parseTeachingReflectionEditorValues(
 export function buildTeachingReflectionHref(
   sessionOccurrenceId: string,
   returnTo: PlanningReturnTarget,
+  reviewReturn?: TeachingReviewReturnState,
 ): string {
   const params = new URLSearchParams({ session: sessionOccurrenceId });
   if (returnTo !== 'learners') params.set('return', returnTo);
+  if (returnTo === 'review' && reviewReturn) appendTeachingReviewReturnParams(params, reviewReturn);
   return `#/planning/session/reflection?${params.toString()}`;
 }
 
 export function buildTeachingReflectionSessionHref(
   sessionOccurrenceId: string,
   returnTo: PlanningReturnTarget,
+  reviewReturn?: TeachingReviewReturnState,
 ): string {
   const params = new URLSearchParams({ session: sessionOccurrenceId });
   if (returnTo !== 'learners') params.set('return', returnTo);
+  if (returnTo === 'review' && reviewReturn) appendTeachingReviewReturnParams(params, reviewReturn);
   return `#/planning/session?${params.toString()}`;
 }
 
