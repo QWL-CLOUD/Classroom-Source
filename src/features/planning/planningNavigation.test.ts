@@ -4,7 +4,9 @@ import {
   buildPlanningEntryHref,
   buildPlanningSurfaceHref,
   buildSessionEditorHref,
+  isDailyPlanningReturnTarget,
   parsePlanningReturnTarget,
+  planningReturnTargetLabel,
 } from './planningNavigation';
 
 describe('planning navigation', () => {
@@ -61,6 +63,17 @@ describe('planning navigation', () => {
         focusOccurrenceId: 'schedule-block:block:2026-07-17',
       }),
     ).toContain('focus=schedule-block%3Ablock%3A2026-07-17');
+  });
+
+  it('classifies daily closeout origins without changing specialized Review or Progress returns', () => {
+    expect(isDailyPlanningReturnTarget('learners')).toBe(true);
+    expect(isDailyPlanningReturnTarget('today')).toBe(true);
+    expect(isDailyPlanningReturnTarget('week')).toBe(true);
+    expect(isDailyPlanningReturnTarget('calendar')).toBe(true);
+    expect(isDailyPlanningReturnTarget('review')).toBe(false);
+    expect(isDailyPlanningReturnTarget('progress')).toBe(false);
+    expect(planningReturnTargetLabel('calendar')).toBe('Calendar');
+    expect(planningReturnTargetLabel('review')).toBe('Teaching Review');
   });
 
   it('rejects unknown return targets by falling back to Learners', () => {

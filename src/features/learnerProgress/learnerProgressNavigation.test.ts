@@ -5,6 +5,7 @@ import {
   buildLearnerProgressEntryHref,
   buildLearnerProgressHref,
   decorateLearnerProgressSourceHref,
+  parseLearnerProgressCloseoutReturnState,
   parseLearnerProgressReturnState,
 } from './learnerProgressNavigation';
 
@@ -98,5 +99,47 @@ describe('Learner Progress return navigation', () => {
     expect(buildLearnerProgressEntryHref({ schoolYearId: 'year-1', sessionId: 'session-1' })).toBe(
       '#/learner-progress?schoolYear=year-1&session=session-1',
     );
+  });
+
+  it('carries a validated Session closeout return through Learner Progress and nested source return', () => {
+    const closeoutReturn = {
+      source: 'session' as const,
+      href: '#/planning/session?session=session-1&return=calendar',
+    };
+    const entry = buildLearnerProgressEntryHref({
+      schoolYearId: 'year-1',
+      sessionId: 'session-1',
+      closeoutReturn,
+    });
+    expect(entry).toContain('closeoutSource=session');
+    expect(entry).toContain('closeoutHref=');
+
+    const directSearch = new URLSearchParams(entry.split('?')[1]);
+    expect(parseLearnerProgressCloseoutReturnState(directSearch)).toEqual(closeoutReturn);
+
+    const decorated = decorateLearnerProgressSourceHref('#/planning/session?session=session-2', {
+      schoolYearId: 'year-1',
+      sessionId: 'session-1',
+      closeoutReturn,
+    });
+    const sourceSearch = new URLSearchParams(decorated.split('?')[1]);
+    const returnState = parseLearnerProgressReturnState(sourceSearch);
+    expect(returnState?.closeoutReturn).toEqual(closeoutReturn);
+    expect(buildLearnerProgressHref(returnState ?? {})).toContain('closeoutSource=session');
+  });
+
+  it('rejects malformed or external closeout return targets', () => {
+    expect(
+      parseLearnerProgressCloseoutReturnState(
+        new URLSearchParams('closeoutSource=session&closeoutHref=https%3A%2F%2Fexample.com'),
+      ),
+    ).toBeUndefined();
+    expect(
+      parseLearnerProgressCloseoutReturnState(
+        new URLSearchParams(
+          'closeoutSource=reflection&closeoutHref=%23%2Fplanning%2Fsession%3Fsession%3Dsession-1',
+        ),
+      ),
+    ).toBeUndefined();
   });
 });

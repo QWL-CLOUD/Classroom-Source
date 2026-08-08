@@ -325,6 +325,18 @@ test('Planning item becomes one synchronized scheduled and completed session', a
     .click();
 
   await page.getByRole('button', { name: 'Mark complete' }).click();
+  await expect(page).toHaveURL(/#\/planning\/session\?.*return=calendar/);
+  await expect(
+    page.getByText(/Session completed\. Session Evidence and an optional Teaching Reflection/),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'Teaching Reflection', exact: true }),
+  ).toContainText('This completed Session is ready for an optional Teaching Reflection.');
+  await expect(page.getByRole('link', { name: 'Session Evidence' })).toHaveAttribute(
+    'href',
+    /closeoutSource=session/,
+  );
+  await page.getByRole('link', { name: 'Back to Calendar' }).click();
   await expect(page).toHaveURL(/#\/calendar\?date=2026-07-10/);
   await expect(
     page.locator('[data-calendar-item^="session-occurrence:"]').filter({

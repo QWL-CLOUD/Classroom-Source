@@ -14,12 +14,18 @@ import {
   buildLearnerProgressEntryHref,
   type LearnerProgressReturnState,
 } from '@/features/learnerProgress/learnerProgressNavigation';
-import type { PlanningReturnTarget } from '@/features/planning/planningNavigation';
+import {
+  buildPlanningSurfaceHref,
+  isDailyPlanningReturnTarget,
+  planningReturnTargetLabel,
+  type PlanningReturnTarget,
+} from '@/features/planning/planningNavigation';
 import type { TeachingReviewReturnState } from '@/features/teachingReview/teachingReviewNavigation';
 import { formatLongDate } from '@/shared/dates/localDate';
 import { EditorActionMenu } from '@/shared/ui/EditorActionMenu';
 
 import {
+  buildTeachingReflectionHref,
   buildTeachingReflectionSessionHref,
   createTeachingReflectionEditorValues,
   parseTeachingReflectionEditorValues,
@@ -142,7 +148,18 @@ export function TeachingReflectionEditor({
   const schoolYearLabel =
     detail?.source.schoolYear.current?.label ?? createSource?.schoolYear.label ?? 'Unavailable';
   const schoolYearId = detail?.source.schoolYear.current?.id ?? createSource?.schoolYear.id;
+  const sourceContextId = reflection?.contextId ?? createSource?.context.id;
   const archived = reflection?.status === 'archived';
+  const directReturnHref =
+    sourceSessionSnapshot && sourceContextId && isDailyPlanningReturnTarget(returnTo)
+      ? buildPlanningSurfaceHref({
+          returnTo,
+          date: sourceSessionSnapshot.date,
+          contextId: sourceContextId,
+          learnerView: sourceSession?.deliveryState === 'completed' ? 'completed' : 'upcoming',
+          focusSessionId: sessionOccurrenceId,
+        })
+      : null;
 
   function update<K extends keyof TeachingReflectionEditorValues>(
     key: K,
@@ -218,6 +235,15 @@ export function TeachingReflectionEditor({
               href={buildLearnerProgressEntryHref({
                 schoolYearId,
                 sessionId: sessionOccurrenceId,
+                closeoutReturn: {
+                  source: 'reflection',
+                  href: buildTeachingReflectionHref(
+                    sessionOccurrenceId,
+                    returnTo,
+                    reviewReturn,
+                    progressReturn,
+                  ),
+                },
               })}
             >
               <Activity aria-hidden="true" size={17} /> Session Evidence
@@ -381,6 +407,13 @@ export function TeachingReflectionEditor({
           <Save aria-hidden="true" size={17} />
           {saving ? 'Saving…' : reflection ? 'Save reflection' : 'Add reflection'}
         </button>
+
+        {directReturnHref ? (
+          <a className="button" href={directReturnHref}>
+            <ArrowLeft aria-hidden="true" size={17} /> Return to{' '}
+            {planningReturnTargetLabel(returnTo)}
+          </a>
+        ) : null}
 
         {reflection ? (
           <EditorActionMenu>

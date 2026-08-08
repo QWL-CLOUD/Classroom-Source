@@ -285,3 +285,25 @@ test('Teaching Reflection remains responsive, keyboard reachable, and axe-clean 
     accessibility.violations.map((violation) => `${violation.id}: ${violation.help}`).join('\n'),
   ).toEqual([]);
 });
+
+test('Session Evidence preserves the Teaching Reflection closeout and offers a direct daily return', async ({
+  page,
+}) => {
+  await seedReflectionWorkspace(page, true);
+  await page.goto('./#/planning/session/reflection?session=reflection-session&return=week');
+
+  await expect(page.getByRole('link', { name: 'Return to Week' })).toHaveAttribute(
+    'href',
+    /#\/week\?date=2026-08-05/,
+  );
+  await page.getByRole('link', { name: 'Session Evidence' }).click();
+
+  await expect(page.getByRole('heading', { level: 1, name: 'Learner Progress' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Back to Teaching Reflection' })).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Teaching Reflection' }).click();
+
+  await expect(page).toHaveURL(
+    /planning\/session\/reflection\?session=reflection-session&return=week/,
+  );
+  await expect(page.getByRole('heading', { level: 1, name: 'Teaching Reflection' })).toBeVisible();
+});

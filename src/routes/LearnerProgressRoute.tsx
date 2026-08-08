@@ -27,6 +27,7 @@ import {
 } from '@/features/learnerProgress/learnerProgressRouteState';
 import {
   decorateLearnerProgressSourceHref,
+  parseLearnerProgressCloseoutReturnState,
   type LearnerProgressReturnState,
 } from '@/features/learnerProgress/learnerProgressNavigation';
 import { useLearnerProgress } from '@/features/learnerProgress/useLearnerProgress';
@@ -40,6 +41,7 @@ export function LearnerProgressRoute() {
   const periodState = parseLearnerProgressPeriodState(searchParams);
   const routeState = parseLearnerProgressRouteState(searchParams);
   const parentReviewReturn = parseTeachingReviewReturnState(searchParams) ?? undefined;
+  const closeoutReturn = parseLearnerProgressCloseoutReturnState(searchParams);
   const state = useLearnerProgress(requestedSchoolYearId);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [mutationMessage, setMutationMessage] = useState<string | null>(null);
@@ -319,6 +321,7 @@ export function LearnerProgressRoute() {
     order: routeState.order,
     period: effectivePeriod,
     parentReview: parentReviewReturn,
+    closeoutReturn,
   };
   const editorRecord =
     routeState.editor && routeState.editor !== 'new'

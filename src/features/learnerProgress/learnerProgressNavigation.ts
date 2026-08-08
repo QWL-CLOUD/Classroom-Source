@@ -13,6 +13,13 @@ import type {
 } from './learnerProgressReadModel';
 import type { LearnerProgressPeriodState } from './learnerProgressPeriod';
 
+export type LearnerProgressCloseoutSource = 'session' | 'reflection';
+
+export interface LearnerProgressCloseoutReturnState {
+  source: LearnerProgressCloseoutSource;
+  href: string;
+}
+
 export interface LearnerProgressReturnState {
   schoolYearId?: string;
   mode?: LearnerProgressMode;
@@ -26,11 +33,55 @@ export interface LearnerProgressReturnState {
   order?: LearnerProgressOrder;
   period?: LearnerProgressPeriodState;
   parentReview?: TeachingReviewReturnState;
+  closeoutReturn?: LearnerProgressCloseoutReturnState;
 }
 
 function clean(value: string | null): string | undefined {
   const normalized = value?.trim();
   return normalized || undefined;
+}
+
+function parseCloseoutSource(value: string | null): LearnerProgressCloseoutSource | undefined {
+  return value === 'session' || value === 'reflection' ? value : undefined;
+}
+
+function validateCloseoutHref(
+  value: string | null,
+  source: LearnerProgressCloseoutSource | undefined,
+): string | undefined {
+  const href = clean(value);
+  if (!href || !source || !href.startsWith('#/')) return undefined;
+  const [path, query = ''] = href.slice(1).split('?');
+  const expectedPath = source === 'session' ? '/planning/session' : '/planning/session/reflection';
+  if (path !== expectedPath) return undefined;
+  return clean(new URLSearchParams(query).get('session')) ? href : undefined;
+}
+
+export function parseLearnerProgressCloseoutReturnState(
+  search: URLSearchParams,
+): LearnerProgressCloseoutReturnState | undefined {
+  const source = parseCloseoutSource(search.get('closeoutSource'));
+  const href = validateCloseoutHref(search.get('closeoutHref'), source);
+  return source && href ? { source, href } : undefined;
+}
+
+function parseProgressCloseoutReturn(
+  search: URLSearchParams,
+): LearnerProgressCloseoutReturnState | undefined {
+  const source = parseCloseoutSource(search.get('progressCloseoutSource'));
+  const href = validateCloseoutHref(search.get('progressCloseoutHref'), source);
+  return source && href ? { source, href } : undefined;
+}
+
+function appendDirectCloseoutReturn(
+  params: URLSearchParams,
+  state?: LearnerProgressCloseoutReturnState,
+): void {
+  params.delete('closeoutSource');
+  params.delete('closeoutHref');
+  if (!state) return;
+  params.set('closeoutSource', state.source);
+  params.set('closeoutHref', state.href);
 }
 
 function parseMode(value: string | null): LearnerProgressMode | undefined {
@@ -124,6 +175,7 @@ export function parseLearnerProgressReturnState(
     order: search.get('progressOrder') === 'oldest' ? 'oldest' : undefined,
     period: parsePeriod(search),
     parentReview: parseParentReview(search),
+    closeoutReturn: parseProgressCloseoutReturn(search),
   };
 }
 
@@ -144,6 +196,12 @@ export function appendLearnerProgressReturnParams(
   if (state.order === 'oldest') params.set('progressOrder', 'oldest');
   appendPeriod(params, state.period);
   appendParentReview(params, state.parentReview);
+  params.delete('progressCloseoutSource');
+  params.delete('progressCloseoutHref');
+  if (state.closeoutReturn) {
+    params.set('progressCloseoutSource', state.closeoutReturn.source);
+    params.set('progressCloseoutHref', state.closeoutReturn.href);
+  }
   return params;
 }
 
@@ -171,6 +229,7 @@ export function buildLearnerProgressHref(state: LearnerProgressReturnState): str
     }
   }
   if (state.parentReview) appendTeachingReviewReturnParams(params, state.parentReview);
+  appendDirectCloseoutReturn(params, state.closeoutReturn);
   const query = params.toString();
   return query ? `#/learner-progress?${query}` : '#/learner-progress';
 }
@@ -183,6 +242,7 @@ export function buildLearnerProgressEntryHref(
     assessmentId?: string;
     standardFilterId?: string;
     sessionId?: string;
+    closeoutReturn?: LearnerProgressCloseoutReturnState;
   } = {},
 ): string {
   return buildLearnerProgressHref({
@@ -192,6 +252,7 @@ export function buildLearnerProgressEntryHref(
     assessmentId: state.assessmentId,
     standardFilterId: state.standardFilterId,
     sessionId: state.sessionId,
+    closeoutReturn: state.closeoutReturn,
   });
 }
 

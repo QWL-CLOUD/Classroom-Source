@@ -35,6 +35,7 @@ import {
 import { buildShellNavigationHref } from '@/app/workspaceNavigation';
 import {
   buildLearnerProgressHref,
+  parseLearnerProgressCloseoutReturnState,
   parseLearnerProgressReturnState,
 } from '@/features/learnerProgress/learnerProgressNavigation';
 import {
@@ -160,6 +161,10 @@ export function AppShell() {
     location.pathname === '/learner-progress'
       ? null
       : parseLearnerProgressReturnState(currentSearch);
+  const closeoutReturnState =
+    location.pathname === '/learner-progress'
+      ? parseLearnerProgressCloseoutReturnState(currentSearch)
+      : undefined;
 
   useEffect(() => {
     document.title = `${presentation.title} · Classroom`;
@@ -442,6 +447,18 @@ export function AppShell() {
                 </Link>
                 <span>
                   Source workspace opened from a source-traceable Learner Progress record.
+                </span>
+              </aside>
+            ) : null}
+            {closeoutReturnState ? (
+              <aside className={styles.reviewReturnBar} aria-label="Session closeout return">
+                <Link className="button" to={closeoutReturnState.href.slice(1)}>
+                  <ArrowLeft size={17} aria-hidden="true" /> Back to{' '}
+                  {closeoutReturnState.source === 'reflection' ? 'Teaching Reflection' : 'Session'}
+                </Link>
+                <span>
+                  Session Evidence opened from the current teaching closeout. Return without losing
+                  the original daily-workspace handoff.
                 </span>
               </aside>
             ) : null}
