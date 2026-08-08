@@ -416,6 +416,38 @@ describe('BackupRecoveryService', () => {
     expect(safetyPreview.validTables.classificationMappingPresets).toEqual([]);
   });
 
+  it('keeps only the five most recent safety snapshots across repeated restores', async () => {
+    await database.tasks.put(task('starting-task', 'Starting state'));
+    const incoming = emptyBackupTables();
+    incoming.tasks.push(task('restored-task', 'Stable restored state'));
+    const preview = buildRestorePreview(
+      serializeBackupEnvelope(
+        createBackupEnvelope(incoming, { backupId: 'repeated-restore', exportedAt: firstTime }),
+      ),
+    );
+    let idCounter = 0;
+    let timeCounter = 0;
+    const service = new BackupRecoveryService(database, {
+      createId: () => `repeated-${++idCounter}`,
+      now: () => new Date(Date.UTC(2026, 7, 8, 12, 0, timeCounter++)).toISOString(),
+    });
+
+    for (let restoreIndex = 0; restoreIndex < 7; restoreIndex += 1) {
+      await service.restore(preview);
+    }
+
+    const snapshots = await service.listSafetySnapshots(10);
+    expect(snapshots).toHaveLength(5);
+    expect(await database.backupSnapshots.count()).toBe(5);
+    expect(await database.restoreRuns.count()).toBe(7);
+    expect(snapshots.map((snapshot) => snapshot.createdAt)).toEqual(
+      [...snapshots.map((snapshot) => snapshot.createdAt)].sort().reverse(),
+    );
+    expect(await database.tasks.toArray()).toEqual([
+      task('restored-task', 'Stable restored state'),
+    ]);
+  });
+
   it('rolls back the safety snapshot and every table change if restore writing fails', async () => {
     await database.tasks.put(task('old-task', 'Before failed restore'));
     await database.importRuns.put({

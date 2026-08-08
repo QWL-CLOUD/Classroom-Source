@@ -32,6 +32,9 @@ This repository is the React + TypeScript source rebuild of Classroom. The legac
   optional Evidence/Reflection follow-up, while Review/Progress precise returns remain intact
 - Teacher Reports v1: learner-specific, teacher-internal Evidence summaries reuse the canonical
   Learner Progress read model and support CSV download plus print without inferred judgment
+- Post-feature personal-pilot hardening: current critical workflows are protected by targeted
+  Chromium/WebKit pilot journeys plus deterministic multi-year data-volume and restore-failure
+  regressions; DB/Backup remain v17
 
 The current pilot includes:
 
@@ -112,7 +115,10 @@ npm run test:e2e
 
 The full Playwright suite runs in Chromium. The dedicated Personal Pilot Readiness scenarios also
 run in WebKit to protect Safari-relevant IndexedDB persistence, downloads, storage capability
-handling, focus, responsive navigation, and critical accessibility behavior.
+handling, current Session-closeout/Reflection/Review/Progress/Reports journeys, focus, responsive
+navigation, and critical accessibility behavior. Chromium additionally runs a deterministic
+multi-year synthetic data-volume regression; this is a functional guard rather than a timing
+benchmark.
 
 See [`docs/testing.md`](docs/testing.md) and
 [`docs/personal-pilot-closure.md`](docs/personal-pilot-closure.md).

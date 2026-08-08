@@ -1,8 +1,8 @@
 # Classroom v20 Development Roadmap
 
-Updated for Phase 4F implementation after Phase 4E closure.
+Updated for Phase 4G implementation after Phase 4F closure.
 
-Current implementation baseline: `main @ 3a97313958e86a53acd9d5fe21aaa97e85ab0f7b` (Phase 4E merged).
+Current implementation baseline: `main @ f3b8481459d29853e9037ddf0a7b38ad76c16751` (Phase 4F merged).
 
 ## Product boundary
 
@@ -297,7 +297,7 @@ Scope:
 DB schema v17, Portable Backup v17, Learner Progress contract v1, Teaching Insights contract v2,
 Teaching Review contract v1, and app version `20.0.0-pilot.1` remain unchanged.
 
-## Phase 4F — Teacher Reports & Export Foundation — current
+## Phase 4F — Teacher Reports & Export Foundation — complete
 
 Goal: make existing canonical teacher-owned Evidence usable outside the Learner Progress workspace
 without introducing a second Evidence interpretation layer or a persisted report domain.
@@ -327,6 +327,34 @@ Retained boundaries:
 - no family/student-facing report, sharing, email, cloud upload, or publishing;
 - no grades, mastery, readiness, learner ranking, progress/growth score, cross-scale averaging,
   expected-Evidence denominator, Evidence-gap inference, or AI interpretation of teacher narrative.
+
+DB schema v17, Portable Backup v17, Learner Progress contract v1, Teaching Insights contract v2,
+Teaching Review contract v1, and app version `20.0.0-pilot.1` remain unchanged.
+
+## Phase 4G — Post-Feature Personal Pilot Hardening — current
+
+Goal: bring the complete Phase 4A–4F personal-teacher product back under one release-readiness
+contract without expanding the product domain.
+
+Scope:
+
+- refresh the dedicated Chromium/WebKit personal-pilot spec so current critical routes include
+  Teaching Review, Learner Progress, Reports, and the Phase 4E Session closeout handoff;
+- protect one complete daily journey from Session completion through Evidence/Reflection and into a
+  learner-scoped Report/CSV output;
+- add a deterministic multi-year synthetic data-volume regression for daily work, Learner Progress,
+  Reports, System Health, Backup, reload, and historical retained records;
+- verify malformed/integrity-tampered restore files remain no-write at the browser layer;
+- explicitly protect the five-safety-snapshot retention bound across repeated restores;
+- refresh personal-pilot/testing/recovery documentation from the old v16/pre-Insights contract to
+  the current v17 post-Phase-4F product.
+
+Retained boundaries:
+
+- no DB/Backup migration or persisted release/pilot state;
+- no new Insights, Reports, learner analytics, inference, or AI;
+- no PWA/offline-asset, cloud, account, tenancy, permission, publishing, or auto-scheduling work;
+- no bundle/XLSX warning refactor without a measured pilot defect.
 
 DB schema v17, Portable Backup v17, Learner Progress contract v1, Teaching Insights contract v2,
 Teaching Review contract v1, and app version `20.0.0-pilot.1` remain unchanged.
