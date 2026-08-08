@@ -289,3 +289,54 @@ test('Backup & Recovery previews without writes, saves a safety backup, and rest
   await page.reload();
   await expect(page.getByText('1 records')).toBeVisible();
 });
+
+test('Backup & Recovery rejects malformed and tampered files without creating restore state', async ({
+  page,
+}) => {
+  await page.goto('./#/export');
+  await seedCurrentTask(page);
+  await page.reload();
+
+  await page.getByLabel('Choose Classroom backup').setInputFiles({
+    name: 'not-json.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from('{not valid json'),
+  });
+  await expect(page.getByRole('alert')).toContainText('The selected file is not valid JSON.');
+  await expect(page.getByText('No restore preview yet', { exact: true })).toBeVisible();
+  await expect
+    .poll(() => readRecoveryState(page))
+    .toMatchObject({
+      tasks: [expect.objectContaining({ id: 'current-task' })],
+      snapshots: [],
+      runs: [],
+      quarantines: [],
+    });
+
+  const tampered = JSON.parse(backupWithTasks()) as {
+    tables: { tasks: Array<Record<string, unknown>> };
+  } & Record<string, unknown>;
+  const [firstTask] = tampered.tables.tasks;
+  if (!firstTask) throw new Error('Expected tamper fixture task.');
+  tampered.tables.tasks[0] = {
+    ...firstTask,
+    title: 'Tampered after integrity hash',
+  };
+  await page.getByLabel('Choose Classroom backup').setInputFiles({
+    name: 'tampered-backup.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(tampered)),
+  });
+  await expect(page.getByRole('alert')).toContainText('The backup integrity check failed.');
+  await expect(page.getByText('No restore preview yet', { exact: true })).toBeVisible();
+  await expect
+    .poll(() => readRecoveryState(page))
+    .toMatchObject({
+      tasks: [
+        expect.objectContaining({ id: 'current-task', title: 'Current task before restore' }),
+      ],
+      snapshots: [],
+      runs: [],
+      quarantines: [],
+    });
+});
