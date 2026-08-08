@@ -72,6 +72,25 @@ describe('Teaching Review navigation', () => {
     );
   });
 
+  it('opens Assessment Evidence issues at the exact Learner Progress record', () => {
+    expect(
+      buildTeachingReviewSourceHref(
+        {
+          entityType: 'assessment-evidence',
+          entityId: 'evidence-1',
+          label: 'Reading check',
+        },
+        {
+          schoolYearId: 'year-1',
+          queue: 'record-issues',
+          focus: 'assessment-evidence:evidence-1',
+        },
+      ),
+    ).toBe(
+      '#/learner-progress?evidence=evidence-1&schoolYear=year-1&return=review&reviewQueue=record-issues&reviewFocus=assessment-evidence%3Aevidence-1',
+    );
+  });
+
   it('opens only Tasks linked to the selected Reflection', () => {
     expect(
       buildTeachingReviewTasksHref('reflection-1', {

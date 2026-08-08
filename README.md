@@ -25,6 +25,9 @@ This repository is the React + TypeScript source rebuild of Classroom. The legac
   without persisted reviewed state or automatic mutation
 - Teaching Review drill-down: exact Standard, Library item, Task, Session, Plan, and Reflection
   navigation with explicit return-to-review state
+- Learner Progress v1: Student, Context, and Standard Evidence review with URL-backed periods and
+  source filters, exact Evidence detail/editing, safe current-retained-roster coverage, same-scale
+  proficiency history, and explicit source-return navigation
 
 The current pilot includes:
 
@@ -38,6 +41,9 @@ The current pilot includes:
 - Session-linked Teaching Reflection with teacher-authored narrative and ordinary Task-based Next Steps
 - Read-only Teaching Review queues for awaiting Reflection, Past still Scheduled, open Reflection
   Next Steps, and remaining record-integrity issues
+- Learner Progress timelines and Evidence editing that keep Score, Proficiency, and Observation
+  distinct, preserve historical source snapshots, support explicit Assessment/Standard/Session review
+  filters and current-retained-roster coverage, and never infer grades or mastery
 - Canonical Import Center for rosters, Standards, Activities, Resources, Assessments, and Calendar
   Events
 - CSV/XLSX templates and reviewed import workflows
@@ -67,6 +73,7 @@ application assets are available offline; no service worker or PWA cache is incl
 - `#/planning/session`
 - `#/insights`
 - `#/teaching-review`
+- `#/learner-progress`
 - `#/library`
 - `#/templates`
 - `#/standards`

@@ -1,4 +1,5 @@
 import {
+  Activity,
   AlertTriangle,
   Archive,
   BookOpen,
@@ -20,6 +21,7 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 're
 import { ZodError } from 'zod';
 
 import type { StudentRecord } from '@/domain/models/entities';
+import { buildLearnerProgressEntryHref } from '@/features/learnerProgress/learnerProgressNavigation';
 
 import { rosterMutationService } from './rosterMutationService';
 import type {
@@ -228,7 +230,13 @@ function StudentCreatePanel({
   );
 }
 
-function StudentProfile({ profile }: { profile: StudentProfileSnapshot }) {
+function StudentProfile({
+  profile,
+  schoolYearId,
+}: {
+  profile: StudentProfileSnapshot;
+  schoolYearId?: string;
+}) {
   const { student } = profile;
   const [editing, setEditing] = useState(false);
   const [values, setValues] = useState({
@@ -319,6 +327,16 @@ function StudentProfile({ profile }: { profile: StudentProfileSnapshot }) {
           >
             {student.status === 'archived' ? 'Archived' : 'Active'}
           </span>
+          <a
+            className="button"
+            href={buildLearnerProgressEntryHref({
+              schoolYearId,
+              mode: 'learners',
+              selectedId: student.id,
+            })}
+          >
+            <Activity aria-hidden="true" size={16} /> Learner Progress
+          </a>
           <button
             className="button"
             type="button"
@@ -506,9 +524,11 @@ function StudentProfile({ profile }: { profile: StudentProfileSnapshot }) {
 
 export function StudentDirectoryWorkspace({
   selectedStudentId,
+  schoolYearId,
   onSelectStudent,
 }: {
   selectedStudentId?: string;
+  schoolYearId?: string;
   onSelectStudent: (student: StudentRecord) => void;
 }) {
   const state = useStudentDirectory(selectedStudentId);
@@ -672,7 +692,7 @@ export function StudentDirectoryWorkspace({
         </section>
 
         {readyData.selectedProfile ? (
-          <StudentProfile profile={readyData.selectedProfile} />
+          <StudentProfile profile={readyData.selectedProfile} schoolYearId={schoolYearId} />
         ) : (
           <div className={`card ${styles.emptyProfile}`}>
             <UserRound aria-hidden="true" size={30} />

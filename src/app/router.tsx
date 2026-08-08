@@ -8,6 +8,7 @@ import { CalendarEventEditorRoute } from '@/routes/CalendarEventEditorRoute';
 import { ExportRoute } from '@/routes/ExportRoute';
 import { ImportRoute } from '@/routes/ImportRoute';
 import { InsightsRoute } from '@/routes/InsightsRoute';
+import { LearnerProgressRoute } from '@/routes/LearnerProgressRoute';
 import { LearnersRoute } from '@/routes/LearnersRoute';
 import { LibraryRoute } from '@/routes/LibraryRoute';
 import { MigrationRoute } from '@/routes/MigrationRoute';
@@ -54,6 +55,7 @@ export const router = createHashRouter([
       { path: 'categories', element: <CategoriesRoute /> },
       { path: 'insights', element: <InsightsRoute /> },
       { path: 'teaching-review', element: <TeachingReviewRoute /> },
+      { path: 'learner-progress', element: <LearnerProgressRoute /> },
       { path: 'import', element: <ImportRoute /> },
       { path: 'migration', element: <MigrationRoute /> },
       { path: 'export', element: <ExportRoute /> },

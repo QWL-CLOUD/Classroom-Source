@@ -1,0 +1,160 @@
+.editor {
+  min-width: 0;
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+}
+
+.header {
+  min-width: 0;
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.header > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.header h2,
+.header p,
+.section h3,
+.section p {
+  margin: 0;
+}
+
+.header p,
+.help,
+.section p {
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.form {
+  min-width: 0;
+  display: grid;
+  gap: 18px;
+}
+
+.grid {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.grid label,
+.kindFields label,
+.section label {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  color: var(--heading);
+  font-weight: 800;
+}
+
+.fullWidth {
+  grid-column: 1 / -1;
+}
+
+.grid input,
+.grid select,
+.grid textarea,
+.kindFields input,
+.kindFields textarea,
+.section select {
+  width: 100%;
+  min-width: 0;
+}
+
+.notesField {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  color: var(--heading);
+  font-weight: 800;
+}
+
+.form textarea {
+  padding: 10px 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.notesTextarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 104px;
+  border-radius: 10px;
+}
+
+.kindFields,
+.section {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.kindGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.standardsSelect {
+  min-height: 180px;
+}
+
+.error,
+.status {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
+.error {
+  border: 1px solid var(--danger-border, var(--border));
+  background: var(--danger-soft, var(--surface-soft));
+  color: var(--danger-text, var(--heading));
+  font-weight: 750;
+}
+
+.status {
+  border: 1px solid var(--border-soft);
+  background: var(--surface-soft);
+  color: var(--text-secondary);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+  .header {
+    display: grid;
+  }
+
+  .grid,
+  .kindGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .fullWidth {
+    grid-column: auto;
+  }
+
+  .actions,
+  .actions button {
+    width: 100%;
+  }
+}

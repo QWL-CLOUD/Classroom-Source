@@ -20,6 +20,7 @@ import {
   type LearnerContext,
   type LessonPlan,
   type LibraryCatalogItem,
+  type SchoolYear,
   type SessionOccurrence,
   type Standard,
 } from '@/domain/models/entities';
@@ -110,7 +111,11 @@ export class AssessmentEvidenceMutationService {
       'rw',
       this.mutationTables(),
       async (): Promise<CommitResult<AssessmentEvidenceRecord>> => {
-        await this.requireStudentAndSchoolYear(parsed.studentId, parsed.schoolYearId);
+        const schoolYear = await this.requireStudentAndSchoolYear(
+          parsed.studentId,
+          parsed.schoolYearId,
+        );
+        this.requireOccurredOnInsideSchoolYear(parsed.occurredOn, schoolYear);
         const sourceSnapshots = await this.validateSourcesAndBuildSnapshots(parsed);
         const now = this.now();
         const created = this.buildRecord(parsed, {
@@ -148,7 +153,11 @@ export class AssessmentEvidenceMutationService {
       this.mutationTables(),
       async (): Promise<CommitResult<AssessmentEvidenceRecord>> => {
         const existing = await this.requireEvidence(id);
-        await this.requireStudentAndSchoolYear(parsed.studentId, parsed.schoolYearId);
+        const schoolYear = await this.requireStudentAndSchoolYear(
+          parsed.studentId,
+          parsed.schoolYearId,
+        );
+        this.requireOccurredOnInsideSchoolYear(parsed.occurredOn, schoolYear);
         const sourceSnapshots = await this.validateSourcesAndBuildSnapshots(parsed, existing);
         const updated = this.buildRecord(parsed, {
           id: existing.id,
@@ -250,7 +259,7 @@ export class AssessmentEvidenceMutationService {
   private async requireStudentAndSchoolYear(
     studentId: string,
     schoolYearId: string,
-  ): Promise<void> {
+  ): Promise<SchoolYear> {
     const [studentValue, schoolYearValue] = await Promise.all([
       this.db.studentRecords.get(studentId),
       this.db.schoolYears.get(schoolYearId),
@@ -258,7 +267,16 @@ export class AssessmentEvidenceMutationService {
     if (!studentValue) throw new Error('The selected Student no longer exists.');
     if (!schoolYearValue) throw new Error('The selected school year no longer exists.');
     studentRecordSchema.parse(studentValue);
-    schoolYearSchema.parse(schoolYearValue);
+    return schoolYearSchema.parse(schoolYearValue);
+  }
+
+  private requireOccurredOnInsideSchoolYear(
+    occurredOn: string,
+    schoolYear: Pick<SchoolYear, 'startsOn' | 'endsOn'>,
+  ): void {
+    if (occurredOn < schoolYear.startsOn || occurredOn > schoolYear.endsOn) {
+      throw new Error('Evidence date must fall inside the selected School Year.');
+    }
   }
 
   private async validateSourcesAndBuildSnapshots(

@@ -137,7 +137,7 @@ review workspace; exact Evidence navigation belongs with Phase 4D rather than cr
 DB schema v17, Portable Backup v17, Insights contract v2, Teaching Review contract v1, and app
 version `20.0.0-pilot.1` remain unchanged.
 
-## Phase 4B-3 — Period Review & UX Closure — current
+## Phase 4B-3 — Period Review & UX Closure — complete
 
 Goal: close the first Teaching Review workflow with explicit, URL-backed teaching periods and
 responsive/readability safeguards without adding reviewed/dismissed persistence.
@@ -165,26 +165,118 @@ Core capability was pulled forward into Phase 4A-2 and must not be redesigned as
 Reflection model. Future work under this label is limited to pilot-proven refinements of the existing
 v17 domain.
 
-## Phase 4D — Learner Progress & Evidence Review
+## Phase 4D-0 — Learner Progress & Evidence Data Contract Audit — complete
 
-Goal: teacher-controlled, source-traceable evidence review.
+The merged v17 Evidence domain already provides canonical Student ownership, School Year/date,
+Score/Proficiency/Observation kinds, optional Context/Plan/Session/Assessment/Standard links,
+historical source snapshots, lifecycle, Undo/Redo, Backup coverage, and indexes sufficient for the
+first learner-progress release.
 
-Candidates:
+Audit decision:
 
-- learner Evidence timeline;
-- Standard-centered Evidence view;
-- Class / Group / Individual context views;
-- Evidence gaps and observation trends supported by explicit records;
-- drill-down to exact Evidence.
+- keep DB schema v17 and Portable Backup v17;
+- treat Student as the canonical learner identity;
+- use `AssessmentEvidenceRecord.contextId` for historical Context review rather than reconstructing
+  membership from the current roster;
+- do not claim a true Evidence gap because there is no expected-Evidence denominator;
+- do not convert heterogeneous scores, proficiency records, or teacher observations into mastery,
+  grades, rank, or black-box growth scores.
 
-Hard boundaries:
+## Phase 4D-1 — Learner Progress Read Model & Workspace Foundation — complete
 
-- Evidence is not a grade;
-- Evidence count is not mastery;
-- no Evidence is not failure;
-- no learner ranking or black-box ability score;
-- Group membership is not Class membership;
-- roster membership does not create an Individual workspace.
+Goal: expose canonical Assessment Evidence through a read-only, source-traceable learner review
+workspace before opening the existing Evidence mutation domain in UI.
+
+Scope:
+
+- new Reflect route `#/learner-progress` and Learner Progress contract v1;
+- URL-backed School Year, School Year / This Week / Last Week / Custom periods, Evidence lifecycle,
+  and Evidence-kind filters;
+- Learners, Contexts, and Standards views;
+- canonical Student timelines and explicit Context-linked Evidence;
+- Standard-centered Evidence without implying Standard mastery;
+- exact `evidence=<id>` detail within Learner Progress;
+- Score, Proficiency, and Observation remain structurally distinct;
+- current source links for Student, Context, Plan, Session, Assessment, and Standard;
+- retained historical snapshots remain readable but are not presented as current clickable sources;
+- responsive/mobile/accessibility regression coverage.
+
+Completed checkpoint boundaries:
+
+- Evidence create/edit/archive/restore UI remains outside 4D-1;
+- `return=progress` source-workspace navigation remains outside 4D-1;
+- exact Teaching Review Evidence-issue drill-down remains outside 4D-1;
+- current-retained-roster coverage UX remains outside 4D-1;
+- expected-Evidence / true gap semantics;
+- mastery, grades, ranking, automatic progress scores, or AI interpretation.
+
+DB schema v17, Portable Backup v17, Teaching Insights contract v2, Teaching Review contract v1,
+and app version `20.0.0-pilot.1` remain unchanged.
+
+## Phase 4D-2 — Evidence Record Workflow & Precise Source Navigation — complete
+
+Goal: expose the existing Evidence mutation domain without changing its persistence model, and make
+Learner Progress a safe two-way navigation layer for exact source records.
+
+Scope:
+
+- Add/Edit Evidence directly through the existing `AssessmentEvidenceMutationService`;
+- Archive/Restore continue to use the existing global Undo/Redo command history;
+- Score, Proficiency, and Observation remain distinct teacher-entered Evidence kinds;
+- optional Context, Lesson Plan, Session, Library Assessment, and multi-Standard links are editable;
+- unchanged historical missing-source links preserve retained source snapshots rather than forcing
+  destructive cleanup;
+- create/update enforce that `occurredOn` falls inside the selected School Year while legacy malformed
+  rows remain readable and lifecycle-manageable;
+- URL-backed `edit=new|<evidenceId>` editor state remains separate from exact `evidence=<id>` detail;
+- `return=progress` preserves School Year, period, view, selected source, exact Evidence, lifecycle,
+  and kind filters through source workspaces;
+- Planning, Session, and Teaching Reflection workflows preserve Learner Progress origin through save,
+  mutation, and return paths;
+- nested Teaching Review → Learner Progress → source navigation retains both return contracts;
+- Teaching Review Assessment Evidence integrity issues open the exact Learner Progress Evidence;
+- Teaching Reflection related Evidence rows open the exact Learner Progress Evidence record.
+
+Retained boundaries:
+
+- no DB/Backup migration;
+- no automatic Evidence creation;
+- no current-roster requirement for historical Context-linked Evidence;
+- no mastery, grades, ranking, growth score, AI interpretation, or true Evidence-gap inference.
+
+DB schema v17, Portable Backup v17, Learner Progress contract v1, Teaching Insights contract v2,
+Teaching Review contract v1, and app version `20.0.0-pilot.1` remain unchanged.
+
+## Phase 4D-3 — Evidence Review Coverage & UX Closure — current
+
+Goal: close the first Learner Progress release with safe review coverage, richer source filters,
+entry points from the teacher workflow, and explicit historical-state behavior without changing the
+Evidence persistence contract.
+
+Scope:
+
+- Context mode current-retained-roster coverage for active Class/Group contexts only, using explicit
+  `RosterMembership` records and explicit `Evidence.contextId` links;
+- no roster denominator for Individual, archived/historical/snapshot-only, or unavailable Context
+  scopes, and no reconstruction of historical membership;
+- URL-backed Library Assessment, linked Standard, Session source, and newest/oldest timeline filters;
+- same-scale proficiency history only when an explicit `scaleKey` establishes scale identity;
+- direct Learner Progress entry points from Student, Context, Standard, Library Assessment, Session,
+  and Teaching Reflection;
+- historical School Year and archived-source copy that keeps recorded Evidence readable while
+  refusing unsupported roster, mastery, grade, rank, growth, or gap claims;
+- responsive/accessibility and final Phase 4D regression coverage.
+
+Retained boundaries:
+
+- no DB/Backup migration;
+- no expected-Evidence denominator or true Evidence-gap inference;
+- no averaging/normalization of heterogeneous scores;
+- no mastery, grades, learner ranking, readiness, automatic progress score, or Observation AI/NLP
+  interpretation.
+
+DB schema v17, Portable Backup v17, Learner Progress contract v1, Teaching Insights contract v2,
+Teaching Review contract v1, and app version `20.0.0-pilot.1` remain unchanged.
 
 ## Phase 4E — Reports & Export
 

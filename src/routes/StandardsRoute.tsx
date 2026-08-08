@@ -1,4 +1,5 @@
 import {
+  Activity,
   Archive,
   BookCheck,
   Import as ImportIcon,
@@ -23,6 +24,7 @@ import {
   type StandardStatus,
 } from '@/domain/models/entities';
 import { buildImportCenterHref } from '@/features/importCenter/importRouteState';
+import { buildLearnerProgressEntryHref } from '@/features/learnerProgress/learnerProgressNavigation';
 import { StandardEditor } from '@/features/standards/StandardEditor';
 import { StandardsCoverageView } from '@/features/standards/StandardsCoverageView';
 import {
@@ -473,6 +475,10 @@ export function StandardsRoute() {
                       : undefined
                   }
                   busy={busy}
+                  progressHref={buildLearnerProgressEntryHref({
+                    mode: 'standards',
+                    selectedId: selected.id,
+                  })}
                   onEdit={() => setEditing(true)}
                   onArchive={() => void run(() => standardMutationService.archive(selected.id))}
                   onRestore={() => void run(() => standardMutationService.restore(selected.id))}
@@ -491,6 +497,7 @@ function StandardDetails({
   standards,
   importMetadata,
   busy,
+  progressHref,
   onEdit,
   onArchive,
   onRestore,
@@ -499,6 +506,7 @@ function StandardDetails({
   standards: readonly StandardView[];
   importMetadata?: StandardImportMetadata;
   busy: boolean;
+  progressHref: string;
   onEdit: () => void;
   onArchive: () => void;
   onRestore: () => void;
@@ -522,6 +530,9 @@ function StandardDetails({
           </span>
         </div>
         <div className={styles.actions}>
+          <a className="button" href={progressHref}>
+            <Activity size={16} aria-hidden="true" /> Learner Progress
+          </a>
           <button className="button" type="button" disabled={busy} onClick={onEdit}>
             <Pencil size={16} aria-hidden="true" /> Edit
           </button>

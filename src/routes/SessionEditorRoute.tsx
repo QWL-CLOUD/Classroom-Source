@@ -1,4 +1,5 @@
 import {
+  Activity,
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
@@ -32,6 +33,12 @@ import {
   type TeachingReflectionRecord,
 } from '@/domain/models/entities';
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
+import {
+  buildLearnerProgressEntryHref,
+  buildLearnerProgressHref,
+  parseLearnerProgressReturnState,
+  type LearnerProgressReturnState,
+} from '@/features/learnerProgress/learnerProgressNavigation';
 import { minuteToTime } from '@/features/editing/calendarEventEditorModel';
 import { LessonFlowEditor, LessonFlowPreview } from '@/features/planning/LessonFlowEditor';
 import { ReminderPanel } from '@/features/reminders/ReminderPanel';
@@ -41,6 +48,7 @@ import {
   type PlanningReturnTarget,
 } from '@/features/planning/planningNavigation';
 import {
+  buildTeachingReviewHref,
   parseTeachingReviewReturnState,
   type TeachingReviewReturnState,
 } from '@/features/teachingReview/teachingReviewNavigation';
@@ -86,12 +94,14 @@ function SessionEditorForm({
   initialDate,
   returnTo,
   reviewReturn,
+  progressReturn,
   service = planningMutationService,
 }: {
   snapshot: SessionEditorSnapshot;
   initialDate: string;
   returnTo: PlanningReturnTarget;
   reviewReturn?: TeachingReviewReturnState;
+  progressReturn?: LearnerProgressReturnState;
   service?: PlanningMutationService;
 }) {
   const { context, plan, session, scheduleBlocks, libraryItems, reflection } = snapshot;
@@ -175,6 +185,13 @@ function SessionEditorForm({
           schoolYearId: reviewReturn?.schoolYearId ?? selectedContext.schoolYearId,
         }
       : undefined;
+  const resolvedProgressReturn: LearnerProgressReturnState | undefined =
+    returnTo === 'progress'
+      ? {
+          ...progressReturn,
+          schoolYearId: progressReturn?.schoolYearId ?? selectedContext.schoolYearId,
+        }
+      : undefined;
   const inheritedContent = resolveSessionLessonContent(selectedPlan).content;
 
   function returnHref(options: {
@@ -189,6 +206,7 @@ function SessionEditorForm({
       learnerView: options.learnerView,
       focusSessionId: options.sessionId,
       reviewReturn: resolvedReviewReturn,
+      progressReturn: resolvedProgressReturn,
     });
   }
 
@@ -366,21 +384,36 @@ function SessionEditorForm({
             <strong>{selectedPlan.title}</strong> · {selectedContext.name}
           </p>
         </div>
-        <a
-          className="button"
-          href={returnHref({
-            date: session?.date ?? initialDate,
-            sessionId: session?.id,
-            learnerView: backView,
-          })}
-        >
-          <ArrowLeft aria-hidden="true" size={17} />
-          {returnTo === 'learners'
-            ? 'Back to Learners'
-            : returnTo === 'review'
-              ? 'Back to Teaching Review'
-              : `Back to ${returnTo === 'today' ? 'Today' : returnTo === 'week' ? 'Week' : 'Calendar'}`}
-        </a>
+        <div className={styles.actions}>
+          {session ? (
+            <a
+              className="button"
+              href={buildLearnerProgressEntryHref({
+                schoolYearId: selectedContext.schoolYearId,
+                sessionId: session.id,
+              })}
+            >
+              <Activity aria-hidden="true" size={17} /> Session Evidence
+            </a>
+          ) : null}
+          <a
+            className="button"
+            href={returnHref({
+              date: session?.date ?? initialDate,
+              sessionId: session?.id,
+              learnerView: backView,
+            })}
+          >
+            <ArrowLeft aria-hidden="true" size={17} />
+            {returnTo === 'learners'
+              ? 'Back to Learners'
+              : returnTo === 'review'
+                ? 'Back to Teaching Review'
+                : returnTo === 'progress'
+                  ? 'Back to Learner Progress'
+                  : `Back to ${returnTo === 'today' ? 'Today' : returnTo === 'week' ? 'Week' : 'Calendar'}`}
+          </a>
+        </div>
       </div>
 
       {session ? (
@@ -635,7 +668,12 @@ function SessionEditorForm({
             {reflection || session.deliveryState === 'completed' ? (
               <a
                 className="button"
-                href={buildTeachingReflectionHref(session.id, returnTo, resolvedReviewReturn)}
+                href={buildTeachingReflectionHref(
+                  session.id,
+                  returnTo,
+                  resolvedReviewReturn,
+                  resolvedProgressReturn,
+                )}
               >
                 <NotebookPen aria-hidden="true" size={17} />
                 {reflection ? 'View reflection' : 'Add reflection'}
@@ -736,6 +774,7 @@ export function SessionEditorRoute() {
   const initialDate = parseLocalDate(requestedDate) ? requestedDate! : todayLocalDate();
   const returnTo = parsePlanningReturnTarget(searchParams.get('return'));
   const reviewReturn = parseTeachingReviewReturnState(searchParams);
+  const progressReturn = parseLearnerProgressReturnState(searchParams);
 
   const snapshot = useLiveQuery(async (): Promise<SessionEditorSnapshot> => {
     const sessionValue = sessionId
@@ -794,8 +833,21 @@ export function SessionEditorRoute() {
       <div className={`card ${styles.errorPanel}`} role="alert">
         <h1>Session unavailable</h1>
         <p>The requested plan, session, or learner context could not be found.</p>
-        <a className="button" href="#/learners">
-          Back to Learners
+        <a
+          className="button"
+          href={
+            returnTo === 'review'
+              ? buildTeachingReviewHref(reviewReturn ?? {})
+              : returnTo === 'progress'
+                ? buildLearnerProgressHref(progressReturn ?? {})
+                : '#/learners'
+          }
+        >
+          {returnTo === 'review'
+            ? 'Back to Teaching Review'
+            : returnTo === 'progress'
+              ? 'Back to Learner Progress'
+              : 'Back to Learners'}
         </a>
       </div>
     );
@@ -809,6 +861,7 @@ export function SessionEditorRoute() {
         initialDate={initialDate}
         returnTo={returnTo}
         reviewReturn={reviewReturn ?? undefined}
+        progressReturn={progressReturn ?? undefined}
       />
     </section>
   );

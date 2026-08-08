@@ -1,4 +1,5 @@
 import {
+  Activity,
   Archive,
   ArrowLeft,
   BookCheck,
@@ -32,6 +33,10 @@ import {
   type NavigationGroupId,
 } from '@/app/navigationGroups';
 import { buildShellNavigationHref } from '@/app/workspaceNavigation';
+import {
+  buildLearnerProgressHref,
+  parseLearnerProgressReturnState,
+} from '@/features/learnerProgress/learnerProgressNavigation';
 import {
   buildTeachingReviewHref,
   parseTeachingReviewReturnState,
@@ -71,6 +76,7 @@ const collapsibleNavigationGroups: Array<{
     links: [
       { to: '/insights', label: 'Teaching Insights', icon: Sparkles },
       { to: '/teaching-review', label: 'Teaching Review', icon: ClipboardCheck },
+      { to: '/learner-progress', label: 'Learner Progress', icon: Activity },
     ],
   },
   {
@@ -117,6 +123,9 @@ function getRoutePresentation(pathname: string): { title: string; layout: Conten
   if (pathname.startsWith('/teaching-review')) {
     return { title: 'Teaching Review', layout: 'standard' };
   }
+  if (pathname.startsWith('/learner-progress')) {
+    return { title: 'Learner Progress', layout: 'standard' };
+  }
   if (pathname.startsWith('/import')) return { title: 'Import Center', layout: 'standard' };
   if (pathname.startsWith('/migration')) return { title: 'Migration', layout: 'reading' };
   if (pathname.startsWith('/export')) return { title: 'Export & Backup', layout: 'reading' };
@@ -144,10 +153,13 @@ export function AppShell() {
   const mobileCloseButtonRef = useRef<HTMLButtonElement>(null);
   const presentation = getRoutePresentation(location.pathname);
   const schoolYearContext = presentActiveSchoolYear(activeSchoolYearState);
+  const currentSearch = new URLSearchParams(location.search);
   const reviewReturnState =
-    location.pathname === '/teaching-review'
+    location.pathname === '/teaching-review' ? null : parseTeachingReviewReturnState(currentSearch);
+  const progressReturnState =
+    location.pathname === '/learner-progress'
       ? null
-      : parseTeachingReviewReturnState(new URLSearchParams(location.search));
+      : parseLearnerProgressReturnState(currentSearch);
 
   useEffect(() => {
     document.title = `${presentation.title} · Classroom`;
@@ -418,6 +430,19 @@ export function AppShell() {
                   <ArrowLeft size={17} aria-hidden="true" /> Back to Teaching Review
                 </Link>
                 <span>Source workspace opened from a read-only Teaching Review queue.</span>
+              </aside>
+            ) : null}
+            {progressReturnState ? (
+              <aside className={styles.reviewReturnBar} aria-label="Learner Progress return">
+                <Link
+                  className="button"
+                  to={buildLearnerProgressHref(progressReturnState).slice(1)}
+                >
+                  <ArrowLeft size={17} aria-hidden="true" /> Back to Learner Progress
+                </Link>
+                <span>
+                  Source workspace opened from a source-traceable Learner Progress record.
+                </span>
               </aside>
             ) : null}
             <Outlet />

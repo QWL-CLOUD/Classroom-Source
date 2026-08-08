@@ -90,7 +90,11 @@ export function buildTeachingReviewSourceHref(
   state: TeachingReviewReturnState,
 ): string | undefined {
   let href = source.href;
-  if (source.entityType === 'standard') {
+  if (source.entityType === 'assessment-evidence') {
+    const params = new URLSearchParams({ evidence: source.entityId });
+    if (state.schoolYearId) params.set('schoolYear', state.schoolYearId);
+    href = `#/learner-progress?${params.toString()}`;
+  } else if (source.entityType === 'standard') {
     href = `#/standards?standard=${encodeURIComponent(source.entityId)}`;
   } else if (source.entityType === 'library-item') {
     href = `#/library?item=${encodeURIComponent(source.entityId)}`;

@@ -18,6 +18,7 @@ test('navigation prioritizes daily work and preserves collapsible group choices'
   await expect(reflect).toHaveAttribute('aria-expanded', 'false');
   await expect(navigation.getByRole('link', { name: 'Teaching Insights' })).toBeHidden();
   await expect(navigation.getByRole('link', { name: 'Teaching Review' })).toBeHidden();
+  await expect(navigation.getByRole('link', { name: 'Learner Progress' })).toBeHidden();
   await expect(settingsData).toHaveAttribute('aria-expanded', 'false');
   await expect(navigation.getByRole('link', { name: 'Import Center' })).toBeHidden();
 
@@ -31,6 +32,9 @@ test('navigation prioritizes daily work and preserves collapsible group choices'
   await expect(
     navigation.getByRole('link', { name: 'Teaching Review', exact: true }),
   ).toBeVisible();
+  await expect(
+    navigation.getByRole('link', { name: 'Learner Progress', exact: true }),
+  ).toBeVisible();
   await expect(teachingInsightsLink).not.toContainText('Planned');
   await page.reload();
   await expect(navigation.getByRole('button', { name: 'Reflect' })).toHaveAttribute(
@@ -43,6 +47,7 @@ test('navigation prioritizes daily work and preserves collapsible group choices'
 
   await page.getByRole('button', { name: 'Collapse navigation' }).click();
   await expect(navigation.getByRole('link', { name: 'Teaching Insights' })).toBeVisible();
+  await expect(navigation.getByRole('link', { name: 'Learner Progress' })).toBeVisible();
   await expect(navigation.getByRole('link', { name: 'Import Center' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Expand navigation' }).click();
@@ -66,6 +71,15 @@ test('navigation prioritizes daily work and preserves collapsible group choices'
   );
   await expect(
     navigation.getByRole('link', { name: 'Teaching Review', exact: true }),
+  ).toBeVisible();
+
+  await page.goto('./#/learner-progress');
+  await expect(navigation.getByRole('button', { name: 'Reflect' })).toHaveAttribute(
+    'aria-expanded',
+    'true',
+  );
+  await expect(
+    navigation.getByRole('link', { name: 'Learner Progress', exact: true }),
   ).toBeVisible();
 });
 

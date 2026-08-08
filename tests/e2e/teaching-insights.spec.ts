@@ -878,3 +878,67 @@ test('Teaching Insights stays responsive, keyboard reachable, and axe-clean at 3
     accessibility.violations.map((violation) => `${violation.id}: ${violation.help}`).join('\n'),
   ).toEqual([]);
 });
+
+test('Teaching Review opens exact Evidence issues and preserves nested Progress return navigation', async ({
+  page,
+}) => {
+  await seedInsights(page);
+
+  await page.evaluate(async (timestampValue) => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('classroom-v20');
+      request.onerror = () => reject(request.error);
+      request.onsuccess = () => resolve(request.result);
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const transaction = database.transaction(['assessmentEvidence'], 'readwrite');
+        transaction.onerror = () => reject(transaction.error);
+        transaction.onabort = () => reject(transaction.error);
+        transaction.oncomplete = () => resolve();
+        transaction.objectStore('assessmentEvidence').put({
+          id: 'insights-evidence-outside-year',
+          studentId: 'insights-student-alice',
+          schoolYearId: 'insights-current-year',
+          occurredOn: '2025-12-31',
+          title: 'Outside-year Evidence',
+          kind: 'observation',
+          observation: { text: 'Historical malformed date retained for repair.' },
+          standardIds: [],
+          status: 'active',
+          createdAt: timestampValue,
+          updatedAt: timestampValue,
+        });
+      });
+    } finally {
+      database.close();
+    }
+  }, timestamp);
+
+  await page.goto('./#/teaching-review?schoolYear=insights-current-year');
+  const recordIssues = page.getByRole('region', { name: 'Record Issues', exact: true });
+  await expect(recordIssues).toContainText('evidence-outside-school-year');
+  await recordIssues.getByRole('link', { name: 'Outside-year Evidence' }).click();
+
+  await expect(page.getByRole('heading', { level: 1, name: 'Learner Progress' })).toBeVisible();
+  await expect(page.getByRole('article', { name: 'Outside-year Evidence' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Back to Teaching Review' })).toBeVisible();
+
+  await page
+    .getByRole('article', { name: 'Outside-year Evidence' })
+    .getByRole('link', { name: 'Alice Chen' })
+    .click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Learners' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Back to Learner Progress' })).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Learner Progress' }).click();
+
+  await expect(page.getByRole('article', { name: 'Outside-year Evidence' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Back to Teaching Review' })).toBeVisible();
+  await page.getByRole('link', { name: 'Back to Teaching Review' }).click();
+  await expect(page).toHaveURL(/queue=record-issues/);
+  await expect(
+    page.locator(
+      '#teaching-review-focus-record-issues-assessment-evidence-insights-evidence-outside-year',
+    ),
+  ).toBeFocused();
+});

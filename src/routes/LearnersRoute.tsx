@@ -1,4 +1,5 @@
 import {
+  Activity,
   AlertTriangle,
   Archive,
   BookOpen,
@@ -24,6 +25,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ZodError } from 'zod';
 
 import type { LearnerContext, StudentRecord } from '@/domain/models/entities';
+import { buildLearnerProgressEntryHref } from '@/features/learnerProgress/learnerProgressNavigation';
 import { LearnerNoticePanel } from '@/features/learnerNotices/LearnerNoticePanel';
 import type { LearnerPlanningView } from '@/domain/readModels/learnerReadModels';
 import {
@@ -1276,6 +1278,7 @@ export function LearnersRoute() {
         <LearnerDirectoryViewTabs value={directoryView} onChange={selectDirectoryView} />
         <StudentDirectoryWorkspace
           selectedStudentId={requestedStudentId}
+          schoolYearId={requestedSchoolYearId}
           onSelectStudent={selectStudent}
         />
       </section>
@@ -1599,6 +1602,16 @@ export function LearnersRoute() {
                     </div>
                   </div>
                   <div className={styles.selectedContextActions}>
+                    <a
+                      className="button"
+                      href={buildLearnerProgressEntryHref({
+                        schoolYearId: model.selectedContext.schoolYearId,
+                        mode: 'contexts',
+                        selectedId: model.selectedContext.id,
+                      })}
+                    >
+                      <Activity aria-hidden="true" size={16} /> Learner Progress
+                    </a>
                     {model.selectedContext.status === 'active' ? (
                       <a
                         className="button button-primary"

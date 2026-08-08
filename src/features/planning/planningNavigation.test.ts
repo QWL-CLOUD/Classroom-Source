@@ -65,6 +65,7 @@ describe('planning navigation', () => {
 
   it('rejects unknown return targets by falling back to Learners', () => {
     expect(parsePlanningReturnTarget('today')).toBe('today');
+    expect(parsePlanningReturnTarget('progress')).toBe('progress');
     expect(parsePlanningReturnTarget('unknown')).toBe('learners');
     expect(parsePlanningReturnTarget(null)).toBe('learners');
   });
@@ -101,5 +102,34 @@ describe('planning navigation', () => {
     ).toBe(
       '#/planning/session?plan=plan&return=review&schoolYear=year-1&reviewQueue=record-issues&reviewFocus=lesson-plan%3Aplan&reviewPeriod=custom&reviewFrom=2026-08-01&reviewTo=2026-08-07',
     );
+  });
+
+  it('returns Progress-origin planning workflows to the exact learner Evidence scope', () => {
+    const progressReturn = {
+      schoolYearId: 'year-1',
+      mode: 'learners' as const,
+      selectedId: 'student-1',
+      evidenceId: 'evidence-1',
+      status: 'all' as const,
+      kind: 'observation' as const,
+      period: { preset: 'last-week' as const },
+    };
+    expect(
+      buildPlanningSurfaceHref({
+        returnTo: 'progress',
+        date: '2026-09-01',
+        contextId: 'context-1',
+        progressReturn,
+      }),
+    ).toBe(
+      '#/learner-progress?schoolYear=year-1&student=student-1&evidence=evidence-1&status=all&kind=observation&period=last-week',
+    );
+    expect(
+      buildSessionEditorHref({
+        planId: 'plan-1',
+        returnTo: 'progress',
+        progressReturn,
+      }),
+    ).toContain('return=progress');
   });
 });

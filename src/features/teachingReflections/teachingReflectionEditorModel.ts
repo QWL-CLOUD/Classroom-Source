@@ -1,4 +1,8 @@
 import type { TeachingReflectionRecord } from '@/domain/models/entities';
+import {
+  appendLearnerProgressReturnParams,
+  type LearnerProgressReturnState,
+} from '@/features/learnerProgress/learnerProgressNavigation';
 import type { PlanningReturnTarget } from '@/features/planning/planningNavigation';
 import {
   appendTeachingReviewReturnParams,
@@ -45,10 +49,14 @@ export function buildTeachingReflectionHref(
   sessionOccurrenceId: string,
   returnTo: PlanningReturnTarget,
   reviewReturn?: TeachingReviewReturnState,
+  progressReturn?: LearnerProgressReturnState,
 ): string {
   const params = new URLSearchParams({ session: sessionOccurrenceId });
   if (returnTo !== 'learners') params.set('return', returnTo);
   if (returnTo === 'review' && reviewReturn) appendTeachingReviewReturnParams(params, reviewReturn);
+  if (returnTo === 'progress' && progressReturn) {
+    appendLearnerProgressReturnParams(params, progressReturn);
+  }
   return `#/planning/session/reflection?${params.toString()}`;
 }
 
@@ -56,10 +64,14 @@ export function buildTeachingReflectionSessionHref(
   sessionOccurrenceId: string,
   returnTo: PlanningReturnTarget,
   reviewReturn?: TeachingReviewReturnState,
+  progressReturn?: LearnerProgressReturnState,
 ): string {
   const params = new URLSearchParams({ session: sessionOccurrenceId });
   if (returnTo !== 'learners') params.set('return', returnTo);
   if (returnTo === 'review' && reviewReturn) appendTeachingReviewReturnParams(params, reviewReturn);
+  if (returnTo === 'progress' && progressReturn) {
+    appendLearnerProgressReturnParams(params, progressReturn);
+  }
   return `#/planning/session?${params.toString()}`;
 }
 
