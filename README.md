@@ -30,6 +30,8 @@ This repository is the React + TypeScript source rebuild of Classroom. The legac
   proficiency history, and explicit source-return navigation
 - Phase 4E closeout handoff: daily-origin Session completion stays in the completed Session for
   optional Evidence/Reflection follow-up, while Review/Progress precise returns remain intact
+- Teacher Reports v1: learner-specific, teacher-internal Evidence summaries reuse the canonical
+  Learner Progress read model and support CSV download plus print without inferred judgment
 
 The current pilot includes:
 
@@ -46,6 +48,8 @@ The current pilot includes:
 - Learner Progress timelines and Evidence editing that keep Score, Proficiency, and Observation
   distinct, preserve historical source snapshots, support explicit Assessment/Standard/Session review
   filters and current-retained-roster coverage, and never infer grades or mastery
+- Teacher-internal Learner Evidence Summary reports with explicit School Year/learner/period/status/kind
+  scope, historical-source provenance, spreadsheet-safe UTF-8 CSV download, and print representation
 - Canonical Import Center for rosters, Standards, Activities, Resources, Assessments, and Calendar
   Events
 - CSV/XLSX templates and reviewed import workflows
@@ -76,6 +80,7 @@ application assets are available offline; no service worker or PWA cache is incl
 - `#/insights`
 - `#/teaching-review`
 - `#/learner-progress`
+- `#/reports`
 - `#/library`
 - `#/templates`
 - `#/standards`

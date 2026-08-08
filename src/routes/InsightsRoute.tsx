@@ -55,7 +55,7 @@ export function InsightsRoute() {
             Open System Health
           </Link>
           <Link className="button" to="/export">
-            Open Export &amp; Backup
+            Open Backup &amp; Recovery
           </Link>
         </div>
       </section>

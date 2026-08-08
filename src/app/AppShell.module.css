@@ -587,3 +587,27 @@
     padding: 26px clamp(20px, 2vw, 28px) 88px;
   }
 }
+
+@media print {
+  .shell[data-route='reports'],
+  .shell[data-route='reports'][data-sidebar-collapsed='true'] {
+    display: block;
+    min-height: 0;
+    background: #fff;
+  }
+
+  .shell[data-route='reports'] .sidebar,
+  .shell[data-route='reports'] .topbar {
+    display: none !important;
+  }
+
+  .shell[data-route='reports'] .workspace {
+    display: block;
+  }
+
+  .shell[data-route='reports'] .content {
+    max-width: none;
+    padding: 0;
+    margin: 0;
+  }
+}

@@ -27,7 +27,8 @@ export function navigationGroupForPath(pathname: string): NavigationGroupId | un
   if (
     pathname.startsWith('/insights') ||
     pathname.startsWith('/teaching-review') ||
-    pathname.startsWith('/learner-progress')
+    pathname.startsWith('/learner-progress') ||
+    pathname.startsWith('/reports')
   )
     return 'reflect';
   if (

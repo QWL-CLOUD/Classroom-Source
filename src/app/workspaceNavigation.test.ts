@@ -44,6 +44,9 @@ describe('buildShellNavigationHref', () => {
     expect(buildShellNavigationHref('/learner-progress', '?schoolYear=year-2025')).toBe(
       '/learner-progress?schoolYear=year-2025',
     );
+    expect(buildShellNavigationHref('/reports', '?schoolYear=year-2025&student=student-1')).toBe(
+      '/reports?schoolYear=year-2025',
+    );
   });
 
   it('does not append workspace context to system routes', () => {

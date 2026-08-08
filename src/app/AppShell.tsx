@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ClipboardCheck,
   Download,
+  FileText,
   HeartPulse,
   Import,
   LayoutDashboard,
@@ -78,6 +79,7 @@ const collapsibleNavigationGroups: Array<{
       { to: '/insights', label: 'Teaching Insights', icon: Sparkles },
       { to: '/teaching-review', label: 'Teaching Review', icon: ClipboardCheck },
       { to: '/learner-progress', label: 'Learner Progress', icon: Activity },
+      { to: '/reports', label: 'Reports', icon: FileText },
     ],
   },
   {
@@ -85,7 +87,7 @@ const collapsibleNavigationGroups: Array<{
     label: 'Settings & Data',
     links: [
       { to: '/import', label: 'Import Center', icon: Import },
-      { to: '/export', label: 'Export & Backup', icon: Download },
+      { to: '/export', label: 'Backup & Recovery', icon: Download },
       { to: '/settings', label: 'School Years', icon: Settings },
       { to: '/system-health', label: 'System Health', icon: HeartPulse },
     ],
@@ -127,9 +129,10 @@ function getRoutePresentation(pathname: string): { title: string; layout: Conten
   if (pathname.startsWith('/learner-progress')) {
     return { title: 'Learner Progress', layout: 'standard' };
   }
+  if (pathname.startsWith('/reports')) return { title: 'Reports', layout: 'wide' };
   if (pathname.startsWith('/import')) return { title: 'Import Center', layout: 'standard' };
   if (pathname.startsWith('/migration')) return { title: 'Migration', layout: 'reading' };
-  if (pathname.startsWith('/export')) return { title: 'Export & Backup', layout: 'reading' };
+  if (pathname.startsWith('/export')) return { title: 'Backup & Recovery', layout: 'reading' };
   if (pathname.startsWith('/settings/rollover')) {
     return { title: 'Advanced rollover', layout: 'reading' };
   }
@@ -258,7 +261,13 @@ export function AppShell() {
       </a>
       <div
         className={styles.shell}
-        data-route={location.pathname.startsWith('/learners') ? 'learners' : undefined}
+        data-route={
+          location.pathname.startsWith('/learners')
+            ? 'learners'
+            : location.pathname.startsWith('/reports')
+              ? 'reports'
+              : undefined
+        }
         data-sidebar-collapsed={sidebarCollapsed}
         data-mobile-navigation-open={mobileNavigationOpen}
       >
