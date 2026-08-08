@@ -55,6 +55,10 @@ const view: LearnerProgressView = {
     proficiencyCount: 0,
     observationCount: 0,
   },
+  assessmentOptions: [],
+  standardOptions: [],
+  sessionOptions: [],
+  schoolYearState: 'current',
 };
 
 const noop = vi.fn();
@@ -75,12 +79,18 @@ describe('LearnerProgressDashboard', () => {
         }}
         statusFilter="active"
         kindFilter="all"
+        orderFilter="newest"
         onSchoolYearChange={noop}
         onPeriodChange={noop}
         onModeChange={noop}
         onScopeChange={noop}
         onStatusFilterChange={noop}
         onKindFilterChange={noop}
+        onAssessmentFilterChange={noop}
+        onStandardFilterChange={noop}
+        onSessionFilterChange={noop}
+        onOrderFilterChange={noop}
+        onClearSourceFilters={noop}
         onEvidenceChange={noop}
       />,
     );
@@ -107,12 +117,18 @@ describe('LearnerProgressDashboard', () => {
         }}
         statusFilter="active"
         kindFilter="all"
+        orderFilter="newest"
         onSchoolYearChange={noop}
         onPeriodChange={noop}
         onModeChange={noop}
         onScopeChange={noop}
         onStatusFilterChange={noop}
         onKindFilterChange={noop}
+        onAssessmentFilterChange={noop}
+        onStandardFilterChange={noop}
+        onSessionFilterChange={noop}
+        onOrderFilterChange={noop}
+        onClearSourceFilters={noop}
         onEvidenceChange={noop}
         editorPanel={
           <section
@@ -146,12 +162,18 @@ describe('LearnerProgressDashboard', () => {
         }}
         statusFilter="all"
         kindFilter="all"
+        orderFilter="newest"
         onSchoolYearChange={noop}
         onPeriodChange={noop}
         onModeChange={noop}
         onScopeChange={noop}
         onStatusFilterChange={noop}
         onKindFilterChange={noop}
+        onAssessmentFilterChange={noop}
+        onStandardFilterChange={noop}
+        onSessionFilterChange={noop}
+        onOrderFilterChange={noop}
+        onClearSourceFilters={noop}
         onEvidenceChange={noop}
         feedbackPanel={<section role="status">Evidence saved</section>}
       />,
@@ -161,5 +183,87 @@ describe('LearnerProgressDashboard', () => {
     const detail = screen.getByRole('article', { name: 'Reading check' });
     expect(detail).toBeVisible();
     expect(detail).toHaveTextContent('3 / 4');
+  });
+
+  it('labels current retained roster coverage as a present comparison and shows keyed proficiency history without inference', () => {
+    render(
+      <LearnerProgressDashboard
+        schoolYears={[view.schoolYear]}
+        view={{
+          ...view,
+          mode: 'contexts',
+          selectedId: 'class-1',
+          scopeLabel: 'Class A',
+          rosterCoverage: {
+            status: 'available',
+            label: 'Class A · current retained roster',
+            contextCount: 1,
+            currentRetainedRosterLearnerCount: 2,
+            coveredRosterLearnerCount: 1,
+            note: 'This compares the current retained roster with recorded Evidence in the selected review scope. It is not a reconstruction of historical membership and is not a mastery or gap judgment.',
+          },
+          selectedEvidence: {
+            ...view.evidence[0]!,
+            kind: 'proficiency',
+            valueLabel: 'Developing · Reading continuum',
+            proficiency: {
+              label: 'Developing',
+              rank: 2,
+              scaleKey: 'reading',
+              scaleLabel: 'Reading continuum',
+            },
+          },
+          proficiencyHistory: {
+            scaleKey: 'reading',
+            scaleLabel: 'Reading continuum',
+            entries: [
+              {
+                id: 'evidence-p1',
+                occurredOn: '2026-07-15',
+                title: 'July proficiency',
+                label: 'Emerging',
+                status: 'active',
+              },
+              {
+                id: 'evidence-p2',
+                occurredOn: '2026-08-04',
+                title: 'August proficiency',
+                label: 'Developing',
+                status: 'active',
+              },
+            ],
+          },
+        }}
+        period={{ preset: 'school-year' }}
+        resolvedPeriod={{
+          preset: 'school-year',
+          startsOn: '2026-07-01',
+          endsOn: '2027-06-30',
+          label: 'Jul 1, 2026–Jun 30, 2027',
+          overlapsSchoolYear: true,
+        }}
+        statusFilter="active"
+        kindFilter="all"
+        orderFilter="newest"
+        onSchoolYearChange={noop}
+        onPeriodChange={noop}
+        onModeChange={noop}
+        onScopeChange={noop}
+        onStatusFilterChange={noop}
+        onKindFilterChange={noop}
+        onAssessmentFilterChange={noop}
+        onStandardFilterChange={noop}
+        onSessionFilterChange={noop}
+        onOrderFilterChange={noop}
+        onClearSourceFilters={noop}
+        onEvidenceChange={noop}
+      />,
+    );
+
+    expect(screen.getByText('Current retained roster coverage')).toBeVisible();
+    expect(screen.getByText('Class A · current retained roster')).toBeVisible();
+    expect(screen.getByText(/does not reconstruct historical membership/)).toBeVisible();
+    expect(screen.getByText('Same-scale proficiency history')).toBeVisible();
+    expect(screen.getByText(/recorded labels from the selected School Year/)).toBeVisible();
   });
 });

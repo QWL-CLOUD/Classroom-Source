@@ -29,6 +29,8 @@ export interface AssessmentEvidenceEditorDraft {
 export interface AssessmentEvidenceDraftDefaults {
   studentId?: string;
   contextId?: string;
+  sessionOccurrenceId?: string;
+  assessmentId?: string;
   standardId?: string;
   occurredOn?: string;
 }
@@ -51,8 +53,8 @@ export function createAssessmentEvidenceEditorDraft(
       kind: 'observation',
       contextId: defaults.contextId ?? '',
       lessonPlanId: '',
-      sessionOccurrenceId: '',
-      assessmentId: '',
+      sessionOccurrenceId: defaults.sessionOccurrenceId ?? '',
+      assessmentId: defaults.assessmentId ?? '',
       standardIds: defaults.standardId ? [defaults.standardId] : [],
       notes: '',
       scoreValue: '',

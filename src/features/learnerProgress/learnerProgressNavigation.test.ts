@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   appendLearnerProgressReturnParams,
+  buildLearnerProgressEntryHref,
   buildLearnerProgressHref,
   decorateLearnerProgressSourceHref,
   parseLearnerProgressReturnState,
@@ -16,12 +17,16 @@ describe('Learner Progress return navigation', () => {
       evidenceId: 'evidence-1',
       status: 'all' as const,
       kind: 'score' as const,
+      assessmentId: 'assessment-1',
+      standardFilterId: 'standard-filter-1',
+      sessionId: 'session-1',
+      order: 'oldest' as const,
       period: { preset: 'custom' as const, from: '2026-08-01', to: '2026-08-07' },
     };
     const source = appendLearnerProgressReturnParams(new URLSearchParams(), state);
     expect(parseLearnerProgressReturnState(source)).toMatchObject(state);
     expect(buildLearnerProgressHref(state)).toBe(
-      '#/learner-progress?schoolYear=year-1&view=standards&standard=standard-1&evidence=evidence-1&status=all&kind=score&period=custom&from=2026-08-01&to=2026-08-07',
+      '#/learner-progress?schoolYear=year-1&view=standards&standard=standard-1&evidence=evidence-1&status=all&kind=score&assessment=assessment-1&standardFilter=standard-filter-1&session=session-1&order=oldest&period=custom&from=2026-08-01&to=2026-08-07',
     );
   });
 
@@ -64,5 +69,34 @@ describe('Learner Progress return navigation', () => {
 
   it('ignores non-progress return contracts', () => {
     expect(parseLearnerProgressReturnState(new URLSearchParams('return=review'))).toBeNull();
+  });
+
+  it('builds concise entry links for Student, Context, Standard, Assessment, and Session review', () => {
+    expect(
+      buildLearnerProgressEntryHref({
+        schoolYearId: 'year-1',
+        mode: 'learners',
+        selectedId: 'student-1',
+      }),
+    ).toBe('#/learner-progress?schoolYear=year-1&student=student-1');
+    expect(
+      buildLearnerProgressEntryHref({
+        schoolYearId: 'year-1',
+        mode: 'contexts',
+        selectedId: 'context-1',
+      }),
+    ).toBe('#/learner-progress?schoolYear=year-1&view=contexts&context=context-1');
+    expect(
+      buildLearnerProgressEntryHref({
+        mode: 'standards',
+        selectedId: 'standard-1',
+      }),
+    ).toBe('#/learner-progress?view=standards&standard=standard-1');
+    expect(buildLearnerProgressEntryHref({ assessmentId: 'assessment-1' })).toBe(
+      '#/learner-progress?assessment=assessment-1',
+    );
+    expect(buildLearnerProgressEntryHref({ schoolYearId: 'year-1', sessionId: 'session-1' })).toBe(
+      '#/learner-progress?schoolYear=year-1&session=session-1',
+    );
   });
 });

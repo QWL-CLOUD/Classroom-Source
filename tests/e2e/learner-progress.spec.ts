@@ -13,6 +13,15 @@ const records = {
       active: true,
       lifecycleState: 'active',
     },
+    {
+      id: 'progress-history-year',
+      label: 'Progress 2024–2025',
+      startsOn: '2024-07-01',
+      endsOn: '2025-06-30',
+      active: false,
+      lifecycleState: 'archived',
+      archivedAt: timestamp,
+    },
   ],
   studentRecords: [
     {
@@ -37,6 +46,33 @@ const records = {
       name: 'Grade 4 Reading',
       schoolYearId: 'progress-year',
       status: 'active',
+    },
+    {
+      id: 'progress-history-class',
+      kind: 'class',
+      name: 'Historical Reading',
+      schoolYearId: 'progress-history-year',
+      status: 'archived',
+    },
+  ],
+  rosterMemberships: [
+    {
+      id: 'progress-membership-alice',
+      contextId: 'progress-class',
+      studentId: 'progress-alice',
+      createdAt: timestamp,
+    },
+    {
+      id: 'progress-membership-ben',
+      contextId: 'progress-class',
+      studentId: 'progress-ben',
+      createdAt: timestamp,
+    },
+    {
+      id: 'progress-history-membership-alice',
+      contextId: 'progress-history-class',
+      studentId: 'progress-alice',
+      createdAt: timestamp,
     },
   ],
   standards: [
@@ -146,6 +182,20 @@ const records = {
       standardIds: [],
       status: 'archived',
       archivedAt: timestamp,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+    {
+      id: 'progress-history-score',
+      studentId: 'progress-alice',
+      schoolYearId: 'progress-history-year',
+      occurredOn: '2025-05-15',
+      title: 'Historical reading check',
+      kind: 'score',
+      score: { value: 2, maximum: 4 },
+      contextId: 'progress-history-class',
+      standardIds: [],
+      status: 'active',
       createdAt: timestamp,
       updatedAt: timestamp,
     },
@@ -286,7 +336,7 @@ test('Learner Progress creates, edits, archives, restores, and returns from exac
   await page.getByLabel('Lesson Plan · optional').selectOption('progress-plan');
   await page.getByLabel('Session · optional').selectOption('progress-session');
   await page.getByLabel('Library Assessment · optional').selectOption('progress-assessment');
-  await page.getByLabel('Linked Standards').selectOption('progress-standard');
+  await page.getByLabel('Linked Standards', { exact: true }).selectOption('progress-standard');
   await page.getByLabel('Teacher observation').fill('Explained the strategy with text evidence.');
   await page.getByRole('button', { name: 'Add Evidence' }).last().click();
 
@@ -332,4 +382,124 @@ test('Learner Progress creates, edits, archives, restores, and returns from exac
   await expect(page.getByRole('link', { name: 'Back to Learner Progress' })).toBeVisible();
   await page.getByRole('link', { name: 'Back to Learner Progress' }).click();
   await expect(page.getByRole('article', { name: 'Teacher conference observation' })).toBeVisible();
+});
+
+test('Learner Progress reviews current retained roster coverage and explicit source filters without claiming a gap', async ({
+  page,
+}) => {
+  await seedLearnerProgress(page);
+
+  await page.getByRole('button', { name: 'Contexts', exact: true }).click();
+  const scopePanel = page.getByRole('complementary', { name: 'Select a source scope' });
+  await scopePanel.getByRole('button', { name: /Grade 4 Reading/ }).click();
+
+  const coverage = page.getByRole('region', { name: 'Grade 4 Reading · current retained roster' });
+  await expect(coverage.getByText('Current retained roster learners')).toBeVisible();
+  await expect(coverage.getByText('2', { exact: true })).toBeVisible();
+  await expect(coverage.getByText(/historical membership/)).toBeVisible();
+  await expect(coverage.getByText(/not a mastery or gap judgment/)).toBeVisible();
+  await expect(coverage).not.toContainText('behind');
+  await expect(coverage).not.toContainText('needs Evidence');
+
+  await scopePanel.getByRole('button', { name: /All contexts/ }).click();
+  await expect(page.getByText('Reading check score')).toBeVisible();
+  await expect(page.getByText('Vocabulary conference')).toBeVisible();
+
+  await page.getByLabel('Library Assessment', { exact: true }).selectOption('progress-assessment');
+  await expect(page.getByText('Reading check score')).toBeVisible();
+  await expect(page.getByText('Vocabulary conference')).toHaveCount(0);
+  await expect(page).toHaveURL(/assessment=progress-assessment/);
+
+  await page.getByRole('button', { name: 'Clear source filters' }).click();
+  await page.getByLabel('Linked Standard', { exact: true }).selectOption('progress-standard');
+  await expect(page.getByText('Reading check score')).toBeVisible();
+  await expect(page.getByText('Vocabulary conference')).toHaveCount(0);
+  await expect(page).toHaveURL(/standardFilter=progress-standard/);
+
+  await page.getByRole('button', { name: 'Clear source filters' }).click();
+  await page.getByLabel('Session source', { exact: true }).selectOption('progress-session');
+  await expect(page.getByText('Reading check score')).toBeVisible();
+  await expect(page.getByText('Vocabulary conference')).toHaveCount(0);
+  await expect(page).toHaveURL(/session=progress-session/);
+
+  await page.getByRole('button', { name: 'Clear source filters' }).click();
+  await page.getByRole('button', { name: 'Learners', exact: true }).click();
+  await page.getByLabel('Timeline order', { exact: true }).selectOption('oldest');
+  const evidenceButtons = page
+    .getByRole('region', { name: 'Evidence timeline' })
+    .getByRole('button');
+  await expect(evidenceButtons.first()).toContainText('Vocabulary conference');
+  await expect(page).toHaveURL(/order=oldest/);
+});
+
+test('Learner Progress keeps historical School Years explicit without reconstructing past roster membership', async ({
+  page,
+}) => {
+  await seedLearnerProgress(page);
+
+  await page.getByLabel('Library Assessment', { exact: true }).selectOption('progress-assessment');
+  await expect(page).toHaveURL(/assessment=progress-assessment/);
+  await page.getByLabel('School Year', { exact: true }).selectOption('progress-history-year');
+  await expect(page).toHaveURL(/schoolYear=progress-history-year/);
+  await expect(page).not.toHaveURL(/assessment=progress-assessment/);
+  await expect(page.getByText('Historical reading check')).toBeVisible();
+  await expect(page.getByText(/Historical School Year selected/)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Contexts', exact: true }).click();
+  const scopePanel = page.getByRole('complementary', { name: 'Select a source scope' });
+  await scopePanel.getByRole('button', { name: /Historical Reading/ }).click();
+  const coverage = page.getByRole('region', {
+    name: 'Current retained roster coverage unavailable',
+  });
+  await expect(coverage.getByText(/does not reconstruct past roster membership/)).toBeVisible();
+  await expect(coverage).not.toContainText('Current retained roster learners');
+});
+
+test('Learner, Context, Standard, Assessment, Session, and Reflection sources expose Learner Progress entry points', async ({
+  page,
+}) => {
+  await seedLearnerProgress(page);
+
+  await page.goto(
+    './#/learners?directory=students&student=progress-alice&schoolYear=progress-year',
+  );
+  const studentProfile = page.getByRole('region', { name: 'Student profile for Alice Chen' });
+  await expect(studentProfile.getByRole('link', { name: 'Learner Progress' })).toHaveAttribute(
+    'href',
+    /learner-progress\?schoolYear=progress-year&student=progress-alice/,
+  );
+
+  await page.goto(
+    './#/learners?schoolYear=progress-year&context=progress-class&workspace=planning',
+  );
+  const contextWorkspace = page.getByRole('region', { name: 'Planning for Grade 4 Reading' });
+  await expect(contextWorkspace.getByRole('link', { name: 'Learner Progress' })).toHaveAttribute(
+    'href',
+    /learner-progress\?schoolYear=progress-year&view=contexts&context=progress-class/,
+  );
+
+  await page.goto('./#/standards?standard=progress-standard');
+  await expect(
+    page
+      .getByRole('article', { name: /ELA\.4\.R\.1 Standard details/ })
+      .getByRole('link', { name: 'Learner Progress' }),
+  ).toHaveAttribute('href', /learner-progress\?view=standards&standard=progress-standard/);
+
+  await page.goto('./#/library?item=progress-assessment');
+  await expect(page.getByRole('link', { name: 'Learner Progress' }).last()).toHaveAttribute(
+    'href',
+    /learner-progress\?assessment=progress-assessment/,
+  );
+
+  await page.goto('./#/planning/session?session=progress-session');
+  await expect(page.getByRole('link', { name: 'Session Evidence' })).toHaveAttribute(
+    'href',
+    /learner-progress\?schoolYear=progress-year&session=progress-session/,
+  );
+
+  await page.goto('./#/planning/session/reflection?session=progress-session');
+  await expect(page.getByRole('link', { name: 'Session Evidence' })).toHaveAttribute(
+    'href',
+    /learner-progress\?schoolYear=progress-year&session=progress-session/,
+  );
 });

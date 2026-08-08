@@ -1,4 +1,5 @@
 import {
+  Activity,
   Archive,
   BookOpen,
   Boxes,
@@ -32,6 +33,7 @@ import {
   type LibraryClassificationSelections,
 } from '@/features/libraryCatalog/libraryClassificationFacets';
 import { buildImportCenterHref } from '@/features/importCenter/importRouteState';
+import { buildLearnerProgressEntryHref } from '@/features/learnerProgress/learnerProgressNavigation';
 import { preserveTeachingReviewReturnParams } from '@/features/teachingReview/teachingReviewNavigation';
 import { libraryCatalogMutationService } from '@/features/libraryCatalog/libraryCatalogMutationService';
 import {
@@ -481,6 +483,11 @@ export function LibraryRoute() {
             <LibraryItemDetail
               item={selected}
               busy={busy}
+              progressHref={
+                selected.catalogType === 'assessment'
+                  ? buildLearnerProgressEntryHref({ assessmentId: selected.id })
+                  : undefined
+              }
               onEdit={() => setEditing(true)}
               onArchive={() => void run(() => libraryCatalogMutationService.archive(selected.id))}
               onRestore={() => void run(() => libraryCatalogMutationService.restore(selected.id))}
@@ -495,12 +502,14 @@ export function LibraryRoute() {
 function LibraryItemDetail({
   item,
   busy,
+  progressHref,
   onEdit,
   onArchive,
   onRestore,
 }: {
   item: LibraryCatalogItemView;
   busy: boolean;
+  progressHref?: string;
   onEdit: () => void;
   onArchive: () => void;
   onRestore: () => void;
@@ -521,6 +530,11 @@ function LibraryItemDetail({
           <h2>{item.title}</h2>
         </div>
         <div className={styles.actions}>
+          {progressHref ? (
+            <a className="button" href={progressHref}>
+              <Activity size={16} aria-hidden="true" /> Learner Progress
+            </a>
+          ) : null}
           <button className="button" type="button" disabled={busy} onClick={onEdit}>
             <Pencil size={16} aria-hidden="true" /> Edit
           </button>

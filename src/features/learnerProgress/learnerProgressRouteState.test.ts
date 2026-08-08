@@ -4,6 +4,7 @@ import {
   appendLearnerProgressEditor,
   appendLearnerProgressFilters,
   appendLearnerProgressMode,
+  appendLearnerProgressSourceFilters,
   parseLearnerProgressRouteState,
 } from './learnerProgressRouteState';
 
@@ -15,6 +16,10 @@ describe('Learner Progress route state', () => {
       evidenceId: undefined,
       status: 'active',
       kind: 'all',
+      assessmentId: undefined,
+      standardFilterId: undefined,
+      sessionId: undefined,
+      order: 'newest',
       editor: null,
     });
   });
@@ -23,7 +28,7 @@ describe('Learner Progress route state', () => {
     expect(
       parseLearnerProgressRouteState(
         new URLSearchParams(
-          'view=contexts&student=student-1&context=group-1&standard=standard-1&evidence=evidence-1&status=all&kind=observation',
+          'view=contexts&student=student-1&context=group-1&standard=standard-1&evidence=evidence-1&status=all&kind=observation&assessment=assessment-1&standardFilter=standard-2&session=session-1&order=oldest',
         ),
       ),
     ).toEqual({
@@ -32,6 +37,10 @@ describe('Learner Progress route state', () => {
       evidenceId: 'evidence-1',
       status: 'all',
       kind: 'observation',
+      assessmentId: 'assessment-1',
+      standardFilterId: 'standard-2',
+      sessionId: 'session-1',
+      order: 'oldest',
       editor: null,
     });
   });
@@ -53,6 +62,22 @@ describe('Learner Progress route state', () => {
   it('keeps default filters out of the URL', () => {
     const params = new URLSearchParams('status=archived&kind=score');
     appendLearnerProgressFilters(params, 'active', 'all');
+    expect(params.toString()).toBe('');
+  });
+
+  it('stores optional Assessment, Standard, Session, and timeline-order filters compactly', () => {
+    const params = new URLSearchParams();
+    appendLearnerProgressSourceFilters(params, {
+      assessmentId: 'assessment-1',
+      standardFilterId: 'standard-1',
+      sessionId: 'session-1',
+      order: 'oldest',
+    });
+    expect(params.toString()).toBe(
+      'assessment=assessment-1&standardFilter=standard-1&session=session-1&order=oldest',
+    );
+
+    appendLearnerProgressSourceFilters(params, { order: 'newest' });
     expect(params.toString()).toBe('');
   });
 });

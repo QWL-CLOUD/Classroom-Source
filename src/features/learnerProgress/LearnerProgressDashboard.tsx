@@ -7,6 +7,7 @@ import type {
   LearnerProgressEvidenceItem,
   LearnerProgressKindFilter,
   LearnerProgressMode,
+  LearnerProgressOrder,
   LearnerProgressSource,
   LearnerProgressStatusFilter,
   LearnerProgressView,
@@ -25,12 +26,21 @@ interface LearnerProgressDashboardProps {
   resolvedPeriod: LearnerProgressResolvedPeriod;
   statusFilter: LearnerProgressStatusFilter;
   kindFilter: LearnerProgressKindFilter;
+  assessmentFilterId?: string;
+  standardFilterId?: string;
+  sessionFilterId?: string;
+  orderFilter: LearnerProgressOrder;
   onSchoolYearChange: (schoolYearId: string) => void;
   onPeriodChange: (period: LearnerProgressPeriodState) => void;
   onModeChange: (mode: LearnerProgressMode) => void;
   onScopeChange: (id?: string) => void;
   onStatusFilterChange: (status: LearnerProgressStatusFilter) => void;
   onKindFilterChange: (kind: LearnerProgressKindFilter) => void;
+  onAssessmentFilterChange: (id?: string) => void;
+  onStandardFilterChange: (id?: string) => void;
+  onSessionFilterChange: (id?: string) => void;
+  onOrderFilterChange: (order: LearnerProgressOrder) => void;
+  onClearSourceFilters: () => void;
   onEvidenceChange: (id?: string) => void;
   onCreateEvidence?: () => void;
   onEditEvidence?: (id: string) => void;
@@ -129,6 +139,7 @@ function EvidenceDetail({
   onArchive,
   onRestore,
   decorateSourceHref,
+  proficiencyHistory,
 }: {
   item: LearnerProgressEvidenceItem;
   onClose: () => void;
@@ -136,6 +147,7 @@ function EvidenceDetail({
   onArchive?: () => void;
   onRestore?: () => void;
   decorateSourceHref?: (href: string) => string;
+  proficiencyHistory?: LearnerProgressView['proficiencyHistory'];
 }) {
   return (
     <article
@@ -241,6 +253,36 @@ function EvidenceDetail({
         </div>
       </dl>
 
+      {proficiencyHistory ? (
+        <section
+          className={styles.proficiencyHistory}
+          aria-labelledby={`evidence-proficiency-history-${item.id}`}
+        >
+          <div>
+            <h3 id={`evidence-proficiency-history-${item.id}`}>Same-scale proficiency history</h3>
+            <p>
+              {proficiencyHistory.scaleLabel ?? proficiencyHistory.scaleKey} · recorded labels from
+              the selected School Year, including archived records. Classroom does not convert these
+              records into mastery or growth.
+            </p>
+          </div>
+          <ol>
+            {proficiencyHistory.entries.map((entry) => (
+              <li key={entry.id}>
+                <span>
+                  <strong>{entry.label}</strong>
+                  <small>{formatShortDate(entry.occurredOn)}</small>
+                </span>
+                <span>
+                  {entry.title}
+                  {entry.status === 'archived' ? ' · Archived' : ''}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
+
       <section className={styles.standards} aria-labelledby={`evidence-standards-${item.id}`}>
         <h3 id={`evidence-standards-${item.id}`}>Standards</h3>
         {item.standards.length === 0 ? (
@@ -266,12 +308,21 @@ export function LearnerProgressDashboard({
   resolvedPeriod,
   statusFilter,
   kindFilter,
+  assessmentFilterId,
+  standardFilterId,
+  sessionFilterId,
+  orderFilter,
   onSchoolYearChange,
   onPeriodChange,
   onModeChange,
   onScopeChange,
   onStatusFilterChange,
   onKindFilterChange,
+  onAssessmentFilterChange,
+  onStandardFilterChange,
+  onSessionFilterChange,
+  onOrderFilterChange,
+  onClearSourceFilters,
   onEvidenceChange,
   onCreateEvidence,
   onEditEvidence,
@@ -353,6 +404,7 @@ export function LearnerProgressDashboard({
 
   const customRangeInvalid =
     !parseLocalDate(customFrom) || !parseLocalDate(customTo) || customFrom > customTo;
+  const sourceFiltersActive = Boolean(assessmentFilterId || standardFilterId || sessionFilterId);
 
   return (
     <section className={styles.page} aria-labelledby="learner-progress-heading">
@@ -412,11 +464,25 @@ export function LearnerProgressDashboard({
           <p className={styles.kicker}>Learner Progress contract v{view.contractVersion}</p>
           <h2 id="learner-progress-contract">Recorded Evidence, not a mastery judgment</h2>
         </div>
-        <p>
-          Score, Proficiency, and Observation records stay structurally distinct. Counts mean
-          recorded Evidence only. No Evidence in this scope does not mean failure, and Classroom
-          does not infer grades, mastery, readiness, growth scores, or learner rank.
-        </p>
+        <div className={styles.contractCopy}>
+          <p>
+            Score, Proficiency, and Observation records stay structurally distinct. Counts mean
+            recorded Evidence only. No Evidence in this scope does not mean failure, and Classroom
+            does not infer grades, mastery, readiness, growth scores, or learner rank.
+          </p>
+          {view.schoolYearState === 'historical' ? (
+            <p className={styles.historicalNote} role="note">
+              Historical School Year selected. Recorded Evidence remains reviewable, but current
+              retained roster coverage is unavailable because Classroom does not reconstruct past
+              membership.
+            </p>
+          ) : view.schoolYearState === 'future' ? (
+            <p className={styles.historicalNote} role="note">
+              Future School Year selected. Recorded Evidence may be empty until teaching records are
+              added.
+            </p>
+          ) : null}
+        </div>
         <dl>
           <div>
             <dt>School Year</dt>
@@ -453,7 +519,12 @@ export function LearnerProgressDashboard({
         <div className={styles.filterGrid}>
           <label>
             Period
-            <select className="select" value={period.preset} onChange={handlePeriodPresetChange}>
+            <select
+              aria-label="Period"
+              className="select"
+              value={period.preset}
+              onChange={handlePeriodPresetChange}
+            >
               {Object.entries(periodLabels).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
@@ -464,6 +535,7 @@ export function LearnerProgressDashboard({
           <label>
             Lifecycle
             <select
+              aria-label="Lifecycle"
               className="select"
               value={statusFilter}
               onChange={(event) =>
@@ -478,6 +550,7 @@ export function LearnerProgressDashboard({
           <label>
             Evidence kind
             <select
+              aria-label="Evidence kind"
               className="select"
               value={kindFilter}
               onChange={(event) =>
@@ -491,6 +564,95 @@ export function LearnerProgressDashboard({
               ))}
             </select>
           </label>
+          <label>
+            Library Assessment
+            <select
+              aria-label="Library Assessment"
+              className="select"
+              value={assessmentFilterId ?? ''}
+              onChange={(event) => onAssessmentFilterChange(event.currentTarget.value || undefined)}
+            >
+              <option value="">All Assessments</option>
+              {view.assessmentOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                  {option.sourceStatus === 'archived'
+                    ? ' · Archived'
+                    : option.sourceStatus === 'snapshot'
+                      ? ' · Historical'
+                      : option.sourceStatus === 'unavailable'
+                        ? ' · Unavailable'
+                        : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Linked Standard
+            <select
+              aria-label="Linked Standard"
+              className="select"
+              value={standardFilterId ?? ''}
+              onChange={(event) => onStandardFilterChange(event.currentTarget.value || undefined)}
+            >
+              <option value="">All linked Standards</option>
+              {view.standardOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                  {option.sourceStatus === 'archived'
+                    ? ' · Archived'
+                    : option.sourceStatus === 'snapshot'
+                      ? ' · Historical'
+                      : option.sourceStatus === 'unavailable'
+                        ? ' · Unavailable'
+                        : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Session source
+            <select
+              aria-label="Session source"
+              className="select"
+              value={sessionFilterId ?? ''}
+              onChange={(event) => onSessionFilterChange(event.currentTarget.value || undefined)}
+            >
+              <option value="">All Sessions</option>
+              {view.sessionOptions.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                  {option.sourceStatus === 'snapshot'
+                    ? ' · Historical'
+                    : option.sourceStatus === 'unavailable'
+                      ? ' · Unavailable'
+                      : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Timeline order
+            <select
+              aria-label="Timeline order"
+              className="select"
+              value={orderFilter}
+              onChange={(event) =>
+                onOrderFilterChange(event.currentTarget.value as LearnerProgressOrder)
+              }
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+            </select>
+          </label>
+          <button
+            className="button button-quiet"
+            type="button"
+            disabled={!sourceFiltersActive}
+            onClick={onClearSourceFilters}
+          >
+            Clear source filters
+          </button>
         </div>
         {period.preset === 'custom' ? (
           <form className={styles.customRange} onSubmit={applyCustomPeriod}>
@@ -611,6 +773,41 @@ export function LearnerProgressDashboard({
             </div>
           </section>
 
+          {view.rosterCoverage ? (
+            <section
+              className={`card ${styles.coverage}`}
+              aria-labelledby="learner-progress-roster-coverage"
+            >
+              <header>
+                <p className={styles.kicker}>Current retained roster coverage</p>
+                <h2 id="learner-progress-roster-coverage">{view.rosterCoverage.label}</h2>
+              </header>
+              {view.rosterCoverage.status === 'available' ? (
+                <dl>
+                  <div>
+                    <dt>Current retained roster learners</dt>
+                    <dd>{view.rosterCoverage.currentRetainedRosterLearnerCount}</dd>
+                  </div>
+                  <div>
+                    <dt>Roster learners represented by Evidence</dt>
+                    <dd>{view.rosterCoverage.coveredRosterLearnerCount}</dd>
+                  </div>
+                  <div>
+                    <dt>Class / Group contexts</dt>
+                    <dd>{view.rosterCoverage.contextCount}</dd>
+                  </div>
+                </dl>
+              ) : (
+                <p className={styles.coverageUnavailable}>
+                  {view.rosterCoverage.status === 'not-applicable'
+                    ? 'Roster coverage is not applicable to this context.'
+                    : 'Roster coverage is unavailable for this historical or archived scope.'}
+                </p>
+              )}
+              <p>{view.rosterCoverage.note}</p>
+            </section>
+          ) : null}
+
           {feedbackPanel}
 
           <div
@@ -624,14 +821,18 @@ export function LearnerProgressDashboard({
             >
               <header>
                 <h2 id="learner-progress-timeline">Evidence timeline</h2>
-                <p>Newest recorded Evidence appears first.</p>
+                <p>
+                  {orderFilter === 'oldest'
+                    ? 'Oldest recorded Evidence appears first.'
+                    : 'Newest recorded Evidence appears first.'}
+                </p>
               </header>
               {view.evidence.length === 0 ? (
                 <div className={styles.emptyState} role="status">
                   <strong>No recorded Evidence in this scope.</strong>
                   <span>
-                    Change the learner/source, period, lifecycle, or Evidence kind to review another
-                    scope.
+                    Change the learner/source, period, lifecycle, Evidence kind, or source filters
+                    to review another scope.
                   </span>
                 </div>
               ) : (
@@ -671,6 +872,7 @@ export function LearnerProgressDashboard({
                       : undefined
                   }
                   decorateSourceHref={decorateSourceHref}
+                  proficiencyHistory={view.proficiencyHistory}
                 />
               </div>
             ) : null}

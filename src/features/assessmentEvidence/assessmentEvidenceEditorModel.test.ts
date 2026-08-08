@@ -13,12 +13,16 @@ describe('Assessment Evidence editor model', () => {
       createAssessmentEvidenceEditorDraft(schoolYear, undefined, {
         studentId: 'student-1',
         contextId: 'context-1',
+        sessionOccurrenceId: 'session-1',
+        assessmentId: 'assessment-1',
         standardId: 'standard-1',
         occurredOn: '2026-09-01',
       }),
     ).toMatchObject({
       studentId: 'student-1',
       contextId: 'context-1',
+      sessionOccurrenceId: 'session-1',
+      assessmentId: 'assessment-1',
       standardIds: ['standard-1'],
       occurredOn: '2026-09-01',
       kind: 'observation',

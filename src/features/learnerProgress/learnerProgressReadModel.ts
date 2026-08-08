@@ -1,10 +1,12 @@
 import type {
   AssessmentEvidenceKind,
+  AssessmentEvidenceProficiency,
   AssessmentEvidenceRecord,
   AssessmentEvidenceStatus,
   LearnerContext,
   LessonPlan,
   LibraryCatalogItem,
+  RosterMembership,
   SchoolYear,
   SessionOccurrence,
   Standard,
@@ -35,7 +37,10 @@ export interface LearnerProgressSnapshot {
   lessonPlans: readonly LessonPlan[];
   sessions: readonly SessionOccurrence[];
   libraryItems: readonly LibraryCatalogItem[];
+  rosterMemberships: readonly RosterMembership[];
 }
+
+export type LearnerProgressOrder = 'newest' | 'oldest';
 
 export interface LearnerProgressFilters {
   mode: LearnerProgressMode;
@@ -43,6 +48,10 @@ export interface LearnerProgressFilters {
   evidenceId?: string;
   status: LearnerProgressStatusFilter;
   kind: LearnerProgressKindFilter;
+  assessmentId?: string;
+  standardFilterId?: string;
+  sessionId?: string;
+  order: LearnerProgressOrder;
   period: LearnerProgressResolvedPeriod;
 }
 
@@ -66,6 +75,7 @@ export interface LearnerProgressEvidenceItem {
   status: AssessmentEvidenceStatus;
   valueLabel: string;
   observationText?: string;
+  proficiency?: AssessmentEvidenceProficiency;
   notes?: string;
   student: LearnerProgressSource;
   context?: LearnerProgressSource;
@@ -91,6 +101,35 @@ export interface LearnerProgressSummary {
   observationCount: number;
 }
 
+export interface LearnerProgressFilterOption {
+  id: string;
+  label: string;
+  sourceStatus: LearnerProgressSourceStatus;
+}
+
+export interface LearnerProgressRosterCoverage {
+  status: 'available' | 'not-applicable' | 'unavailable';
+  label: string;
+  contextCount: number;
+  currentRetainedRosterLearnerCount: number;
+  coveredRosterLearnerCount: number;
+  note: string;
+}
+
+export interface LearnerProgressProficiencyHistoryEntry {
+  id: string;
+  occurredOn: string;
+  title: string;
+  label: string;
+  status: AssessmentEvidenceStatus;
+}
+
+export interface LearnerProgressProficiencyHistory {
+  scaleKey: string;
+  scaleLabel?: string;
+  entries: LearnerProgressProficiencyHistoryEntry[];
+}
+
 export interface LearnerProgressView {
   contractVersion: typeof LEARNER_PROGRESS_CONTRACT_VERSION;
   schoolYear: SchoolYear;
@@ -103,6 +142,12 @@ export interface LearnerProgressView {
   evidence: LearnerProgressEvidenceItem[];
   selectedEvidence?: LearnerProgressEvidenceItem;
   summary: LearnerProgressSummary;
+  assessmentOptions: LearnerProgressFilterOption[];
+  standardOptions: LearnerProgressFilterOption[];
+  sessionOptions: LearnerProgressFilterOption[];
+  rosterCoverage?: LearnerProgressRosterCoverage;
+  proficiencyHistory?: LearnerProgressProficiencyHistory;
+  schoolYearState: 'future' | 'current' | 'historical';
 }
 
 function studentLabel(student: StudentRecord): string {
@@ -318,6 +363,7 @@ function buildEvidenceItems(snapshot: LearnerProgressSnapshot): LearnerProgressE
         status: record.status,
         valueLabel: evidenceValueLabel(record),
         observationText: record.kind === 'observation' ? record.observation.text : undefined,
+        proficiency: record.kind === 'proficiency' ? record.proficiency : undefined,
         notes: record.notes,
         student,
         context,
@@ -338,6 +384,14 @@ function globallyFilteredEvidence(
     if (!dateInsideLearnerProgressPeriod(item.occurredOn, filters.period)) return false;
     if (filters.status !== 'all' && item.status !== filters.status) return false;
     if (filters.kind !== 'all' && item.kind !== filters.kind) return false;
+    if (filters.assessmentId && item.assessment?.entityId !== filters.assessmentId) return false;
+    if (filters.sessionId && item.session?.entityId !== filters.sessionId) return false;
+    if (
+      filters.standardFilterId &&
+      !item.standards.some((standard) => standard.entityId === filters.standardFilterId)
+    ) {
+      return false;
+    }
     return true;
   });
 }
@@ -365,6 +419,14 @@ function scopeFilteredEvidence(
   return items.filter((item) =>
     item.standards.some((standard) => standard.entityId === filters.selectedId),
   );
+}
+
+function orderedEvidence(
+  items: readonly LearnerProgressEvidenceItem[],
+  order: LearnerProgressOrder,
+): LearnerProgressEvidenceItem[] {
+  const sorted = [...items].sort(compareEvidence);
+  return order === 'oldest' ? sorted.reverse() : sorted;
 }
 
 function countBy(
@@ -516,6 +578,176 @@ function summary(items: readonly LearnerProgressEvidenceItem[]): LearnerProgress
   };
 }
 
+function filterOptions(
+  sources: readonly (LearnerProgressSource | undefined)[],
+): LearnerProgressFilterOption[] {
+  const values = new Map<string, LearnerProgressFilterOption>();
+  for (const source of sources) {
+    if (!source?.entityId) continue;
+    const existing = values.get(source.entityId);
+    if (existing) {
+      if (existing.sourceStatus !== 'current' && source.status === 'current') {
+        values.set(source.entityId, {
+          id: source.entityId,
+          label: source.label,
+          sourceStatus: source.status,
+        });
+      }
+      continue;
+    }
+    values.set(source.entityId, {
+      id: source.entityId,
+      label: source.label,
+      sourceStatus: source.status,
+    });
+  }
+  return [...values.values()].sort(
+    (first, second) =>
+      first.label.localeCompare(second.label, 'en', { numeric: true, sensitivity: 'base' }) ||
+      first.id.localeCompare(second.id),
+  );
+}
+
+function standardFilterOptions(
+  items: readonly LearnerProgressEvidenceItem[],
+): LearnerProgressFilterOption[] {
+  return filterOptions(items.flatMap((item) => item.standards));
+}
+
+function schoolYearState(
+  snapshot: LearnerProgressSnapshot,
+): LearnerProgressView['schoolYearState'] {
+  if (
+    snapshot.schoolYear.lifecycleState === 'archived' ||
+    snapshot.asOfDate > snapshot.schoolYear.endsOn
+  ) {
+    return 'historical';
+  }
+  if (snapshot.asOfDate < snapshot.schoolYear.startsOn) return 'future';
+  return 'current';
+}
+
+function buildRosterCoverage(
+  snapshot: LearnerProgressSnapshot,
+  filters: LearnerProgressFilters,
+  evidence: readonly LearnerProgressEvidenceItem[],
+): LearnerProgressRosterCoverage | undefined {
+  if (filters.mode !== 'contexts') return undefined;
+
+  const currentContexts = snapshot.contexts.filter(
+    (context) => context.schoolYearId === snapshot.schoolYear.id,
+  );
+  const studentIds = new Set(snapshot.students.map((student) => student.id));
+
+  let relevantContexts = currentContexts.filter(
+    (context) => context.kind === 'class' || context.kind === 'group',
+  );
+  let label = 'All current Class and Group rosters';
+
+  if (filters.selectedId) {
+    const selected = currentContexts.find((context) => context.id === filters.selectedId);
+    if (!selected || selected.status === 'archived') {
+      return {
+        status: 'unavailable',
+        label: 'Current retained roster coverage unavailable',
+        contextCount: 0,
+        currentRetainedRosterLearnerCount: 0,
+        coveredRosterLearnerCount: 0,
+        note: 'This Context is historical, archived, or unavailable. Classroom does not reconstruct past roster membership from retained roster links.',
+      };
+    }
+    if (selected.kind === 'individual') {
+      return {
+        status: 'not-applicable',
+        label: 'Current retained roster coverage not applicable',
+        contextCount: 0,
+        currentRetainedRosterLearnerCount: 0,
+        coveredRosterLearnerCount: 0,
+        note: 'Individual is a one-on-one planning context, not a roster. Evidence remains linked through the canonical Student record and explicit source links.',
+      };
+    }
+    relevantContexts = [selected];
+    label = `${selected.name} · current retained roster`;
+  } else {
+    relevantContexts = relevantContexts.filter((context) => context.status === 'active');
+  }
+
+  if (schoolYearState(snapshot) === 'historical') {
+    return {
+      status: 'unavailable',
+      label: 'Current retained roster coverage unavailable',
+      contextCount: 0,
+      currentRetainedRosterLearnerCount: 0,
+      coveredRosterLearnerCount: 0,
+      note: 'A historical School Year does not provide a trustworthy current-roster denominator. Classroom keeps recorded Evidence readable without reconstructing past membership.',
+    };
+  }
+
+  const contextIds = new Set(relevantContexts.map((context) => context.id));
+  const retainedRosterLearnerIds = new Set(
+    snapshot.rosterMemberships
+      .filter(
+        (membership) =>
+          contextIds.has(membership.contextId) && studentIds.has(membership.studentId),
+      )
+      .map((membership) => membership.studentId),
+  );
+  const evidenceLearnerIds = new Set(
+    evidence
+      .filter((item) => item.context?.entityId && contextIds.has(item.context.entityId))
+      .map((item) => item.studentId),
+  );
+  const coveredRosterLearnerCount = [...retainedRosterLearnerIds].filter((studentId) =>
+    evidenceLearnerIds.has(studentId),
+  ).length;
+
+  return {
+    status: 'available',
+    label,
+    contextCount: relevantContexts.length,
+    currentRetainedRosterLearnerCount: retainedRosterLearnerIds.size,
+    coveredRosterLearnerCount,
+    note: 'This compares the current retained roster with recorded Evidence in the selected review scope. It is not a reconstruction of historical membership and is not a mastery or gap judgment.',
+  };
+}
+
+function buildProficiencyHistory(
+  selectedEvidence: LearnerProgressEvidenceItem | undefined,
+  allItems: readonly LearnerProgressEvidenceItem[],
+): LearnerProgressProficiencyHistory | undefined {
+  if (selectedEvidence?.kind !== 'proficiency' || !selectedEvidence.proficiency?.scaleKey) {
+    return undefined;
+  }
+
+  const scaleKey = selectedEvidence.proficiency.scaleKey;
+  const entries = allItems
+    .filter(
+      (item) =>
+        item.kind === 'proficiency' &&
+        item.studentId === selectedEvidence.studentId &&
+        item.proficiency?.scaleKey === scaleKey,
+    )
+    .sort(
+      (first, second) =>
+        first.occurredOn.localeCompare(second.occurredOn) ||
+        first.title.localeCompare(second.title, 'en', { sensitivity: 'base' }) ||
+        first.id.localeCompare(second.id),
+    )
+    .map((item) => ({
+      id: item.id,
+      occurredOn: item.occurredOn,
+      title: item.title,
+      label: item.proficiency!.label,
+      status: item.status,
+    }));
+
+  return {
+    scaleKey,
+    scaleLabel: selectedEvidence.proficiency.scaleLabel,
+    entries,
+  };
+}
+
 export function buildLearnerProgressView(
   snapshot: LearnerProgressSnapshot,
   filters: LearnerProgressFilters,
@@ -529,7 +761,11 @@ export function buildLearnerProgressView(
         ? buildContextRows(snapshot, globallyFiltered)
         : buildStandardRows(globallyFiltered);
   const eligibleEvidence = modeEligibleEvidence(globallyFiltered, filters.mode);
-  const evidence = scopeFilteredEvidence(eligibleEvidence, filters);
+  const scopedEvidence = scopeFilteredEvidence(eligibleEvidence, filters);
+  const evidence = orderedEvidence(scopedEvidence, filters.order);
+  const selectedEvidence = filters.evidenceId
+    ? allItems.find((item) => item.id === filters.evidenceId)
+    : undefined;
 
   return {
     contractVersion: LEARNER_PROGRESS_CONTRACT_VERSION,
@@ -541,9 +777,13 @@ export function buildLearnerProgressView(
     scopeRows,
     scopeEvidenceCount: eligibleEvidence.length,
     evidence,
-    selectedEvidence: filters.evidenceId
-      ? allItems.find((item) => item.id === filters.evidenceId)
-      : undefined,
+    selectedEvidence,
     summary: summary(evidence),
+    assessmentOptions: filterOptions(allItems.map((item) => item.assessment)),
+    standardOptions: standardFilterOptions(allItems),
+    sessionOptions: filterOptions(allItems.map((item) => item.session)),
+    rosterCoverage: buildRosterCoverage(snapshot, filters, scopedEvidence),
+    proficiencyHistory: buildProficiencyHistory(selectedEvidence, allItems),
+    schoolYearState: schoolYearState(snapshot),
   };
 }

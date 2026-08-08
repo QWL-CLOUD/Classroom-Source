@@ -4,6 +4,7 @@ import {
   learnerContextSchema,
   lessonPlanSchema,
   libraryCatalogItemSchema,
+  rosterMembershipSchema,
   schoolYearSchema,
   sessionOccurrenceSchema,
   standardSchema,
@@ -75,6 +76,7 @@ export class LearnerProgressReadService {
         this.db.lessonPlans,
         this.db.sessionOccurrences,
         this.db.libraryItems,
+        this.db.rosterMemberships,
       ],
       async () => {
         const [
@@ -86,6 +88,7 @@ export class LearnerProgressReadService {
           lessonPlanValues,
           sessionValues,
           libraryItemValues,
+          rosterMembershipValues,
         ] = await Promise.all([
           this.db.schoolYears.toArray(),
           this.db.studentRecords.toArray(),
@@ -95,6 +98,7 @@ export class LearnerProgressReadService {
           this.db.lessonPlans.toArray(),
           this.db.sessionOccurrences.toArray(),
           this.db.libraryItems.toArray(),
+          this.db.rosterMemberships.toArray(),
         ]);
 
         const schoolYears = schoolYearValues
@@ -116,6 +120,9 @@ export class LearnerProgressReadService {
           lessonPlans: lessonPlanValues.map((value) => lessonPlanSchema.parse(value)),
           sessions: sessionValues.map((value) => sessionOccurrenceSchema.parse(value)),
           libraryItems: libraryItemValues.map((value) => libraryCatalogItemSchema.parse(value)),
+          rosterMemberships: rosterMembershipValues.map((value) =>
+            rosterMembershipSchema.parse(value),
+          ),
         };
 
         return { schoolYears, selectedSchoolYear, asOfDate, snapshot };

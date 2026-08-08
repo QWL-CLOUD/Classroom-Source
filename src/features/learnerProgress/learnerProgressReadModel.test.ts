@@ -93,6 +93,20 @@ function snapshot(): LearnerProgressSnapshot {
         updatedAt: timestamp,
       },
     ],
+    rosterMemberships: [
+      {
+        id: 'membership-alice',
+        contextId: 'class-a',
+        studentId: 'student-alice',
+        createdAt: timestamp,
+      },
+      {
+        id: 'membership-ben',
+        contextId: 'class-a',
+        studentId: 'student-ben',
+        createdAt: timestamp,
+      },
+    ],
     evidence: [
       {
         id: 'evidence-score',
@@ -165,6 +179,7 @@ describe('Learner Progress read model', () => {
       mode: 'learners',
       status: 'all',
       kind: 'all',
+      order: 'newest',
       period,
     });
 
@@ -194,6 +209,7 @@ describe('Learner Progress read model', () => {
       selectedId: 'deleted-group',
       status: 'active',
       kind: 'all',
+      order: 'newest',
       period,
     });
 
@@ -222,6 +238,7 @@ describe('Learner Progress read model', () => {
       evidenceId: 'evidence-observation',
       status: 'active',
       kind: 'score',
+      order: 'newest',
       period,
     });
 
@@ -231,5 +248,289 @@ describe('Learner Progress read model', () => {
       entityId: 'deleted-standard',
       status: 'snapshot',
     });
+  });
+
+  it('filters by explicit Assessment, Standard, and Session sources and can order history oldest first', () => {
+    const input = snapshot();
+    const period = resolveLearnerProgressPeriod(
+      { preset: 'school-year' },
+      input.schoolYear,
+      input.asOfDate,
+    );
+    const view = buildLearnerProgressView(input, {
+      mode: 'learners',
+      status: 'all',
+      kind: 'all',
+      assessmentId: 'assessment-1',
+      standardFilterId: 'standard-1',
+      sessionId: 'session-1',
+      order: 'oldest',
+      period,
+    });
+
+    expect(view.evidence.map((item) => item.id)).toEqual(['evidence-score']);
+    expect(view.assessmentOptions.map((option) => option.id)).toContain('assessment-1');
+    expect(view.standardOptions.map((option) => option.id)).toContain('standard-1');
+    expect(view.sessionOptions.map((option) => option.id)).toContain('session-1');
+  });
+
+  it('reports current retained roster coverage only as a present roster comparison', () => {
+    const input = snapshot();
+    const period = resolveLearnerProgressPeriod(
+      { preset: 'school-year' },
+      input.schoolYear,
+      input.asOfDate,
+    );
+    const view = buildLearnerProgressView(input, {
+      mode: 'contexts',
+      selectedId: 'class-a',
+      status: 'active',
+      kind: 'all',
+      order: 'newest',
+      period,
+    });
+
+    expect(view.rosterCoverage).toMatchObject({
+      status: 'available',
+      currentRetainedRosterLearnerCount: 2,
+      coveredRosterLearnerCount: 1,
+      contextCount: 1,
+    });
+    expect(view.rosterCoverage?.note).toContain('current retained roster');
+    expect(view.rosterCoverage?.note).toContain('historical membership');
+    expect(view.rosterCoverage?.note).toContain('not a mastery or gap judgment');
+  });
+
+  it('treats Individual as a one-on-one planning context rather than a roster', () => {
+    const input = snapshot();
+    input.contexts = [
+      ...input.contexts,
+      {
+        id: 'individual-alice',
+        kind: 'individual',
+        name: 'Alice Individual',
+        schoolYearId: 'year-1',
+        linkedStudentId: 'student-alice',
+        status: 'active',
+      },
+    ];
+
+    const period = resolveLearnerProgressPeriod(
+      { preset: 'school-year' },
+      input.schoolYear,
+      input.asOfDate,
+    );
+    const view = buildLearnerProgressView(input, {
+      mode: 'contexts',
+      selectedId: 'individual-alice',
+      status: 'active',
+      kind: 'all',
+      order: 'newest',
+      period,
+    });
+
+    expect(view.rosterCoverage).toMatchObject({
+      status: 'not-applicable',
+      currentRetainedRosterLearnerCount: 0,
+      coveredRosterLearnerCount: 0,
+    });
+    expect(view.rosterCoverage?.note).toContain('not a roster');
+  });
+
+  it('does not count Evidence from unrelated or historical Context sources toward all-context roster coverage', () => {
+    const input = snapshot();
+    input.evidence = [
+      ...input.evidence,
+      {
+        id: 'ben-historical-context-evidence',
+        studentId: 'student-ben',
+        schoolYearId: 'year-1',
+        occurredOn: '2026-08-06',
+        title: 'Ben historical context note',
+        kind: 'observation',
+        observation: { text: 'Recorded against a retained historical Context snapshot.' },
+        contextId: 'deleted-group',
+        standardIds: [],
+        sourceSnapshots: { context: { kind: 'group', name: 'Historical vocabulary group' } },
+        status: 'active',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+    ];
+
+    const period = resolveLearnerProgressPeriod(
+      { preset: 'school-year' },
+      input.schoolYear,
+      input.asOfDate,
+    );
+    const view = buildLearnerProgressView(input, {
+      mode: 'contexts',
+      status: 'active',
+      kind: 'all',
+      order: 'newest',
+      period,
+    });
+
+    expect(view.rosterCoverage).toMatchObject({
+      status: 'available',
+      currentRetainedRosterLearnerCount: 2,
+      coveredRosterLearnerCount: 1,
+      contextCount: 1,
+    });
+  });
+
+  it('does not present a retained-roster denominator for a historical School Year', () => {
+    const input = snapshot();
+    input.schoolYear = {
+      ...input.schoolYear,
+      id: 'history-year',
+      label: '2024–2025',
+      startsOn: '2024-07-01',
+      endsOn: '2025-06-30',
+      active: false,
+      lifecycleState: 'archived',
+      archivedAt: timestamp,
+    };
+    input.contexts = [
+      {
+        id: 'history-class',
+        kind: 'class',
+        name: 'Historical Class',
+        schoolYearId: 'history-year',
+        status: 'archived',
+      },
+    ];
+    input.rosterMemberships = [
+      {
+        id: 'history-membership',
+        contextId: 'history-class',
+        studentId: 'student-alice',
+        createdAt: timestamp,
+      },
+    ];
+    input.evidence = [
+      {
+        id: 'history-evidence',
+        studentId: 'student-alice',
+        schoolYearId: 'history-year',
+        occurredOn: '2025-05-15',
+        title: 'Historical check',
+        kind: 'score',
+        score: { value: 2, maximum: 4 },
+        contextId: 'history-class',
+        standardIds: [],
+        status: 'active',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+    ];
+
+    const period = resolveLearnerProgressPeriod(
+      { preset: 'school-year' },
+      input.schoolYear,
+      input.asOfDate,
+    );
+    const view = buildLearnerProgressView(input, {
+      mode: 'contexts',
+      selectedId: 'history-class',
+      status: 'active',
+      kind: 'all',
+      order: 'newest',
+      period,
+    });
+
+    expect(view.schoolYearState).toBe('historical');
+    expect(view.rosterCoverage).toMatchObject({
+      status: 'unavailable',
+      currentRetainedRosterLearnerCount: 0,
+      coveredRosterLearnerCount: 0,
+    });
+    expect(view.rosterCoverage?.note).toContain('does not reconstruct past roster membership');
+  });
+
+  it('shows same-scale proficiency history only when the selected record has an explicit scale key', () => {
+    const input = snapshot();
+    input.evidence = [
+      ...input.evidence,
+      {
+        id: 'alice-proficiency-1',
+        studentId: 'student-alice',
+        schoolYearId: 'year-1',
+        occurredOn: '2026-07-15',
+        title: 'Reading continuum July',
+        kind: 'proficiency',
+        proficiency: {
+          label: 'Emerging',
+          rank: 1,
+          scaleKey: 'reading',
+          scaleLabel: 'Reading continuum',
+        },
+        standardIds: [],
+        status: 'active',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+      {
+        id: 'alice-proficiency-2',
+        studentId: 'student-alice',
+        schoolYearId: 'year-1',
+        occurredOn: '2026-08-06',
+        title: 'Reading continuum August',
+        kind: 'proficiency',
+        proficiency: {
+          label: 'Developing',
+          rank: 2,
+          scaleKey: 'reading',
+          scaleLabel: 'Reading continuum',
+        },
+        standardIds: [],
+        status: 'active',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+      {
+        id: 'alice-unkeyed-proficiency',
+        studentId: 'student-alice',
+        schoolYearId: 'year-1',
+        occurredOn: '2026-08-07',
+        title: 'Unkeyed proficiency',
+        kind: 'proficiency',
+        proficiency: { label: 'Teacher label only' },
+        standardIds: [],
+        status: 'active',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+    ];
+
+    const period = resolveLearnerProgressPeriod(
+      { preset: 'school-year' },
+      input.schoolYear,
+      input.asOfDate,
+    );
+    const keyed = buildLearnerProgressView(input, {
+      mode: 'learners',
+      selectedId: 'student-alice',
+      evidenceId: 'alice-proficiency-2',
+      status: 'all',
+      kind: 'all',
+      order: 'newest',
+      period,
+    });
+    expect(keyed.proficiencyHistory?.entries.map((entry) => entry.id)).toEqual([
+      'alice-proficiency-1',
+      'alice-proficiency-2',
+    ]);
+
+    const unkeyed = buildLearnerProgressView(input, {
+      mode: 'learners',
+      selectedId: 'student-alice',
+      evidenceId: 'alice-unkeyed-proficiency',
+      status: 'all',
+      kind: 'all',
+      order: 'newest',
+      period,
+    });
+    expect(unkeyed.proficiencyHistory).toBeUndefined();
   });
 });

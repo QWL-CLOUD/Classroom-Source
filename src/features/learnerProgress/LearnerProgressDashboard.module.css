@@ -60,7 +60,7 @@
   margin: 0;
 }
 
-.contractNote > p,
+.contractCopy > p,
 .controlIntro > p,
 .summary header > p,
 .timeline header > p,
@@ -106,6 +106,21 @@
   text-align: right;
 }
 
+.contractCopy {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.historicalNote {
+  padding: 10px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
 .controls {
   min-width: 0;
   display: grid;
@@ -131,6 +146,11 @@
 .filterGrid select,
 .customRange input {
   width: 100%;
+}
+
+.filterGrid > button {
+  align-self: end;
+  min-height: 42px;
 }
 
 .customRange {
@@ -253,6 +273,63 @@
   min-width: 0;
   display: grid;
   gap: 16px;
+}
+
+.coverage {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+  padding: 18px 20px;
+}
+
+.coverage header,
+.coverage h2,
+.coverage p {
+  margin: 0;
+}
+
+.coverage header {
+  display: grid;
+  gap: 4px;
+}
+
+.coverage > p {
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.coverage dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.coverage dl div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 11px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+
+.coverage dt {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.coverage dd {
+  margin: 0;
+  color: var(--heading);
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.coverageUnavailable {
+  font-weight: 800;
 }
 
 .evidenceWorkspace {
@@ -515,6 +592,63 @@
   overflow-wrap: anywhere;
 }
 
+.proficiencyHistory {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.proficiencyHistory > div {
+  display: grid;
+  gap: 4px;
+}
+
+.proficiencyHistory h3,
+.proficiencyHistory p {
+  margin: 0;
+}
+
+.proficiencyHistory h3 {
+  color: var(--heading);
+  font-size: 0.95rem;
+}
+
+.proficiencyHistory p {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.proficiencyHistory ol {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+}
+
+.proficiencyHistory li {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.proficiencyHistory li > span {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: space-between;
+  overflow-wrap: anywhere;
+}
+
+.proficiencyHistory li small {
+  color: var(--text-muted);
+}
+
 .standards {
   display: grid;
   gap: 8px;
@@ -563,7 +697,8 @@
     max-height: none;
   }
 
-  .metricGrid {
+  .metricGrid,
+  .coverage dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -579,6 +714,7 @@
   .filterGrid,
   .customRange,
   .metricGrid,
+  .coverage dl,
   .sourceGrid,
   .detailHeader {
     grid-template-columns: minmax(0, 1fr);

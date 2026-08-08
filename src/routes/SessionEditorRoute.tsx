@@ -1,4 +1,5 @@
 import {
+  Activity,
   AlertTriangle,
   ArrowLeft,
   CheckCircle2,
@@ -33,6 +34,7 @@ import {
 } from '@/domain/models/entities';
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
 import {
+  buildLearnerProgressEntryHref,
   buildLearnerProgressHref,
   parseLearnerProgressReturnState,
   type LearnerProgressReturnState,
@@ -382,23 +384,36 @@ function SessionEditorForm({
             <strong>{selectedPlan.title}</strong> · {selectedContext.name}
           </p>
         </div>
-        <a
-          className="button"
-          href={returnHref({
-            date: session?.date ?? initialDate,
-            sessionId: session?.id,
-            learnerView: backView,
-          })}
-        >
-          <ArrowLeft aria-hidden="true" size={17} />
-          {returnTo === 'learners'
-            ? 'Back to Learners'
-            : returnTo === 'review'
-              ? 'Back to Teaching Review'
-              : returnTo === 'progress'
-                ? 'Back to Learner Progress'
-                : `Back to ${returnTo === 'today' ? 'Today' : returnTo === 'week' ? 'Week' : 'Calendar'}`}
-        </a>
+        <div className={styles.actions}>
+          {session ? (
+            <a
+              className="button"
+              href={buildLearnerProgressEntryHref({
+                schoolYearId: selectedContext.schoolYearId,
+                sessionId: session.id,
+              })}
+            >
+              <Activity aria-hidden="true" size={17} /> Session Evidence
+            </a>
+          ) : null}
+          <a
+            className="button"
+            href={returnHref({
+              date: session?.date ?? initialDate,
+              sessionId: session?.id,
+              learnerView: backView,
+            })}
+          >
+            <ArrowLeft aria-hidden="true" size={17} />
+            {returnTo === 'learners'
+              ? 'Back to Learners'
+              : returnTo === 'review'
+                ? 'Back to Teaching Review'
+                : returnTo === 'progress'
+                  ? 'Back to Learner Progress'
+                  : `Back to ${returnTo === 'today' ? 'Today' : returnTo === 'week' ? 'Week' : 'Calendar'}`}
+          </a>
+        </div>
       </div>
 
       {session ? (

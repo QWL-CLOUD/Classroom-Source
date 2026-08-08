@@ -29,11 +29,13 @@ transaction tests.
   Teaching Review E2E coverage verifies URL-backed School Year and review-period selection, queue
   semantics, source drill-down/return state, exact Standard/Library/Task focus, Reflection-linked
   Task filtering, period preservation through source returns, no hidden Evidence-gap queue, 390px
-  page containment, and automated accessibility. Learner Progress E2E coverage verifies read-only
-  Student/Context/Standard Evidence views, URL-backed period/lifecycle/kind state, exact Evidence
-  selection, retained historical source snapshots, teacher-controlled create/edit/archive/restore,
-  School Year date guards, exact source return navigation, nested Teaching Review return state,
-  mobile containment, and automated accessibility.
+  page containment, and automated accessibility. Learner Progress E2E coverage verifies
+  Student/Context/Standard Evidence views, URL-backed period/lifecycle/kind and
+  Assessment/Standard/Session source filters, newest/oldest chronology, exact Evidence selection,
+  retained historical source snapshots, safe current-retained-roster coverage, historical School Year
+  non-reconstruction, teacher-controlled create/edit/archive/restore, School Year date guards, direct
+  Student/Context/Standard/Assessment/Session/Reflection entry points, exact source return navigation,
+  nested Teaching Review return state, mobile containment, and automated accessibility.
 - **WebKit pilot:** runs only `personal-pilot-readiness.spec.ts`. It protects the Safari-relevant
   personal-pilot path without duplicating every historical Chromium scenario.
 

@@ -1,4 +1,4 @@
-import { Archive, ArrowLeft, RotateCcw, Save } from 'lucide-react';
+import { Activity, Archive, ArrowLeft, RotateCcw, Save } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ZodError } from 'zod';
 
@@ -10,7 +10,10 @@ import type {
   TeachingReflectionRecord,
 } from '@/domain/models/entities';
 import { formatCalendarMinute } from '@/features/calendar/calendarReadModel';
-import type { LearnerProgressReturnState } from '@/features/learnerProgress/learnerProgressNavigation';
+import {
+  buildLearnerProgressEntryHref,
+  type LearnerProgressReturnState,
+} from '@/features/learnerProgress/learnerProgressNavigation';
 import type { PlanningReturnTarget } from '@/features/planning/planningNavigation';
 import type { TeachingReviewReturnState } from '@/features/teachingReview/teachingReviewNavigation';
 import { formatLongDate } from '@/shared/dates/localDate';
@@ -138,6 +141,7 @@ export function TeachingReflectionEditor({
       : undefined);
   const schoolYearLabel =
     detail?.source.schoolYear.current?.label ?? createSource?.schoolYear.label ?? 'Unavailable';
+  const schoolYearId = detail?.source.schoolYear.current?.id ?? createSource?.schoolYear.id;
   const archived = reflection?.status === 'archived';
 
   function update<K extends keyof TeachingReflectionEditorValues>(
@@ -207,18 +211,31 @@ export function TeachingReflectionEditor({
             <strong>{sourcePlanTitle}</strong> · {sourceContextName}
           </p>
         </div>
-        <a
-          className="button"
-          href={buildTeachingReflectionSessionHref(
-            sessionOccurrenceId,
-            returnTo,
-            reviewReturn,
-            progressReturn,
-          )}
-        >
-          <ArrowLeft aria-hidden="true" size={17} />
-          Back to Session
-        </a>
+        <div className={styles.actions}>
+          {schoolYearId ? (
+            <a
+              className="button"
+              href={buildLearnerProgressEntryHref({
+                schoolYearId,
+                sessionId: sessionOccurrenceId,
+              })}
+            >
+              <Activity aria-hidden="true" size={17} /> Session Evidence
+            </a>
+          ) : null}
+          <a
+            className="button"
+            href={buildTeachingReflectionSessionHref(
+              sessionOccurrenceId,
+              returnTo,
+              reviewReturn,
+              progressReturn,
+            )}
+          >
+            <ArrowLeft aria-hidden="true" size={17} />
+            Back to Session
+          </a>
+        </div>
       </header>
 
       <section className={styles.sourceCard} aria-labelledby="reflection-source-heading">

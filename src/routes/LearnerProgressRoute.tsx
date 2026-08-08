@@ -15,12 +15,14 @@ import {
   buildLearnerProgressView,
   type LearnerProgressKindFilter,
   type LearnerProgressMode,
+  type LearnerProgressOrder,
   type LearnerProgressStatusFilter,
 } from '@/features/learnerProgress/learnerProgressReadModel';
 import {
   appendLearnerProgressEditor,
   appendLearnerProgressFilters,
   appendLearnerProgressMode,
+  appendLearnerProgressSourceFilters,
   parseLearnerProgressRouteState,
 } from '@/features/learnerProgress/learnerProgressRouteState';
 import {
@@ -70,6 +72,10 @@ export function LearnerProgressRoute() {
     next.delete('standard');
     next.delete('evidence');
     next.delete('edit');
+    next.delete('assessment');
+    next.delete('standardFilter');
+    next.delete('session');
+    next.delete('order');
     setSearchParams(next, { replace: true });
   }, [requestedSchoolYearId, searchParams, setSearchParams, state]);
 
@@ -89,6 +95,7 @@ export function LearnerProgressRoute() {
       target ? clampLearnerProgressPeriodToSchoolYear(effectivePeriod, target) : effectivePeriod,
     );
     appendLearnerProgressMode(next, routeState.mode);
+    appendLearnerProgressSourceFilters(next, { order: routeState.order });
     appendLearnerProgressEditor(next, null);
     update(next);
   }
@@ -126,6 +133,44 @@ export function LearnerProgressRoute() {
   function selectKind(kind: LearnerProgressKindFilter): void {
     const next = new URLSearchParams(searchParams);
     appendLearnerProgressFilters(next, routeState.status, kind);
+    next.delete('evidence');
+    appendLearnerProgressEditor(next, null);
+    update(next);
+  }
+
+  function selectAssessmentFilter(id?: string): void {
+    const next = new URLSearchParams(searchParams);
+    appendLearnerProgressSourceFilters(next, { ...routeState, assessmentId: id });
+    next.delete('evidence');
+    appendLearnerProgressEditor(next, null);
+    update(next);
+  }
+
+  function selectStandardFilter(id?: string): void {
+    const next = new URLSearchParams(searchParams);
+    appendLearnerProgressSourceFilters(next, { ...routeState, standardFilterId: id });
+    next.delete('evidence');
+    appendLearnerProgressEditor(next, null);
+    update(next);
+  }
+
+  function selectSessionFilter(id?: string): void {
+    const next = new URLSearchParams(searchParams);
+    appendLearnerProgressSourceFilters(next, { ...routeState, sessionId: id });
+    next.delete('evidence');
+    appendLearnerProgressEditor(next, null);
+    update(next);
+  }
+
+  function selectOrderFilter(order: LearnerProgressOrder): void {
+    const next = new URLSearchParams(searchParams);
+    appendLearnerProgressSourceFilters(next, { ...routeState, order });
+    update(next);
+  }
+
+  function clearSourceFilters(): void {
+    const next = new URLSearchParams(searchParams);
+    appendLearnerProgressSourceFilters(next, { order: routeState.order });
     next.delete('evidence');
     appendLearnerProgressEditor(next, null);
     update(next);
@@ -169,6 +214,7 @@ export function LearnerProgressRoute() {
     const next = new URLSearchParams(searchParams);
     next.set('evidence', id);
     appendLearnerProgressFilters(next, 'all', 'all');
+    appendLearnerProgressSourceFilters(next, { order: routeState.order });
     appendLearnerProgressEditor(next, null);
     setMutationError(null);
     setMutationMessage('Evidence saved. Global Undo is available in the top bar.');
@@ -254,6 +300,10 @@ export function LearnerProgressRoute() {
     evidenceId: routeState.evidenceId,
     status: routeState.status,
     kind: routeState.kind,
+    assessmentId: routeState.assessmentId,
+    standardFilterId: routeState.standardFilterId,
+    sessionId: routeState.sessionId,
+    order: routeState.order,
     period: resolvedPeriod,
   });
   const progressReturn: LearnerProgressReturnState = {
@@ -263,6 +313,10 @@ export function LearnerProgressRoute() {
     evidenceId: view.selectedEvidence?.id ?? routeState.evidenceId,
     status: routeState.status,
     kind: routeState.kind,
+    assessmentId: routeState.assessmentId,
+    standardFilterId: routeState.standardFilterId,
+    sessionId: routeState.sessionId,
+    order: routeState.order,
     period: effectivePeriod,
     parentReview: parentReviewReturn,
   };
@@ -273,7 +327,10 @@ export function LearnerProgressRoute() {
   const editorDefaults = {
     studentId: routeState.mode === 'learners' ? routeState.selectedId : undefined,
     contextId: routeState.mode === 'contexts' ? routeState.selectedId : undefined,
-    standardId: routeState.mode === 'standards' ? routeState.selectedId : undefined,
+    sessionOccurrenceId: routeState.sessionId,
+    assessmentId: routeState.assessmentId,
+    standardId:
+      routeState.mode === 'standards' ? routeState.selectedId : routeState.standardFilterId,
     occurredOn:
       state.data.asOfDate >= view.schoolYear.startsOn &&
       state.data.asOfDate <= view.schoolYear.endsOn
@@ -289,12 +346,21 @@ export function LearnerProgressRoute() {
       resolvedPeriod={resolvedPeriod}
       statusFilter={routeState.status}
       kindFilter={routeState.kind}
+      assessmentFilterId={routeState.assessmentId}
+      standardFilterId={routeState.standardFilterId}
+      sessionFilterId={routeState.sessionId}
+      orderFilter={routeState.order}
       onSchoolYearChange={selectSchoolYear}
       onPeriodChange={selectPeriod}
       onModeChange={selectMode}
       onScopeChange={selectScope}
       onStatusFilterChange={selectStatus}
       onKindFilterChange={selectKind}
+      onAssessmentFilterChange={selectAssessmentFilter}
+      onStandardFilterChange={selectStandardFilter}
+      onSessionFilterChange={selectSessionFilter}
+      onOrderFilterChange={selectOrderFilter}
+      onClearSourceFilters={clearSourceFilters}
       onEvidenceChange={selectEvidence}
       onCreateEvidence={openCreateEvidence}
       onEditEvidence={openEditEvidence}

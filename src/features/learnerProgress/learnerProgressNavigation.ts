@@ -8,6 +8,7 @@ import { parseLocalDate } from '@/shared/dates/localDate';
 import type {
   LearnerProgressKindFilter,
   LearnerProgressMode,
+  LearnerProgressOrder,
   LearnerProgressStatusFilter,
 } from './learnerProgressReadModel';
 import type { LearnerProgressPeriodState } from './learnerProgressPeriod';
@@ -19,6 +20,10 @@ export interface LearnerProgressReturnState {
   evidenceId?: string;
   status?: LearnerProgressStatusFilter;
   kind?: LearnerProgressKindFilter;
+  assessmentId?: string;
+  standardFilterId?: string;
+  sessionId?: string;
+  order?: LearnerProgressOrder;
   period?: LearnerProgressPeriodState;
   parentReview?: TeachingReviewReturnState;
 }
@@ -113,6 +118,10 @@ export function parseLearnerProgressReturnState(
     evidenceId: clean(search.get('progressEvidence')),
     status: parseStatus(search.get('progressStatus')),
     kind: parseKind(search.get('progressKind')),
+    assessmentId: clean(search.get('progressAssessment')),
+    standardFilterId: clean(search.get('progressStandardFilter')),
+    sessionId: clean(search.get('progressSession')),
+    order: search.get('progressOrder') === 'oldest' ? 'oldest' : undefined,
     period: parsePeriod(search),
     parentReview: parseParentReview(search),
   };
@@ -129,6 +138,10 @@ export function appendLearnerProgressReturnParams(
   if (state.evidenceId) params.set('progressEvidence', state.evidenceId);
   if (state.status) params.set('progressStatus', state.status);
   if (state.kind) params.set('progressKind', state.kind);
+  if (state.assessmentId) params.set('progressAssessment', state.assessmentId);
+  if (state.standardFilterId) params.set('progressStandardFilter', state.standardFilterId);
+  if (state.sessionId) params.set('progressSession', state.sessionId);
+  if (state.order === 'oldest') params.set('progressOrder', 'oldest');
   appendPeriod(params, state.period);
   appendParentReview(params, state.parentReview);
   return params;
@@ -146,6 +159,10 @@ export function buildLearnerProgressHref(state: LearnerProgressReturnState): str
   if (state.evidenceId) params.set('evidence', state.evidenceId);
   if (state.status && state.status !== 'active') params.set('status', state.status);
   if (state.kind && state.kind !== 'all') params.set('kind', state.kind);
+  if (state.assessmentId) params.set('assessment', state.assessmentId);
+  if (state.standardFilterId) params.set('standardFilter', state.standardFilterId);
+  if (state.sessionId) params.set('session', state.sessionId);
+  if (state.order === 'oldest') params.set('order', 'oldest');
   if (state.period && state.period.preset !== 'school-year') {
     params.set('period', state.period.preset);
     if (state.period.preset === 'custom' && state.period.from && state.period.to) {
@@ -156,6 +173,26 @@ export function buildLearnerProgressHref(state: LearnerProgressReturnState): str
   if (state.parentReview) appendTeachingReviewReturnParams(params, state.parentReview);
   const query = params.toString();
   return query ? `#/learner-progress?${query}` : '#/learner-progress';
+}
+
+export function buildLearnerProgressEntryHref(
+  state: {
+    schoolYearId?: string;
+    mode?: LearnerProgressMode;
+    selectedId?: string;
+    assessmentId?: string;
+    standardFilterId?: string;
+    sessionId?: string;
+  } = {},
+): string {
+  return buildLearnerProgressHref({
+    schoolYearId: state.schoolYearId,
+    mode: state.mode,
+    selectedId: state.selectedId,
+    assessmentId: state.assessmentId,
+    standardFilterId: state.standardFilterId,
+    sessionId: state.sessionId,
+  });
 }
 
 export function decorateLearnerProgressSourceHref(

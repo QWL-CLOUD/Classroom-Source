@@ -465,6 +465,7 @@ export function AssessmentEvidenceEditorPanel({
           <label>
             Linked Standards
             <select
+              aria-label="Linked Standards"
               className={`select ${styles.standardsSelect}`}
               multiple
               value={draft.standardIds}

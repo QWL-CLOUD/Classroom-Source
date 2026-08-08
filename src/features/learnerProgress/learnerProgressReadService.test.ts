@@ -48,6 +48,12 @@ beforeEach(async () => {
     schoolYearId: 'year-current',
     status: 'active',
   });
+  await database.rosterMemberships.put({
+    id: 'membership-1',
+    contextId: 'class-1',
+    studentId: 'student-1',
+    createdAt: now,
+  });
   await database.standards.put({
     id: 'standard-1',
     issuingOrganization: 'Synthetic',
@@ -90,6 +96,9 @@ describe('LearnerProgressReadService', () => {
     expect(result.snapshot?.students.map((student) => student.id)).toEqual(['student-1']);
     expect(result.snapshot?.contexts.map((context) => context.id)).toEqual(['class-1']);
     expect(result.snapshot?.standards.map((standard) => standard.id)).toEqual(['standard-1']);
+    expect(result.snapshot?.rosterMemberships.map((membership) => membership.id)).toEqual([
+      'membership-1',
+    ]);
     expect(await database.changeLog.count()).toBe(0);
   });
 

@@ -1,6 +1,7 @@
 import type {
   LearnerProgressKindFilter,
   LearnerProgressMode,
+  LearnerProgressOrder,
   LearnerProgressStatusFilter,
 } from './learnerProgressReadModel';
 
@@ -10,6 +11,10 @@ export interface LearnerProgressRouteState {
   evidenceId?: string;
   status: LearnerProgressStatusFilter;
   kind: LearnerProgressKindFilter;
+  assessmentId?: string;
+  standardFilterId?: string;
+  sessionId?: string;
+  order: LearnerProgressOrder;
   editor: 'new' | string | null;
 }
 
@@ -42,6 +47,10 @@ export function parseLearnerProgressRouteState(search: URLSearchParams): Learner
     evidenceId: clean(search.get('evidence')),
     status,
     kind,
+    assessmentId: clean(search.get('assessment')),
+    standardFilterId: clean(search.get('standardFilter')),
+    sessionId: clean(search.get('session')),
+    order: search.get('order') === 'oldest' ? 'oldest' : 'newest',
     editor: clean(search.get('edit')) ?? null,
   };
 }
@@ -76,6 +85,30 @@ export function appendLearnerProgressFilters(
 
   if (kind === 'all') params.delete('kind');
   else params.set('kind', kind);
+  return params;
+}
+
+export function appendLearnerProgressSourceFilters(
+  params: URLSearchParams,
+  filters: {
+    assessmentId?: string;
+    standardFilterId?: string;
+    sessionId?: string;
+    order?: LearnerProgressOrder;
+  },
+): URLSearchParams {
+  if (filters.assessmentId) params.set('assessment', filters.assessmentId);
+  else params.delete('assessment');
+
+  if (filters.standardFilterId) params.set('standardFilter', filters.standardFilterId);
+  else params.delete('standardFilter');
+
+  if (filters.sessionId) params.set('session', filters.sessionId);
+  else params.delete('session');
+
+  if (filters.order === 'oldest') params.set('order', 'oldest');
+  else params.delete('order');
+
   return params;
 }
 
