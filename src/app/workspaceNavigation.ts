@@ -9,7 +9,12 @@ const contextAwareRoutes = new Set([
   '/learners',
 ]);
 
-const schoolYearAwareRoutes = new Set(['/insights', '/teaching-review', '/learner-progress']);
+const schoolYearAwareRoutes = new Set([
+  '/insights',
+  '/teaching-review',
+  '/learner-progress',
+  '/reports',
+]);
 
 const workspaceContextKeys = ['context', 'status', 'planning'] as const;
 

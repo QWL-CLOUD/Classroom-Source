@@ -1,0 +1,456 @@
+.page {
+  min-width: 0;
+  display: grid;
+  gap: 18px;
+}
+
+.pageHeader {
+  align-items: flex-start;
+}
+
+.headerActions,
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.headerActions {
+  justify-content: flex-end;
+}
+
+.contract,
+.controls,
+.report,
+.chooseLearner,
+.state {
+  min-width: 0;
+}
+
+.contract {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.7fr) minmax(320px, 1.3fr);
+  gap: 18px;
+  align-items: start;
+  padding: 18px 20px;
+  background: var(--surface-soft);
+}
+
+.contract h2,
+.contract p,
+.controls h2,
+.controls p,
+.report h2,
+.report h3,
+.report h4,
+.report p,
+.chooseLearner h2,
+.chooseLearner p,
+.state h1,
+.state p {
+  margin: 0;
+}
+
+.contract > p,
+.chooseLearner > p,
+.state > p {
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.kicker {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.controls {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+}
+
+.controls > div:first-child {
+  display: grid;
+  gap: 5px;
+}
+
+.filterGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.filterGrid label,
+.customRange label {
+  min-width: 0;
+  display: grid;
+  gap: 7px;
+  color: var(--heading);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.filterGrid select,
+.customRange input {
+  width: 100%;
+}
+
+.customRange {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 260px)) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.customRange button {
+  min-height: 42px;
+}
+
+.report {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+}
+
+.reportHeader {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.reportHeader > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.reportHeader h2 {
+  overflow-wrap: anywhere;
+  color: var(--heading);
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.1;
+}
+
+.reportHeader p:not(.kicker) {
+  color: var(--text-secondary);
+}
+
+.reportMeta {
+  min-width: min(100%, 310px);
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.reportMeta div {
+  display: flex;
+  gap: 16px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.reportMeta dt {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.reportMeta dd {
+  margin: 0;
+  color: var(--heading);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.summary div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.summary strong {
+  color: var(--heading);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.summary span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.disclosure {
+  padding: 11px 13px;
+  border-left: 3px solid var(--border-strong, var(--border));
+  color: var(--text-muted);
+  background: var(--surface-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.records {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+  list-style: none;
+}
+
+.record {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.recordHeader {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.recordHeader > div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.recordHeader h3 {
+  overflow-wrap: anywhere;
+  color: var(--heading);
+  font-size: 17px;
+}
+
+.recordDate {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.recordValue {
+  max-width: 320px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.recordValue > span,
+.sourceStatus {
+  padding: 3px 7px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--surface-soft);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.recordValue strong {
+  width: 100%;
+  overflow-wrap: anywhere;
+  color: var(--heading);
+}
+
+.narrative {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+
+.narrative h4 {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.narrative p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+
+.sources {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sources > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.sources dt {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.sources dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.standardSources {
+  grid-column: 1 / -1;
+}
+
+.standardSources ul {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+  list-style: none;
+}
+
+.sourceValue {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: baseline;
+}
+
+.sourceValue > span:first-child {
+  overflow-wrap: anywhere;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.emptyReport,
+.chooseLearner,
+.state {
+  display: grid;
+  gap: 10px;
+  padding: 22px;
+}
+
+.emptyReport {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.emptyReport p {
+  color: var(--text-secondary);
+}
+
+@media (max-width: 1100px) {
+  .filterGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .pageHeader,
+  .contract,
+  .reportHeader,
+  .recordHeader {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .headerActions,
+  .recordValue {
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  .filterGrid,
+  .customRange,
+  .summary,
+  .sources {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .standardSources {
+    grid-column: auto;
+  }
+
+  .reportMeta {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+@media print {
+  @page {
+    margin: 0.55in;
+  }
+
+  .screenOnly {
+    display: none !important;
+  }
+
+  .page,
+  .report {
+    display: block;
+  }
+
+  .report {
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .reportHeader,
+  .summary,
+  .disclosure,
+  .records {
+    margin-bottom: 14px;
+  }
+
+  .summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .record {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .recordValue > span,
+  .sourceStatus,
+  .summary div,
+  .record,
+  .narrative {
+    background: transparent;
+  }
+}

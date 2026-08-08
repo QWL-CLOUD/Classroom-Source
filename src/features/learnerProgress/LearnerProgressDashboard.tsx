@@ -49,6 +49,7 @@ interface LearnerProgressDashboardProps {
   decorateSourceHref?: (href: string) => string;
   feedbackPanel?: ReactNode;
   editorPanel?: ReactNode;
+  reportHref?: string;
 }
 
 const modeLabels: Record<LearnerProgressMode, string> = {
@@ -331,6 +332,7 @@ export function LearnerProgressDashboard({
   decorateSourceHref,
   feedbackPanel,
   editorPanel,
+  reportHref,
 }: LearnerProgressDashboardProps) {
   const [customFrom, setCustomFrom] = useState(
     period.preset === 'custom'
@@ -442,6 +444,11 @@ export function LearnerProgressDashboard({
               <button className="button button-primary" type="button" onClick={onCreateEvidence}>
                 Add Evidence
               </button>
+            ) : null}
+            {reportHref ? (
+              <a className="button" href={reportHref}>
+                Open report
+              </a>
             ) : null}
             <a
               className="button"

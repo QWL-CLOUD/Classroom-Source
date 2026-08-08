@@ -14,6 +14,7 @@ import { LibraryRoute } from '@/routes/LibraryRoute';
 import { MigrationRoute } from '@/routes/MigrationRoute';
 import { NotFoundRoute } from '@/routes/NotFoundRoute';
 import { PlanningEditorRoute } from '@/routes/PlanningEditorRoute';
+import { ReportsRoute } from '@/routes/ReportsRoute';
 import { ScheduleBlockEditorRoute } from '@/routes/ScheduleBlockEditorRoute';
 import { ScheduleOccurrenceEditorRoute } from '@/routes/ScheduleOccurrenceEditorRoute';
 import { SessionEditorRoute } from '@/routes/SessionEditorRoute';
@@ -56,6 +57,7 @@ export const router = createHashRouter([
       { path: 'insights', element: <InsightsRoute /> },
       { path: 'teaching-review', element: <TeachingReviewRoute /> },
       { path: 'learner-progress', element: <LearnerProgressRoute /> },
+      { path: 'reports', element: <ReportsRoute /> },
       { path: 'import', element: <ImportRoute /> },
       { path: 'migration', element: <MigrationRoute /> },
       { path: 'export', element: <ExportRoute /> },

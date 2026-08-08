@@ -31,6 +31,7 @@ import {
   type LearnerProgressReturnState,
 } from '@/features/learnerProgress/learnerProgressNavigation';
 import { useLearnerProgress } from '@/features/learnerProgress/useLearnerProgress';
+import { buildLearnerEvidenceReportHref } from '@/features/reports/reportsNavigation';
 import { parseTeachingReviewReturnState } from '@/features/teachingReview/teachingReviewNavigation';
 
 import styles from './InsightsRoute.module.css';
@@ -269,7 +270,7 @@ export function LearnerProgressRoute() {
             Open System Health
           </Link>
           <Link className="button" to="/export">
-            Open Export &amp; Backup
+            Open Backup &amp; Recovery
           </Link>
         </div>
       </section>
@@ -386,6 +387,17 @@ export function LearnerProgressRoute() {
             ) : null}
           </>
         ) : null
+      }
+      reportHref={
+        routeState.mode === 'learners' && routeState.selectedId
+          ? buildLearnerEvidenceReportHref({
+              schoolYearId: view.schoolYear.id,
+              studentId: routeState.selectedId,
+              period: effectivePeriod,
+              status: routeState.status,
+              kind: routeState.kind,
+            })
+          : undefined
       }
       editorPanel={
         routeState.editor ? (

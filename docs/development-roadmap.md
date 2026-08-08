@@ -1,8 +1,8 @@
 # Classroom v20 Development Roadmap
 
-Updated after Phase 4D closure and the Phase 4E-0 roadmap audit.
+Updated for Phase 4F implementation after Phase 4E closure.
 
-Current implementation baseline: `main @ daad0ac0fc57f1043448f0bcdf20d7783df7a784` (Phase 4D merged).
+Current implementation baseline: `main @ 3a97313958e86a53acd9d5fe21aaa97e85ab0f7b` (Phase 4E merged).
 
 ## Product boundary
 
@@ -278,7 +278,7 @@ Retained boundaries:
 DB schema v17, Portable Backup v17, Learner Progress contract v1, Teaching Insights contract v2,
 Teaching Review contract v1, and app version `20.0.0-pilot.1` remain unchanged.
 
-## Phase 4E — Session Closeout & Reflection Handoff — current
+## Phase 4E — Session Closeout & Reflection Handoff — complete
 
 Goal: close the high-frequency daily teaching loop without creating a new persisted closeout domain.
 
@@ -297,19 +297,39 @@ Scope:
 DB schema v17, Portable Backup v17, Learner Progress contract v1, Teaching Insights contract v2,
 Teaching Review contract v1, and app version `20.0.0-pilot.1` remain unchanged.
 
-## Phase 4F — Teacher Reports & Export Foundation
+## Phase 4F — Teacher Reports & Export Foundation — current
 
-Recommended order:
+Goal: make existing canonical teacher-owned Evidence usable outside the Learner Progress workspace
+without introducing a second Evidence interpretation layer or a persisted report domain.
 
-1. teacher-facing learner Evidence summary;
-2. CSV export;
-3. printable report;
-4. PDF only after report semantics stabilize;
-5. configurable templates only if real pilot use justifies persistence.
+Scope:
 
-Preview included fields before export; do not upload or send automatically; distinguish internal
-teacher reports from any future family-facing reports. Keep derived outputs separate from Backup &
-Recovery and do not infer grades, mastery, readiness, rank, or true Evidence gaps.
+- a new Reflect → Reports workspace at `#/reports` with one explicit Teacher Internal report type:
+  Learner Evidence Summary;
+- School Year, learner, period, Evidence lifecycle status, and Evidence kind remain explicit URL-backed
+  report filters;
+- the report reuses the existing Learner Progress v1 snapshot/read model so Class, Group, Individual,
+  archived/current sources, historical snapshots, and Evidence kind boundaries stay identical;
+- preview shows recorded Evidence counts, explicit recorded values, teacher observations/notes, and
+  linked Context/Assessment/Session/Standard provenance;
+- UTF-8 CSV download quotes multiline/commas/quotes, protects spreadsheet formula-like text, and
+  preserves source-status provenance;
+- print representation hides application chrome/controls while retaining learner, School Year, period,
+  filter disclosure, Evidence records, and the Teacher Internal boundary;
+- Learner Progress exposes an `Open report` handoff for the currently selected learner/filter scope;
+- the existing `#/export` backup route remains stable but user-facing terminology becomes
+  `Backup & Recovery` so database recovery is not confused with teacher reports.
+
+Retained boundaries:
+
+- no DB/Backup migration and no persisted report/template/history entity;
+- no PDF generator in the foundation; browser print can Save as PDF;
+- no family/student-facing report, sharing, email, cloud upload, or publishing;
+- no grades, mastery, readiness, learner ranking, progress/growth score, cross-scale averaging,
+  expected-Evidence denominator, Evidence-gap inference, or AI interpretation of teacher narrative.
+
+DB schema v17, Portable Backup v17, Learner Progress contract v1, Teaching Insights contract v2,
+Teaching Review contract v1, and app version `20.0.0-pilot.1` remain unchanged.
 
 ## Phase 5 — Platform Expansion
 
