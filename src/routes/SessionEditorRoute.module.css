@@ -87,6 +87,7 @@
 }
 
 .inheritanceNote,
+.closeoutNotice,
 .warning,
 .error {
   margin: 16px 0 0;
@@ -96,7 +97,8 @@
   line-height: 1.5;
 }
 
-.inheritanceNote {
+.inheritanceNote,
+.closeoutNotice {
   border: 1px solid #a9bba9;
   color: #355145;
   background: #f0f6f1;

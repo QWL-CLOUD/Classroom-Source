@@ -28,6 +28,8 @@ This repository is the React + TypeScript source rebuild of Classroom. The legac
 - Learner Progress v1: Student, Context, and Standard Evidence review with URL-backed periods and
   source filters, exact Evidence detail/editing, safe current-retained-roster coverage, same-scale
   proficiency history, and explicit source-return navigation
+- Phase 4E closeout handoff: daily-origin Session completion stays in the completed Session for
+  optional Evidence/Reflection follow-up, while Review/Progress precise returns remain intact
 
 The current pilot includes:
 

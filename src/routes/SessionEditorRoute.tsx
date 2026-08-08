@@ -44,7 +44,9 @@ import { LessonFlowEditor, LessonFlowPreview } from '@/features/planning/LessonF
 import { ReminderPanel } from '@/features/reminders/ReminderPanel';
 import {
   buildPlanningSurfaceHref,
+  isDailyPlanningReturnTarget,
   parsePlanningReturnTarget,
+  planningReturnTargetLabel,
   type PlanningReturnTarget,
 } from '@/features/planning/planningNavigation';
 import {
@@ -65,7 +67,10 @@ import {
   type PlanningMutationService,
 } from '@/features/planning/planningMutationService';
 import type { SeriesBumpPreview } from '@/features/planning/seriesBumpPlanner';
-import { buildTeachingReflectionHref } from '@/features/teachingReflections/teachingReflectionEditorModel';
+import {
+  buildTeachingReflectionHref,
+  buildTeachingReflectionSessionHref,
+} from '@/features/teachingReflections/teachingReflectionEditorModel';
 import { resolveScheduleOccurrence } from '@/features/scheduleExceptions/scheduleOccurrenceResolver';
 import { useScheduleExceptionsForRange } from '@/features/scheduleExceptions/useScheduleExceptionsForRange';
 import { formatLongDate, parseLocalDate, todayLocalDate } from '@/shared/dates/localDate';
@@ -134,6 +139,7 @@ function SessionEditorForm({
   const [bumpLoading, setBumpLoading] = useState(false);
   const [bumpPreview, setBumpPreview] = useState<SeriesBumpPreview | null>(null);
   const [unscheduleArmed, setUnscheduleArmed] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const exceptionDate = parseLocalDate(values.date) ? values.date : initialDate;
   const scheduleExceptions = useScheduleExceptionsForRange(exceptionDate, exceptionDate);
@@ -216,6 +222,7 @@ function SessionEditorForm({
   ): void {
     applyValues((current) => ({ ...current, [key]: value }));
     setError(null);
+    setStatusMessage(null);
     setBumpPreview(null);
     setUnscheduleArmed(false);
   }
@@ -233,6 +240,7 @@ function SessionEditorForm({
       return { ...current, ...content };
     });
     setError(null);
+    setStatusMessage(null);
     setBumpPreview(null);
     setUnscheduleArmed(false);
   }
@@ -244,6 +252,7 @@ function SessionEditorForm({
       ...createLessonContentEditorValues(inheritedContent),
     }));
     setError(null);
+    setStatusMessage(null);
   }
 
   function restoreInheritedContent(): void {
@@ -253,12 +262,14 @@ function SessionEditorForm({
       ...createLessonContentEditorValues(inheritedContent),
     }));
     setError(null);
+    setStatusMessage(null);
   }
 
   async function save(): Promise<void> {
     if (saving) return;
     setSaving(true);
     setError(null);
+    setStatusMessage(null);
     try {
       const currentValues = latestValuesRef.current;
       const saved = session
@@ -277,13 +288,21 @@ function SessionEditorForm({
 
   async function changeCompletion(): Promise<void> {
     if (!session || saving) return;
+    const completing = session.deliveryState !== 'completed';
     setSaving(true);
     setError(null);
+    setStatusMessage(null);
     try {
-      const updated =
-        session.deliveryState === 'completed'
-          ? await service.reopenSession(session.id)
-          : await service.completeSession(session.id);
+      const updated = completing
+        ? await service.completeSession(session.id)
+        : await service.reopenSession(session.id);
+      if (completing && isDailyPlanningReturnTarget(returnTo)) {
+        setStatusMessage(
+          `Session completed. Session Evidence and an optional Teaching Reflection are ready before you return to ${planningReturnTargetLabel(returnTo)}.`,
+        );
+        setSaving(false);
+        return;
+      }
       window.location.hash = returnHref({
         date: updated.date,
         sessionId: updated.id,
@@ -391,6 +410,18 @@ function SessionEditorForm({
               href={buildLearnerProgressEntryHref({
                 schoolYearId: selectedContext.schoolYearId,
                 sessionId: session.id,
+                closeoutReturn:
+                  session.deliveryState === 'completed'
+                    ? {
+                        source: 'session',
+                        href: buildTeachingReflectionSessionHref(
+                          session.id,
+                          returnTo,
+                          resolvedReviewReturn,
+                          resolvedProgressReturn,
+                        ),
+                      }
+                    : undefined,
               })}
             >
               <Activity aria-hidden="true" size={17} /> Session Evidence
@@ -424,6 +455,12 @@ function SessionEditorForm({
             {formatCalendarMinute(session.startMinute)}–{formatCalendarMinute(session.endMinute)}
           </span>
         </div>
+      ) : null}
+
+      {statusMessage ? (
+        <p className={styles.closeoutNotice} role="status">
+          {statusMessage}
+        </p>
       ) : null}
 
       <section className={styles.schedulingSection} aria-labelledby="session-schedule-heading">

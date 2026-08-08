@@ -1,8 +1,8 @@
 # Classroom v20 Development Roadmap
 
-Recovered and corrected after Phase 4A-2.
+Updated after Phase 4D closure and the Phase 4E-0 roadmap audit.
 
-Current implementation baseline: `main @ d3884351` (Phase 4A-2.1 merged).
+Current implementation baseline: `main @ daad0ac0fc57f1043448f0bcdf20d7783df7a784` (Phase 4D merged).
 
 ## Product boundary
 
@@ -247,7 +247,7 @@ Retained boundaries:
 DB schema v17, Portable Backup v17, Learner Progress contract v1, Teaching Insights contract v2,
 Teaching Review contract v1, and app version `20.0.0-pilot.1` remain unchanged.
 
-## Phase 4D-3 — Evidence Review Coverage & UX Closure — current
+## Phase 4D-3 — Evidence Review Coverage & UX Closure — complete
 
 Goal: close the first Learner Progress release with safe review coverage, richer source filters,
 entry points from the teacher workflow, and explicit historical-state behavior without changing the
@@ -278,18 +278,38 @@ Retained boundaries:
 DB schema v17, Portable Backup v17, Learner Progress contract v1, Teaching Insights contract v2,
 Teaching Review contract v1, and app version `20.0.0-pilot.1` remain unchanged.
 
-## Phase 4E — Reports & Export
+## Phase 4E — Session Closeout & Reflection Handoff — current
+
+Goal: close the high-frequency daily teaching loop without creating a new persisted closeout domain.
+
+Scope:
+
+- daily-origin Session completion (`Learners`, `Today`, `Week`, `Calendar`) stays in the completed
+  Session so existing Session Evidence and optional Teaching Reflection actions are immediately
+  available;
+- Teaching Review and Learner Progress origins retain their existing precise automatic returns;
+- Session Evidence carries a validated navigation-only return contract back to the source Session;
+- Teaching Reflection Session Evidence returns to the exact Reflection and preserves its original
+  daily/Review/Progress handoff;
+- Teaching Reflection exposes a direct return to the originating daily surface after reflection work;
+- no closeout checklist, required-reflection state, automatic Evidence, or combined mutation is added.
+
+DB schema v17, Portable Backup v17, Learner Progress contract v1, Teaching Insights contract v2,
+Teaching Review contract v1, and app version `20.0.0-pilot.1` remain unchanged.
+
+## Phase 4F — Teacher Reports & Export Foundation
 
 Recommended order:
 
-1. teacher-facing summary;
+1. teacher-facing learner Evidence summary;
 2. CSV export;
 3. printable report;
-4. PDF export;
-5. configurable templates after report semantics stabilize.
+4. PDF only after report semantics stabilize;
+5. configurable templates only if real pilot use justifies persistence.
 
 Preview included fields before export; do not upload or send automatically; distinguish internal
-teacher reports from any future family-facing reports.
+teacher reports from any future family-facing reports. Keep derived outputs separate from Backup &
+Recovery and do not infer grades, mastery, readiness, rank, or true Evidence gaps.
 
 ## Phase 5 — Platform Expansion
 

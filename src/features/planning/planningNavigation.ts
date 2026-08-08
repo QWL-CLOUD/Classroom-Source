@@ -20,6 +20,30 @@ export const planningReturnTargets = [
 ] as const;
 
 export type PlanningReturnTarget = (typeof planningReturnTargets)[number];
+export type DailyPlanningReturnTarget = Exclude<PlanningReturnTarget, 'review' | 'progress'>;
+
+export function isDailyPlanningReturnTarget(
+  value: PlanningReturnTarget,
+): value is DailyPlanningReturnTarget {
+  return value !== 'review' && value !== 'progress';
+}
+
+export function planningReturnTargetLabel(value: PlanningReturnTarget): string {
+  switch (value) {
+    case 'learners':
+      return 'Learners';
+    case 'today':
+      return 'Today';
+    case 'week':
+      return 'Week';
+    case 'calendar':
+      return 'Calendar';
+    case 'review':
+      return 'Teaching Review';
+    case 'progress':
+      return 'Learner Progress';
+  }
+}
 
 export function parsePlanningReturnTarget(value: string | null): PlanningReturnTarget {
   return planningReturnTargets.includes(value as PlanningReturnTarget)

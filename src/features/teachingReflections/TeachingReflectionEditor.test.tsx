@@ -152,9 +152,11 @@ describe('TeachingReflectionEditor', () => {
       }),
     );
     expect(screen.getByRole('status')).toHaveTextContent('Teaching Reflection added.');
-    expect(screen.getByRole('link', { name: 'Session Evidence' })).toHaveAttribute(
-      'href',
-      '#/learner-progress?schoolYear=school-year&session=session',
+    expect(screen.getByRole('link', { name: 'Session Evidence' }).getAttribute('href')).toContain(
+      'closeoutSource=reflection',
+    );
+    expect(screen.getByRole('link', { name: 'Return to Week' }).getAttribute('href')).toContain(
+      '#/week?',
     );
     expect(screen.getByRole('link', { name: 'Back to Session' })).toHaveAttribute(
       'href',
